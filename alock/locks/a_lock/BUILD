@@ -2,7 +2,7 @@ cc_library(
     name = "alock_common",
     hdrs = ["a_lock.h"],
     deps = [
-        "//qplock:util",
+        "//alock:util",
         "@rome//rome/rdma/memory_pool",
     ],
 )

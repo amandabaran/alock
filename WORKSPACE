@@ -1,4 +1,4 @@
-workspace(name = "qplock")
+workspace(name = "alock")
 
 local_repository(
     name = "rome",
