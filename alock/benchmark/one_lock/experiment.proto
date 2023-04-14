@@ -1,0 +1,80 @@
+syntax = "proto2";
+
+import "protos/metrics.proto";
+import "protos/colosseum.proto";
+import "alock/cluster/cluster.proto";
+
+enum Ycsb {
+  A = 0; // 50% Get 50% Insert
+  B = 1; // 95% Get 5% Insert
+  C = 2; // 100% Get
+  D = 3; // Latest
+  E = 4; // Scan
+  R = 5; // Read-then-write
+};
+
+message AckProto {};
+
+message Workload {
+  optional string ycsb = 1;
+  
+  // Length of "critical section"
+  optional uint32 think_time_ns = 2;
+
+  // The benchmark length in seconds
+  optional int32 runtime = 3;
+
+  optional uint64 min_key = 4;
+  optional uint64 max_key = 5;
+
+  optional uint32 theta = 6;
+  
+};
+
+message RemotePtrProto {
+  optional uint64 raw = 1;
+};
+
+message ExperimentParams {
+  // A name to give the experiment, used to prefix the result file
+  optional string name = 1;
+
+  // The mode determining how to run the benchmark (i.e., "client" or "server")
+  optional Mode mode = 2;
+
+  // The number of nodes in the system
+  optional uint32 num_nodes = 3;
+
+  // A list of node ids to run on this node when running multiple nodes/servers per physical node
+  repeated uint32 node_ids = 4;
+
+  // The offered load in queries (or ops) per second
+  optional int32 max_qps = 5;
+
+  // The rate at which the actual QPS is sampled in milliseconds
+  optional uint32 sampling_rate_ms = 6;
+
+  // Directory where the results file is saved
+  optional string save_dir = 7;
+
+  optional Workload workload = 8;
+};
+
+message CloudlabClusterProto {
+  optional X.ClusterProto cluster = 1;
+  optional string domain = 2;
+  optional string node_type = 3;
+};
+
+message ResultProto {
+  optional ExperimentParams experiment_params = 1;
+  optional NodeProto client = 2;
+  optional rome.WorkloadDriverProto driver = 3;
+};
+
+
+message ResultsProto {
+  optional uint32 cluster_size = 4;
+  optional ExperimentParams experiment_params = 1;
+  repeated ResultProto results = 2;
+}
