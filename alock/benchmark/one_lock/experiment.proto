@@ -4,30 +4,19 @@ import "protos/metrics.proto";
 import "protos/colosseum.proto";
 import "alock/cluster/cluster.proto";
 
-enum Ycsb {
-  A = 0; // 50% Get 50% Insert
-  B = 1; // 95% Get 5% Insert
-  C = 2; // 100% Get
-  D = 3; // Latest
-  E = 4; // Scan
-  R = 5; // Read-then-write
-};
-
 message AckProto {};
 
 message Workload {
-  optional string ycsb = 1;
-  
   // Length of "critical section"
-  optional uint32 think_time_ns = 2;
+  optional uint32 think_time_ns = 1;
 
   // The benchmark length in seconds
-  optional int32 runtime = 3;
+  optional int32 runtime = 2;
 
-  optional uint64 min_key = 4;
-  optional uint64 max_key = 5;
+  optional uint64 min_key = 3;
+  optional uint64 max_key = 4;
 
-  optional uint32 theta = 6;
+  optional uint32 theta = 5;
   
 };
 
@@ -58,6 +47,9 @@ message ExperimentParams {
   optional string save_dir = 7;
 
   optional Workload workload = 8;
+
+  // Number of threads per node
+  optional uint32 num_threads = 9;
 };
 
 message CloudlabClusterProto {

@@ -3,7 +3,7 @@
 #include <string>
 
 #include "rome/logging/logging.h"
-#include "qplock/cluster/cluster.pb.h"
+#include "alock/cluster/cluster.pb.h"
 
 namespace X {
 

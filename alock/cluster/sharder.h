@@ -1,15 +1,16 @@
-pragma once
+#pragma once
 
-#include "qplock/cluster/cluster.pb.h"
-#include "qplock/cluster/common.h"
+#include "alock/cluster/cluster.pb.h"
+#include "alock/cluster/common.h"
 
 namespace X {
 
+// Class that determines which node a given key is on based on the range it falls into
 class Sharder {
  public:
   explicit Sharder(const ClusterProto& cluster) {
-    for (auto server : cluster.servers()) {
-      shards_.emplace(server.range().low(), server.node().nid());
+    for (auto n : cluster.nodes()) {
+      shards_.emplace(n.range().low(), n.node().nid());
     }
   }
 
@@ -24,4 +25,3 @@ class Sharder {
 };
 
 }  // namespace X
-Footer

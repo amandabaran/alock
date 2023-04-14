@@ -41,31 +41,17 @@ cc_library(
 )
 
 cc_library(
-    name = "server",
-    hdrs = ["server.h"],
+    name = "node",
+    hdrs = ["node.h"],
     deps = [
         ":experiment_cc_proto",
         ":setup",
-        "//qplock/locks/rdma_mcs_lock:rdma_mcs_lock",
-        "//qplock/locks/spin_lock:rdma_spin_lock",
-        "//qplock/locks/a_lock:a_lock",
+        "//alock/locks/rdma_mcs_lock:rdma_mcs_lock",
+        "//alock/locks/spin_lock:rdma_spin_lock",
+        "//alock/locks/a_lock:a_lock",
         "@absl//absl/status",
         "@absl//absl/status:statusor",
         "@rome//rome/rdma/connection_manager",
-    ],
-)
-
-cc_library(
-    name = "client",
-    hdrs = ["client.h"],
-    deps = [
-        ":experiment_cc_proto",
-        ":setup",
-        "//qplock/locks/rdma_mcs_lock:rdma_mcs_lock",
-        "//qplock/locks/spin_lock:rdma_spin_lock",
-        "//qplock/locks/a_lock:a_lock",
-        "@absl//absl/status",
-        "@absl//absl/status:statusor",
     ],
 )
 
@@ -104,7 +90,7 @@ cc_binary(
     name = "main",
     srcs = ["main.cc"],
     copts = ["-Wno-deprecated-enum-enum-conversion"],
-    data = ["//qplock/benchmark:nodefiles"],
+    data = ["//alock/benchmark:nodefiles"],
     defines = select(
         {
             ":mcs": ["LOCK_TYPE=::X::RdmaMcsLock"],
@@ -113,9 +99,8 @@ cc_binary(
         },
     ),
     deps = [
-        ":client",
+        ":node",
         ":experiment_cc_proto",
-        ":server",
         "@absl//absl/flags:flag",
         "@absl//absl/flags:parse",
         "@absl//absl/status",
@@ -141,7 +126,7 @@ py_binary(
     name = "launch",
     srcs = ["launch.py"],
     data = [
-        "//qplock/benchmark:nodefiles",
+        "//alock/benchmark:nodefiles",
     ],
     deps = [
         ":experiment_py_proto",

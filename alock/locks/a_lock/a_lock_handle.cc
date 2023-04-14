@@ -16,7 +16,7 @@ absl::Status ALockHandle::ALockInit(const std::vector<MemoryPool::Peer> &peers){
   // TODO: Currently at 16 MB and runs OOM, but other locks dont even need this much
   // Allocate pool for ALocks
   auto capacity = 1 << 24;
-  auto status = pool_.Init(capacity, peers);
+  auto status = desc_pool_.Init(capacity, peers);
   // Send all peers the base address of the lock residing on the host
   RemoteObjectProto proto;
   a_lock_pointer_ = pool_.Allocate<ALock>();
@@ -38,17 +38,17 @@ absl::Status ALockHandle::Init(MemoryPool::Peer host,
   // TODO: Currently at 16 MB and runs OOM, but other locks dont even need this much
   auto capacity = 1 << 30;
   // Allocate pool for Remote Descriptors
-  auto status = pool_.Init(capacity, peers);
+  auto status = desc_pool_->Init(capacity, peers);
   // ROME_ASSERT_OK(status);
   ROME_CHECK_OK(ROME_RETURN(status), status);
  
-  // allocate local and remote descriptors for client to use
-  AllocateClientDescriptors();
+  // allocate local and remote descriptors for this node to use
+  AllocateDescriptors();
 
   //Get base address of alock mem pool from each server role
 
   // Otherwise, wait until the base address is shared by the host
-  auto conn_or = pool_.connection_manager()->GetConnection(host.id);
+  auto conn_or = desc_pool_->connection_manager()->GetConnection(host.id);
   ROME_CHECK_OK(ROME_RETURN(conn_or.status()), conn_or);
   auto got = conn_or.value()->channel()->TryDeliver<RemoteObjectProto>();
   while (got.status().code() == absl::StatusCode::kUnavailable) {
@@ -59,33 +59,40 @@ absl::Status ALockHandle::Init(MemoryPool::Peer host,
   a_lock_pointer_ = decltype(a_lock_pointer_)(host.id, got->raddr());
 
   //Used as preallocated memory for RDMA writes
-  prealloc_ = pool_.Allocate<remote_ptr<RdmaDescriptor>>();
+  prealloc_ = desc_pool_->Allocate<remote_ptr<RdmaDescriptor>>();
   
   ROME_DEBUG("Lock pointer {:x}", static_cast<uint64_t>(a_lock_pointer_));
   return absl::OkStatus();
 }
 
-void ALockHandle::AllocateClientDescriptors(){
+void ALockHandle::AllocateDescriptors(){
   // Pointer to first remote descriptor
-  r_desc_pointer_ = pool_.Allocate<RdmaDescriptor>();
+  r_desc_pointer_ = desc_pool_->Allocate<RdmaDescriptor>();
   r_desc_ = reinterpret_cast<RdmaDescriptor *>(r_desc_pointer_.address());
   ROME_INFO("First RdmaDescriptor @ {:x}", static_cast<uint64_t>(r_desc_pointer_));
-  for (int i = 0; i < DESCS_PER_CLIENT; i++){
-    auto temp = pool_.Allocate<RdmaDescriptor>();
+  r_bitset[0] = 0;
+  for (int i = 1; i < DESCS_PER_CLIENT; i++){
+    auto temp = desc_pool_->Allocate<RdmaDescriptor>();
     ROME_DEBUG("RdmaDescriptor @ {:x}", static_cast<uint64_t>(temp));
+    r_bitset[i] = 0;
   }
   
   // Make sure all rdma descriptors are allocated first in contiguous memory
   std::atomic_thread_fence(std::memory_order_release);
 
   // Pointer to first local descriptor
-  l_desc_pointer_ = pool_.Allocate<LocalDescriptor>();
+  l_desc_pointer_ = desc_pool_->Allocate<LocalDescriptor>();
   l_desc_ = reinterpret_cast<LocalDescriptor *>(l_desc_pointer_.address());
   ROME_DEBUG("First LocalDescriptor @ {:x}", static_cast<uint64_t>(l_desc_pointer_));
-  for (int i = 0; i < DESCS_PER_CLIENT; i++){
-    auto temp = pool_.Allocate<LocalDescriptor>();
+  l_bitset[0] = 0;
+  for (int i = 1; i < DESCS_PER_CLIENT; i++){
+    auto temp = desc_pool_->Allocate<LocalDescriptor>();
     ROME_DEBUG("LocalDescriptor @ {:x}", static_cast<uint64_t>(temp));
+    l_bitset[i] = 0;
   }
+
+  // Make sure all local descriptors are done allocating
+  std::atomic_thread_fence(std::memory_order_release);
 }
 
 bool ALockHandle::IsLocked() {
@@ -164,10 +171,10 @@ void ALockHandle::LockRemoteMcsQueue(){
             cpu_relax();
         }
         if (r_desc_->budget == 0) {
-            ROME_DEBUG("Budget exhausted (id={})",
+            ROME_DEBUG("Remote Budget exhausted (id={})",
                         static_cast<uint64_t>(r_desc_pointer_.id()));
             // Release the lock before trying to continue
-            Reacquire();
+            Reacquire(false);
             r_desc_->budget = kInitBudget;
         }
     } else { //no one had the lock, we were swapped in
@@ -196,6 +203,35 @@ void ALockHandle::RemoteLock(){
 }
 
 void ALockHandle::LockLocalMcsQueue(){
+    ROME_DEBUG("LOCKING LOCAL MCS QUEUE...");
+    // to acquire the lock a thread atomically appends its own local node at the
+    // tail of the list returning tail's previous contents
+    // ROME_DEBUG("l_tail_ @ {:x}", (&l_tail_));
+    auto prior_node = l_l_tail_.exchange(l_desc_, std::memory_order_acquire);
+    if (prior_node != nullptr) {
+        l_desc_->budget = -1;
+        // if the list was not previously empty, it sets the predecessor’s next
+        // field to refer to its own local node
+        prior_node->next = l_desc_;
+        // thread then spins on its local locked field, waiting until its
+        // predecessor sets this field to false
+        //!STUCK IN THIS LOOP!!!!!!!! 
+        while (l_desc_->budget < 0) {
+            cpu_relax();
+            ROME_DEBUG("WAITING IN HERE...");
+        }
+
+        // If budget exceeded, then reinitialize.
+        if (l_desc_->budget == 0) {
+            ROME_DEBUG("Local Budget exhausted (id={})",
+                        static_cast<uint64_t>(l_desc_pointer_.id()));
+            // Release the lock before trying to continue
+            Reacquire(true);
+            l_desc_->budget = kInitBudget;
+        }
+    }
+    // now first in the queue, own the lock and enter the critical section...
+    // is_leader_ = true;
 
 }
 
@@ -300,5 +336,16 @@ void ALockHandle::Unlock(){
   // a_lock_->locked = false;
 }
 
+void ALockHandle::Reacquire(bool isLocal){
+  if (isLocal){
+    while (*l_victim_== LOCAL_VICTIM && IsRTailLocked()){
+        cpu_relax();
+    } 
+  } else {
+    while (IsRemoteVictim() && IsLTailLocked()){
+        cpu_relax();
+    } 
+  }
+}
 
 }

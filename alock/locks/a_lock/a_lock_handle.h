@@ -41,7 +41,7 @@ public:
   void Unlock();
 
 private:
-  void AllocateClientDescriptors();
+  void AllocateDescriptors();
 
   bool inline IsLocal();
   bool IsRTailLocked();
@@ -50,19 +50,19 @@ private:
  
   void LockRemoteMcsQueue();
   void RemoteLock();
-  void LockLocalMcsQueue(); //TODO
+  void LockLocalMcsQueue();
   void LocalLock();
   void RemoteUnlock();
   void LocalUnlock();
 
-  void Reacquire();  //TODO
-
-  bool is_host_;
+  void Reacquire(bool isLocal);
+  
   bool is_r_leader_;
   bool is_l_leader_;
   
   MemoryPool::Peer self_;
-  MemoryPool &pool_; 
+  MemoryPool &pool_; // pool of alocks that the handle is local to (initalized in node)
+  std::unique_ptr<MemoryPool> desc_pool_;  //pool used for descriptors local to this handle
 
   // Bitsets to track the usage status of the remote and local descriptors
   std::bitset<DESCS_PER_CLIENT> r_bitset{0x0};
