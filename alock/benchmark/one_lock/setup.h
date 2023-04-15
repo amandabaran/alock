@@ -4,10 +4,10 @@
 
 #include <memory>
 
-#include "qplock/benchmark/baseline/experiment.pb.h"
-#include "qplock/locks/rdma_mcs_lock/rdma_mcs_lock.h"
-#include "qplock/locks/spin_lock/rdma_spin_lock.h"
-#include "qplock/locks/a_lock/a_lock_handle.h"
+#include "alock/benchmark/baseline/experiment.pb.h"
+#include "alock/locks/rdma_mcs_lock/rdma_mcs_lock.h"
+#include "alock/locks/spin_lock/rdma_spin_lock.h"
+#include "alock/locks/a_lock/a_lock_handle.h"
 
 #include "absl/status/status.h"
 #include "rome/colosseum/client_adaptor.h"

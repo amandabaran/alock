@@ -6,7 +6,7 @@ proto_library(
     name = "experiment_proto",
     srcs = ["experiment.proto"],
     deps = [
-        "//alock/cluster:cluster_proto"
+        "//alock/cluster:cluster_proto",
         "@rome//protos:colosseum_proto",
         "@rome//protos:metrics_proto",
     ],
@@ -41,8 +41,8 @@ cc_library(
 )
 
 cc_library(
-    name = "node",
-    hdrs = ["node.h"],
+    name = "node_harness",
+    hdrs = ["node_harness.h"],
     deps = [
         ":experiment_cc_proto",
         ":setup",
@@ -99,7 +99,7 @@ cc_binary(
         },
     ),
     deps = [
-        ":node",
+        ":node_harness",
         ":experiment_cc_proto",
         "@absl//absl/flags:flag",
         "@absl//absl/flags:parse",

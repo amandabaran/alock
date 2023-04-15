@@ -17,7 +17,7 @@
 #include "absl/flags/parse.h"
 #include "absl/status/status.h"
 #include "google/protobuf/text_format.h"
-#include "qplock/benchmark/baseline/experiment.pb.h"
+#include "alock/benchmark/baseline/experiment.pb.h"
 #include "rome/colosseum/client_adaptor.h"
 #include "rome/colosseum/qps_controller.h"
 #include "rome/colosseum/streams/streams.h"
