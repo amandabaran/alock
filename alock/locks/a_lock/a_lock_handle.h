@@ -37,8 +37,8 @@ public:
                       const std::vector<MemoryPool::Peer> &peers);
 
   bool IsLocked();
-  void Lock();
-  void Unlock();
+  void Lock(remote_ptr<ALock> alock);
+  void Unlock(remote_ptr<ALock> alock);
 
 private:
   void AllocateDescriptors();
@@ -56,12 +56,12 @@ private:
   void LocalUnlock();
 
   void Reacquire(bool isLocal);
-  
+
   bool is_r_leader_;
   bool is_l_leader_;
   
   MemoryPool::Peer self_;
-  MemoryPool &pool_; // pool of alocks that the handle is local to (initalized in node)
+  MemoryPool &lock_pool_; // pool of alocks that the handle is local to (initalized in cluster/node_impl.h)
   std::unique_ptr<MemoryPool> desc_pool_;  //pool used for descriptors local to this handle
 
   // Bitsets to track the usage status of the remote and local descriptors
@@ -82,7 +82,7 @@ private:
   std::atomic<LocalDescriptor*> l_l_tail_;
   std::atomic<uint64_t*> l_victim_;
   
-  // Prealloc used for rdma writes
+  // Prealloc used for rdma writes of rdma descriptor in RemoteUnlock
   remote_ptr<remote_ptr<RdmaDescriptor>> prealloc_;
 
   // Pointers to pre-allocated descriptor to be used locally

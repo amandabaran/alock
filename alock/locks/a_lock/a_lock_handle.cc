@@ -9,59 +9,24 @@ using ::rome::rdma::remote_ptr;
 using ::rome::rdma::RemoteObjectProto;
 
 ALockHandle::ALockHandle(MemoryPool::Peer self, MemoryPool &pool)
-    : self_(self), pool_(pool) {}
-
-// TODO: MOVE THIS CODE TO SERVER? WE WANT TO CONTROL HOW MANY WE ARE CREATING.....
-absl::Status ALockHandle::ALockInit(const std::vector<MemoryPool::Peer> &peers){
-  // TODO: Currently at 16 MB and runs OOM, but other locks dont even need this much
-  // Allocate pool for ALocks
-  auto capacity = 1 << 24;
-  auto status = desc_pool_.Init(capacity, peers);
-  // Send all peers the base address of the lock residing on the host
-  RemoteObjectProto proto;
-  a_lock_pointer_ = pool_.Allocate<ALock>();
-  proto.set_raddr(a_lock_pointer_.address());
-  // tell all the peers where to find the addr of the first lock
-  for (const auto &p : peers) {
-    auto conn_or = pool_.connection_manager()->GetConnection(p.id);
-    ROME_CHECK_OK(ROME_RETURN(conn_or.status()), conn_or);
-    status = conn_or.value()->channel()->Send(proto);
-    ROME_CHECK_OK(ROME_RETURN(status), status);
-  }
-
-  ROME_DEBUG("Lock pointer {:x}", static_cast<uint64_t>(a_lock_pointer_));
-  return absl::OkStatus();
-}
+    : self_(self), lock_pool_(pool) {}
 
 absl::Status ALockHandle::Init(MemoryPool::Peer host,
                                const std::vector<MemoryPool::Peer> &peers) {
-  // TODO: Currently at 16 MB and runs OOM, but other locks dont even need this much
-  auto capacity = 1 << 30;
+  auto capacity = 1 << kPoolSize;
   // Allocate pool for Remote Descriptors
   auto status = desc_pool_->Init(capacity, peers);
   // ROME_ASSERT_OK(status);
   ROME_CHECK_OK(ROME_RETURN(status), status);
  
-  // allocate local and remote descriptors for this node to use
+  // allocate local and remote descriptors for this worker to use
   AllocateDescriptors();
 
-  //Get base address of alock mem pool from each server role
-
-  // Otherwise, wait until the base address is shared by the host
-  auto conn_or = desc_pool_->connection_manager()->GetConnection(host.id);
-  ROME_CHECK_OK(ROME_RETURN(conn_or.status()), conn_or);
-  auto got = conn_or.value()->channel()->TryDeliver<RemoteObjectProto>();
-  while (got.status().code() == absl::StatusCode::kUnavailable) {
-    got = conn_or.value()->channel()->TryDeliver<RemoteObjectProto>();
-  }
-  ROME_CHECK_OK(ROME_RETURN(got.status()), got);
-  // set lock pointer to the base address of the lock on the host
-  a_lock_pointer_ = decltype(a_lock_pointer_)(host.id, got->raddr());
+  //TODO: Figure out how/if descriptor pool needs to be shared amongst workers
 
   //Used as preallocated memory for RDMA writes
   prealloc_ = desc_pool_->Allocate<remote_ptr<RdmaDescriptor>>();
   
-  ROME_DEBUG("Lock pointer {:x}", static_cast<uint64_t>(a_lock_pointer_));
   return absl::OkStatus();
 }
 
@@ -96,50 +61,47 @@ void ALockHandle::AllocateDescriptors(){
 }
 
 bool ALockHandle::IsLocked() {
-  // TODO: figure this out, not used rn
-  // return a_lock_->locked; 
-  return false;
+  return (a_lock_pointer_ != remote_nullptr);
 }
 
-// may need to change to take in an addr for when we expand to multiple locks
 bool inline ALockHandle::IsLocal(){
   return ((a_lock_pointer_).id() == self_.id);
 }
 
 bool ALockHandle::IsRTailLocked(){
     // read in value of current r_tail on host
-    auto remote = pool_.Read<remote_ptr<RdmaDescriptor>>(r_tail_);
+    auto remote = lock_pool_.Read<remote_ptr<RdmaDescriptor>>(r_tail_);
     // store result of if its locked (0 = unlocked)
     auto locked = static_cast<uint64_t>(*(std::to_address(remote))) != 0;
     // deallocate the ptr used as a landing spot for reading in (which is created in Read)
     auto ptr =
         remote_ptr<remote_ptr<RdmaDescriptor>>{self_.id, std::to_address(remote)};
-    pool_.Deallocate(ptr);
+    lock_pool_.Deallocate(ptr);
     return locked;
 
 }
 
 bool ALockHandle::IsLTailLocked(){
     // remotely read in value of current l_tail on host
-    auto remote = pool_.Read<remote_ptr<LocalDescriptor>>(r_l_tail_);
+    auto remote = lock_pool_.Read<remote_ptr<LocalDescriptor>>(r_l_tail_);
     // store result of if its locked
     auto locked = static_cast<uint64_t>(*(std::to_address(remote))) != 0;
     // deallocate the ptr used as a landing spot for reading in (which is created in Read)
     auto ptr =
         remote_ptr<remote_ptr<LocalDescriptor>>{self_.id, std::to_address(remote)};
-    pool_.Deallocate(ptr);
+    lock_pool_.Deallocate(ptr);
     return locked;
 }
 
 bool ALockHandle::IsRemoteVictim() {
     // read in value of victim var on host
-    auto remote = pool_.Read<uint64_t>(r_victim_);
+    auto remote = lock_pool_.Read<uint64_t>(r_victim_);
     // store result of if its locked
     auto check_victim = static_cast<uint64_t>(*(std::to_address(remote))) == REMOTE_VICTIM;
     // deallocate the ptr used as a landing spot for reading in (which is created in Read)
     auto ptr =
         remote_ptr<uint64_t>{self_.id, std::to_address(remote)};
-    pool_.Deallocate(ptr);
+    lock_pool_.Deallocate(ptr);
     return check_victim;
 }
 
@@ -152,15 +114,15 @@ void ALockHandle::LockRemoteMcsQueue(){
 
     // swap RdmaDescriptor onto the remote tail of the alock 
     auto prev =
-      pool_.AtomicSwap(r_tail_, static_cast<uint64_t>(r_desc_pointer_));
+      lock_pool_.AtomicSwap(r_tail_, static_cast<uint64_t>(r_desc_pointer_));
     
     if (prev != remote_nullptr) { //someone else has the lock
         auto temp_ptr = remote_ptr<uint8_t>(prev);
-        temp_ptr +=32; //temp_ptr = next field of the current tail's RdmaDescriptor
+        temp_ptr += NEXT_PTR_OFFSET; //temp_ptr = next field of the current tail's RdmaDescriptor
         // make prev point to the current tail RdmaDescriptor's next pointer
         prev = remote_ptr<RdmaDescriptor>(temp_ptr);
         // set the address of the current tail's next field = to the addr of our local RdmaDescriptor
-        pool_.Write<remote_ptr<RdmaDescriptor>>(
+        lock_pool_.Write<remote_ptr<RdmaDescriptor>>(
             static_cast<remote_ptr<remote_ptr<RdmaDescriptor>>>(prev), r_desc_pointer_,
             prealloc_);
         ROME_DEBUG("[Lock] Enqueued: {} --> (id={})",
@@ -194,7 +156,7 @@ void ALockHandle::LockRemoteMcsQueue(){
 void ALockHandle::RemoteLock(){
     LockRemoteMcsQueue();
     if (is_r_leader_){
-        auto prev = pool_.AtomicSwap(r_victim_, static_cast<uint8_t>(REMOTE_VICTIM));
+        auto prev = lock_pool_.AtomicSwap(r_victim_, static_cast<uint8_t>(REMOTE_VICTIM));
         //! this is remotely spinning on the victim var?? --> but competition is only among two at this point
         while (IsRemoteVictim() && IsLTailLocked()){
             cpu_relax();
@@ -237,8 +199,6 @@ void ALockHandle::LockLocalMcsQueue(){
 
 void ALockHandle::LocalLock(){
   ROME_DEBUG("ALockHandle::LocalLock()");
-    // ROME_ASSERT(!is_locked_, "Lock has already been called on LockHandle.");
-    // is_locked_ = true;
     LockLocalMcsQueue();
     if (is_l_leader_){
         auto prev = l_victim_.exchange(LOCAL_VICTIM, std::memory_order_acquire);
@@ -255,7 +215,7 @@ void ALockHandle::RemoteUnlock(){
     // if r_tail_ == my desc (we are the tail), set it to 0 to unlock
     // otherwise, someone else is contending for lock and we want to give it to them
     // try to swap in a 0 to unlock the RdmaDescriptor at the addr of the remote tail, which we expect to currently be equal to our RdmaDescriptor
-    auto prev = pool_.CompareAndSwap(r_tail_,
+    auto prev = lock_pool_.CompareAndSwap(r_tail_,
                                     static_cast<uint64_t>(r_desc_pointer_), 0);
    
     // if the descriptor at r_tail_ was not our RdmaDescriptor (other clients have attempted to lock & enqueued since)
@@ -270,7 +230,7 @@ void ALockHandle::RemoteUnlock(){
         // gets a pointer to the next RdmaDescriptor object
         auto next = const_cast<remote_ptr<RdmaDescriptor> &>(r_desc_->next);
         //writes to the the next descriptors budget which lets it know it has the lock now
-        pool_.Write<uint64_t>(static_cast<remote_ptr<uint64_t>>(next),
+        lock_pool_.Write<uint64_t>(static_cast<remote_ptr<uint64_t>>(next),
                             r_desc_->budget - 1,
                             static_cast<remote_ptr<uint64_t>>(prealloc_));
     } 
@@ -314,30 +274,35 @@ void ALockHandle::LocalUnlock(){
 }
 
 //Eventually will take in remote_ptr<ALock> once using sharding or just an offset?
-void ALockHandle::Lock(){
-  // ROME_ASSERT(a_lock_->locked == false, "Attempting to lock handle that is already locked.")
+void ALockHandle::Lock(remote_ptr<ALock> alock){
+  ROME_ASSERT(a_lock_pointer_ == remote_nullptr, "Attempting to lock handle that is already locked.")
+  a_lock_pointer_ = alock;
+  r_tail_ = decltype(r_tail_)(alock.id(), alock.address());
+  r_l_tail_ = decltype(r_l_tail_)(alock.id(), alock.address() + DESC_PTR_OFFSET);
+  r_victim_ = decltype(r_victim_)(alock.id(), alock.address() + VICTIM_OFFSET);   
   if (IsLocal()){ 
     ROME_DEBUG("ALock is LOCAL to node {}", static_cast<uint64_t>(self_.id));
+    l_l_tail_ = reinterpret_cast<LocalDescriptor*>(alock.address() + DESC_PTR_OFFSET);
+    l_victim_ = reinterpret_cast<uint64_t*>(alock.address() + VICTIM_OFFSET);
     LocalLock();
   } else {
     ROME_DEBUG("ALock is REMOTE");
     RemoteLock();
   }
-  // a_lock_->locked = true;
 }
 
-void ALockHandle::Unlock(){
-  // ROME_ASSERT(a_lock_->locked == true, "Attempting to unlock handle that is not locked.")
+void ALockHandle::Unlock(remote_ptr<ALock> alock){
+  ROME_ASSERT(alock.address() == a_lock_pointer_.address(), "Attempting to unlock alock that is not locked.")
   if (IsLocal()){
     LocalUnlock();
   } else {
     RemoteUnlock();
   }
-  // a_lock_->locked = false;
+  a_lock_pointer_ = remote_nullptr;
 }
 
 void ALockHandle::Reacquire(bool isLocal){
-  if (isLocal){
+  if (IsLocal()){
     while (*l_victim_== LOCAL_VICTIM && IsRTailLocked()){
         cpu_relax();
     } 

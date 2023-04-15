@@ -50,6 +50,9 @@ message ExperimentParams {
 
   // Number of threads per node
   optional uint32 num_threads = 9;
+
+  // Whether to prefill range of locks or just one
+  optional bool prefill = 10;
 };
 
 message CloudlabClusterProto {

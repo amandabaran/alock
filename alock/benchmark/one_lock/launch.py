@@ -52,6 +52,8 @@ flags.DEFINE_float('theta', 0.99, 'Theta in Zipfian distribution')
 
 flags.DEFINE_integer('runtime', 10, 'Number of seconds to run experiment')
 
+flags.DEFINE_bool('prefill', False, 'Prefill range of locks or just one')
+
 flags.DEFINE_string('ssh_user', 'adb321', '')
 flags.DEFINE_string('ssh_keyfile', '~/.ssh/id_ed25519', '')
 flags.DEFINE_string('bazel_flags', '-c opt',
@@ -216,9 +218,10 @@ def fill_experiment_params(
     proto.workload.runtime = FLAGS.runtime
     proto.workload.think_time_ns = think
     proto.save_dir = build_save_dir(lock)
-    # proto.workload.min_key = FLAGS.min_key
-    # proto.workload.max_key = FLAGS.max_key
+    proto.workload.min_key = FLAGS.min_key
+    proto.workload.max_key = FLAGS.max_key
     # proto.workload.theta = FLAGS.theta
+    proto.prefill = FLAGS.prefill
     return proto
 
 

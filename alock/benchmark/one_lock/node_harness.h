@@ -51,9 +51,9 @@ class Worker : public rome::ClientAdaptor<X::RequestProto> {
     ROME_ASSERT_OK(driver->Start());
 
     // Sleep while driver is running then stop it.
-    if (experiment_params.has_runtime() && experiment_params.runtime() > 0) {
-      ROME_INFO("Running workload for {}s", experiment_params.runtime());
-      auto runtime = std::chrono::seconds(experiment_params.runtime());
+    if (experiment_params.workload().has_runtime() && experiment_params.workload().runtime() > 0) {
+      ROME_INFO("Running workload for {}s", experiment_params.workload().runtime());
+      auto runtime = std::chrono::seconds(experiment_params.workload().runtime());
       std::this_thread::sleep_for(runtime);
     } else {
       ROME_INFO("Running workload indefinitely");
@@ -78,14 +78,14 @@ class Worker : public rome::ClientAdaptor<X::RequestProto> {
   }
 
   absl::Status Start() override {
-    ds_->RegisterThisThread();
+    // ds_->RegisterThisThread();
     barrier_->arrive_and_wait();
     return absl::OkStatus();
   }
 
   absl::Status Apply(const rome::NoOp &op) override {
     ROME_DEBUG("Locking...");
-    lock_.Lock();
+    lock_handle_.Lock();
     auto start = util::SystemClock::now();
     if (experiment_params_.workload().has_think_time_ns()) {
       while (util::SystemClock::now() - start <
@@ -93,11 +93,11 @@ class Worker : public rome::ClientAdaptor<X::RequestProto> {
        ;
     }
     ROME_DEBUG("Unlocking...");
-    lock_.Unlock();
+    lock_handle_.Unlock();
     return absl::OkStatus();
   }
 
-    //TODO: Does this need to change? see baseline/client.h
+    
   absl::Status Stop() override {
     ds_->DelistThisThread();
     barrier_->arrive_and_wait();
@@ -115,7 +115,10 @@ class Worker : public rome::ClientAdaptor<X::RequestProto> {
   const X::NodeProto node_proto_;
   const ExperimentParams params_;
   std::barrier<>* barrier_;
-  LockType lock_; //Handle to interact with descriptors
+  LockType lock_handle_; //Handle to interact with descriptors, local per worker
+
+  std::random_device rd_;
+  std::default_random_engine rand_;
 };
 
 class NodeHarness {

@@ -6,7 +6,6 @@
 #include "absl/strings/str_cat.h"
 #include "alock/cluster/cluster.pb.h"
 #include "alock/cluster/common.h"
-#include "alock/datastore.h"
 
 namespace X {
 
@@ -19,33 +18,30 @@ class Node {
   using 
 
  public:
-  using ds_type = std::vector<lock_type>;
+  using ds_type = std::vector<key_type>;
   ~Node();
   Node(const NodeProto& self, const ClusterProto& cluster, 
-        uint32_t num_threads = 1);
+        uint32_t num_threads, bool prefill);
 
-  absl::Status CreateALock();
+  absl::Status Prefill(const key_type& min_key, const key_type& max_key);
 
-  // absl::Status Prefill(const key_type& min_key, const key_type& max_key);
+  ds_type* GetDatastore() { return keys_.get(); }
 
-  ds_type* GetDatastore() { return ds_.get(); }
-
-  static absl::StatusOr<ResultProto> Run(const ExperimentParams &experiment_params, volatile bool *done);
-  
  private:
-  std::unique_ptr<MemoryPool> pool_;
-  std::unique_ptr<ds_type> ds_;
+  std::unique_ptr<MemoryPool> lock_pool_;
+
+  // index of key is used to find correct offset into lock_pool_
+  std::unique_ptr<ds_type> keys_;
+  remote_ptr<lock_type> root_lock_ptr_;
 
   const ClusterProto cluster_;
   const NodeProto self_;
 
   Sharder sharder_;
 
-  std::random_device rd_;
-  std::default_random_engine rand_;
-
   struct node_ctx_t {
     std::unique_ptr<root_type> lock_root;
+    // ! Not really sure below is needed?
     MemoryPool::conn_type* conn;
   };
   std::map<uint32_t, node_ctx_t> peers_ctx_;
