@@ -4,7 +4,7 @@ cc_library(
     hdrs = ["rdma_mcs_lock.h"],
     visibility = ["//visibility:public"],
     deps = [
-        "//qplock:util",
+        "//alock:util",
         "@rome//rome/rdma:rdma_memory",
         "@rome//rome/rdma/channel:sync_accessor",
         "@rome//rome/rdma/connection_manager",

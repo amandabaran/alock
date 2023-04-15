@@ -27,12 +27,22 @@ cc_library(
 )
 
 cc_library(
+    name = "sharder",
+    hdrs = ["sharder.h"],
+    deps = [
+        ":cluster_cc_proto",
+        ":common",
+    ],
+)
+
+cc_library(
     name = "node_impl",
     hdrs = ["node_impl.h"],
     deps = [
         ":common",
         ":cluster_cc_proto",
         "@rome//rome/logging",
+        "@rome//rome/rdma/memory_pool",
     ],
 )
 
@@ -44,6 +54,7 @@ cc_library(
         ":node_impl",
         ":common",
         ":cluster_cc_proto",
+        ":sharder",
         "@absl//absl/strings",
     ],
 )

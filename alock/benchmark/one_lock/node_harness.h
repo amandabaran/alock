@@ -7,7 +7,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "becnhmark/one_lock/experiment.pb.h"
+#include "alock/benchmark/one_lock/experiment.pb.h"
 #include "rome/colosseum/qps_controller.h"
 #include "rome/colosseum/streams/streams.h"
 #include "rome/colosseum/workload_driver.h"
@@ -19,8 +19,8 @@
 
 #include "setup.h"
 
-class Worker : public rome::ClientAdaptor<X::RequestProto> {
-  using LockTable = X::Node<key_type, value_type>::ds_type;
+class Worker : public rome::ClientAdaptor<rome::NoOp>  {
+  using LockTable = X::Node<X::key_type, X::value_type>::ds_type;
 
  public:
   static std::unique_ptr<Worker> Create(LockTable* ds, const X::NodeProto& node_proto,
@@ -66,8 +66,7 @@ class Worker : public rome::ClientAdaptor<X::RequestProto> {
 
     // Output results.
     ResultProto result;
-    result.mutable_experiment_params()->CopyFrom(experiment_params);
-    result.mutable_client()->CopyFrom(worker_ptr->ToProto());
+    result.mutable_worker()->CopyFrom(worker_ptr->ToProto());
     result.mutable_driver()->CopyFrom(driver->ToProto());
 
     // Sleep for a hot sec to let the node receive the messages sent by the
@@ -99,7 +98,7 @@ class Worker : public rome::ClientAdaptor<X::RequestProto> {
 
     
   absl::Status Stop() override {
-    ds_->DelistThisThread();
+    // ds_->DelistThisThread();
     barrier_->arrive_and_wait();
     return absl::OkStatus();
   }
@@ -109,11 +108,11 @@ class Worker : public rome::ClientAdaptor<X::RequestProto> {
  private:
   Worker(LockTable* ds, const X::NodeProto& node_proto, const ExperimentParams& params,
          std::barrier<>* barrier)
-      : ds_(ds), node_proto_(node_proto), params_(params), barrier_(barrier) {}
+      : ds_(ds), node_proto_(node_proto), experiment_params_(params), barrier_(barrier), lock_handle_() {}
 
   LockTable* ds_;
   const X::NodeProto node_proto_;
-  const ExperimentParams params_;
+  const ExperimentParams experiment_params_;
   std::barrier<>* barrier_;
   LockType lock_handle_; //Handle to interact with descriptors, local per worker
 
@@ -126,7 +125,7 @@ class NodeHarness {
   ~NodeHarness() = default;
 
   static std::unique_ptr<NodeHarness> Create(
-      std::unique_ptr<X::Node<key_type, value_type>> node,
+      std::unique_ptr<X::Node<X::key_type, X::value_type>> node,
       const X::NodeProto& node_proto, ExperimentParams params) {
     return std::unique_ptr<NodeHarness>(
         new NodeHarness(std::move(node), node_proto, params));
@@ -134,7 +133,7 @@ class NodeHarness {
 
   absl::Status Launch(volatile bool* done, ExperimentParams experiment_params) {
     std::vector<std::unique_ptr<Worker>> workers;
-    for (auto i = 0; i < experiment_params.workload().worker_threads(); ++i) {
+    for (auto i = 0; i < experiment_params.num_threads(); ++i) {
       workers.emplace_back(
           Worker::Create(node_->GetDatastore(), node_proto_, params_, &barrier_));
     }
@@ -166,16 +165,14 @@ class NodeHarness {
   std::vector<ResultProto> GetResults() { return result_protos_; }
 
  private:
-  static constexpr size_t kNumEntries = 1 << 12;
-
-  NodeHarness(std::unique_ptr<X::Node<key_type, value_type>> node,
+  NodeHarness(std::unique_ptr<X::Node<X::key_type, X::value_type>> node,
                 const X::NodeProto& node_proto, ExperimentParams params)
       : node_(std::move(node)),
         node_proto_(node_proto),
         params_(params),
-        barrier_(params.workload().worker_threads()) {}
+        barrier_(params.num_threads()) {}
 
-  std::unique_ptr<X::Node<key_type, value_type>> node_;
+  std::unique_ptr<X::Node<X::key_type, X::value_type>> node_;
   const X::NodeProto& node_proto_;
   ExperimentParams params_;
 

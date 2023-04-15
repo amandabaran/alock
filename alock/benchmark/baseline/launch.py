@@ -10,11 +10,11 @@ from multiprocessing import Process
 from os import abort
 from time import sleep
 
-import qplock.benchmark.baseline.experiment_pb2 as experiment_pb2
+import alock.benchmark.baseline.experiment_pb2 as experiment_pb2
 import pandas
 from absl import app, flags
 from alive_progress import alive_bar
-import qplock.benchmark.baseline.plot as plot
+import alock.benchmark.baseline.plot as plot
 from rome.rome.util.debugpy_util import debugpy_hook
 
 # `launch.py` is a helper script to run experiments remotely. It takes the same input paramters as the underlying script to execute along with additional parameters
@@ -28,7 +28,7 @@ flags.DEFINE_bool(
     'Whether or not to print commands to retrieve data from client nodes')
 flags.DEFINE_string(
     'save_root',
-    'qplock_rome/qplock/',
+    'alock/alock/',
     'Directory results are saved under when running')
 flags.DEFINE_string('nodefile', None, 'Path to nodefile',
                     short_name='n', required=True)
@@ -58,7 +58,7 @@ flags.DEFINE_string('bazel_flags', '-c opt',
                     'The run command to pass to Bazel')
 flags.DEFINE_string('bazel_bin', '~/go/bin/bazelisk',
                     'Location of bazel binary')
-flags.DEFINE_string('bazel_prefix', 'cd qplock_rome/qplock/ && ',
+flags.DEFINE_string('bazel_prefix', 'cd alock/alock/ && ',
                     'Command to run before bazel')
 flags.DEFINE_bool('gdb', False, 'Run in gdb')
 
@@ -213,16 +213,16 @@ def build_common_command(lock, params, cluster):
         cmd = ' '.join([cmd, FLAGS.bazel_flags])
         cmd = ' '.join([cmd, '--lock_type=' + lock])
         cmd = ' '.join([cmd, '--log_level=' + FLAGS.log_level])
-        cmd = ' '.join([cmd, '//qplock/benchmark/baseline:main --'])
+        cmd = ' '.join([cmd, '//alock/benchmark/baseline:main --'])
     else:
         cmd = ' '.join([cmd, 'build'])
         cmd = ' '.join([cmd, FLAGS.bazel_flags])
         cmd = ' '.join([cmd, '--lock_type=' + lock])
         cmd = ' '.join([cmd, '--log_level=' + FLAGS.log_level])
         cmd = ' '.join([cmd, '--copt=-g', '--strip=never',
-                        '//qplock/benchmark/baseline:main'])
+                        '//alock/benchmark/baseline:main'])
         cmd = ' '.join([cmd, '&& gdb -ex run -ex bt -ex q -ex y --args',
-                        'bazel-bin/qplock/benchmark/baseline/main'])
+                        'bazel-bin/alock/benchmark/baseline/main'])
     cmd = ' '.join([cmd, '--experiment_params', quote(make_one_line(params))])
     cmd = ' '.join([cmd, '--cluster', quote(make_one_line(cluster))])
     return cmd

@@ -46,6 +46,7 @@ cc_library(
     deps = [
         ":experiment_cc_proto",
         ":setup",
+        "//alock/cluster:node",
         "//alock/locks/rdma_mcs_lock:rdma_mcs_lock",
         "//alock/locks/spin_lock:rdma_spin_lock",
         "//alock/locks/a_lock:a_lock",

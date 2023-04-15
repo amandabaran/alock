@@ -3,7 +3,7 @@ cc_library(
     srcs = ["mcs_lock.cc"],
     hdrs = ["mcs_lock.h"],
     visibility = ["//visibility:public"],
-    deps = ["//qplock:util",
+    deps = ["//alock:util",
             "@rome//rome/logging",
             "@rome//rome/util:thread_util",
     ],

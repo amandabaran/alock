@@ -5,9 +5,21 @@
 
 #include "absl/strings/str_cat.h"
 #include "alock/cluster/cluster.pb.h"
-#include "alock/cluster/common.h"
+#include "rome/rdma/channel/sync_accessor.h"
+#include "rome/rdma/connection_manager/connection.h"
+#include "rome/rdma/connection_manager/connection_manager.h"
+#include "rome/rdma/memory_pool/memory_pool.h"
+#include "rome/rdma/memory_pool/remote_ptr.h"
+#include "rome/rdma/rdma_memory.h"
+#include "common.h"
+#include "sharder.h"
 
 namespace X {
+
+using ::rome::rdma::ConnectionManager;
+using ::rome::rdma::MemoryPool;
+using ::rome::rdma::remote_nullptr;
+using ::rome::rdma::remote_ptr;
 
 template <typename K, typename V>
 class Node {
@@ -15,10 +27,10 @@ class Node {
   using lock_type = V; // ALock
   using MemoryPool = rome::rdma::MemoryPool;
   using root_type = remote_ptr<lock_type>;
-  using 
-
+  
  public:
   using ds_type = std::vector<key_type>;
+
   ~Node();
   Node(const NodeProto& self, const ClusterProto& cluster, 
         uint32_t num_threads, bool prefill);
@@ -51,5 +63,3 @@ class Node {
 };
 
 }  // namespace X
-
-#include "server_impl.h"

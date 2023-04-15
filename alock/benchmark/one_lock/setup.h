@@ -4,7 +4,7 @@
 
 #include <memory>
 
-#include "alock/benchmark/baseline/experiment.pb.h"
+#include "alock/benchmark/one_lock/experiment.pb.h"
 #include "alock/locks/rdma_mcs_lock/rdma_mcs_lock.h"
 #include "alock/locks/spin_lock/rdma_spin_lock.h"
 #include "alock/locks/a_lock/a_lock_handle.h"
@@ -66,7 +66,7 @@ inline void PopulateDefaultValues(ExperimentParams* params) {
     params->mutable_workload()->set_max_key(1000000);
   if (!params->workload().has_theta())
     params->mutable_workload()->set_theta(0.99);
-  if (!params->has_num_threads()) params->set_num_server_threads(1);
+  if (!params->has_num_threads()) params->set_num_threads(1);
   if (!params->has_sampling_rate_ms()) {
     params->set_sampling_rate_ms(50);
   }

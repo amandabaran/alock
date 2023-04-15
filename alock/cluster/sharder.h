@@ -10,7 +10,7 @@ class Sharder {
  public:
   explicit Sharder(const ClusterProto& cluster) {
     for (auto n : cluster.nodes()) {
-      shards_.emplace(n.range().low(), n.node().nid());
+      shards_.emplace(n.range().low(), n.nid());
     }
   }
 

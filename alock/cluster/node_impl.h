@@ -16,8 +16,6 @@
 
 namespace X {
 
-using ::rome::rdma::MemoryPool;
-
 template <typename K, typename V>
 Node<K, V>::~Node(){
   //Disconnect ? shutdown?

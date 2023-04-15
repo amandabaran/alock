@@ -302,7 +302,7 @@ void ALockHandle::Unlock(remote_ptr<ALock> alock){
 }
 
 void ALockHandle::Reacquire(bool isLocal){
-  if (IsLocal()){
+  if (IsLocal()) {
     while (*l_victim_== LOCAL_VICTIM && IsRTailLocked()){
         cpu_relax();
     } 
