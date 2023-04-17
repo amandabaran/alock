@@ -38,13 +38,13 @@ Node<K, V>::Node(const NodeProto& self, const ClusterProto& cluster, uint32_t nu
   lock_pool_ = std::make_unique<MemoryPool>(peer, std::move(cm));
   lock_table_ = std::make_unique<std::vector<lock_type>>();
 
-  // Init `MemoryPool` for ALocks
+  // Init `MemoryPool` for locks
   ROME_ASSERT_OK(lock_pool_->Init(kPoolSize, peers));
 
   if (prefill){
     ROME_ASSERT_OK(Prefill(self_.range().low(), self_.range().high()));
   } else {
-    // Just create one alock
+    // Just create one lock
     auto root_lock_ptr_ = lock_pool_.Allocate<lock_type>();
   }
   RemoteObjectProto proto;

@@ -65,8 +65,6 @@ flags.DEFINE_string('bazel_prefix', 'cd alock/alock/ && ',
 flags.DEFINE_bool('gdb', False, 'Run in gdb')
 
 # Experiment configuration
-flags.DEFINE_integer('server_memory', int(2e9),
-                     'Number of bytes to alloc on server')
 flags.DEFINE_multi_integer(
     'nodes', 1, 'Number of nodes in cluster', short_name='n')
 
@@ -333,7 +331,7 @@ def main(args):
                     FLAGS.nodefile, n_count)
                 if nodes_csv is None:
                     continue
-                cluster_proto = experiment_pb2.ClusterProto()
+                cluster_proto = experiment_pb2.CloudlabClusterProto()
                 temp, nodes = parse_nodes(nodes_csv, 0, n_count)
                 cluster_proto.MergeFrom(temp)
 
