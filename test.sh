@@ -1,7 +1,7 @@
 #!/bin/bash
 
 workspace=/home/amanda/alock/alock/alock
-nodefile=~/alock/alock/alock/benchmark/nodefiles/xl170.csv
+nodefile=/home/amanda/alock/alock/alock/benchmark/nodefiles/xl170.csv
 
 #** FUNCTION DEFINITIONS **#
 
