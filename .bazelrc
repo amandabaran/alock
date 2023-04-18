@@ -30,5 +30,6 @@ build:xray --linkopt=-fxray-instrument
 build --config=clang
 
 build --flag_alias=log_level=@rome//rome/logging:log_level
-# build --flag_alias=lock_type=//qplock/benchmark:lock_type
-build --flag_alias=lock_type=//qplock/benchmark/baseline:lock_type
+# build --flag_alias=lock_type=//alock/benchmark:lock_type
+# build --flag_alias=lock_type=//alock/benchmark/baseline:lock_type
+build --flag_alias=lock_type=//alock/benchmark/one_lock:lock_type

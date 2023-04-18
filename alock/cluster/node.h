@@ -12,7 +12,7 @@
 #include "rome/rdma/memory_pool/remote_ptr.h"
 #include "rome/rdma/rdma_memory.h"
 #include "common.h"
-#include "sharder.h"
+#include "lock_table.h"
 
 namespace X {
 

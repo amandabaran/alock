@@ -21,6 +21,7 @@
 
 class Worker : public rome::ClientAdaptor<rome::NoOp>  {
   using LockTable = X::LockTable<X::key_type, LockType>;
+  using lock_ptr = X::Node<X::key_type, LockType>::root_type;
 
  public:
   static std::unique_ptr<Worker> Create(LockTable* ds, const X::NodeProto& node_proto,
@@ -44,8 +45,8 @@ class Worker : public rome::ClientAdaptor<rome::NoOp>  {
     auto* worker_ptr = worker.get();
 
     // Create and start the workload driver
-    auto driver = rome::WorkloadDriver<rome::NoOp>::Create(
-        std::move(worker), std::make_unique<rome::NoOpStream>(),
+    auto driver = rome::WorkloadDriver<int>::Create(
+        std::move(worker), std::make_unique<rome::UniformIntStream>(),
         qps_controller.get(),
         std::chrono::milliseconds(experiment_params.sampling_rate_ms()));
     ROME_ASSERT_OK(driver->Start());
@@ -82,9 +83,12 @@ class Worker : public rome::ClientAdaptor<rome::NoOp>  {
     return absl::OkStatus();
   }
 
-  absl::Status Apply(const rome::NoOp &op) override {
+  absl::Status Apply(const int &op) override {
+    ROME_DEBUG("Attempting to lock key {}", op);
+    lock_ptr lock_addr = lock_table_->GetLock(op);
+    ROME_DEBUG("Address for lock is {x}", static_cast<uint64_t>(lock_addr));
     ROME_DEBUG("Locking...");
-    lock_handle_.Lock();
+    lock_handle_.Lock(lock_ptr);
     auto start = util::SystemClock::now();
     if (experiment_params_.workload().has_think_time_ns()) {
       while (util::SystemClock::now() - start <
@@ -92,7 +96,7 @@ class Worker : public rome::ClientAdaptor<rome::NoOp>  {
        ;
     }
     ROME_DEBUG("Unlocking...");
-    lock_handle_.Unlock();
+    lock_handle_.Unlock(lock_ptr);
     return absl::OkStatus();
   }
 
@@ -157,7 +161,7 @@ class NodeHarness {
       }
     }
 
-    ROME_DEBUG("Waiting for clients to disconnect (in destructor)...");
+    ROME_DEBUG("Waiting for nodes to disconnect (in destructor)...");
     node_.reset();
     return absl::OkStatus();
   }
