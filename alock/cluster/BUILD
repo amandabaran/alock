@@ -27,8 +27,8 @@ cc_library(
 )
 
 cc_library(
-    name = "sharder",
-    hdrs = ["sharder.h"],
+    name = "lock_table",
+    hdrs = ["lock_table.h"],
     deps = [
         ":cluster_cc_proto",
         ":common",
@@ -54,7 +54,7 @@ cc_library(
         ":node_impl",
         ":common",
         ":cluster_cc_proto",
-        ":sharder",
+        ":lock_table",
         "@absl//absl/strings",
     ],
 )

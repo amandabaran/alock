@@ -4,7 +4,7 @@ from absl import app
 import os
 import google.protobuf.text_format as text_format
 import google.protobuf.descriptor as descriptor
-import qplock.benchmark.baseline.experiment_pb2 as experiment
+import alock.benchmark.one_lock.experiment_pb2 as experiment
 from alive_progress import alive_bar
 import pandas
 import matplotlib.pyplot as plt

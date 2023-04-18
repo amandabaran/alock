@@ -16,6 +16,9 @@
 
 namespace X {
 
+inline static void cpu_relax() { asm volatile("pause\n" : : : "memory"); }
+
+
 template <typename K, typename V>
 Node<K, V>::~Node(){
   //Disconnect ? shutdown?
@@ -25,10 +28,7 @@ template <typename K, typename V>
 Node<K, V>::Node(const NodeProto& self, const ClusterProto& cluster, uint32_t num_threads, bool prefill)
     : self_(self),
       cluster_(cluster),
-      sharder_(cluster),
-      num_threads_(num_threads_),
-      rd_(),
-      rand_(rd_()) {
+      num_threads_(num_threads_) {
   auto nid = self.node().nid();
   auto name = self.node().name();
   auto port = self.node().port();
@@ -36,7 +36,14 @@ Node<K, V>::Node(const NodeProto& self, const ClusterProto& cluster, uint32_t nu
   auto peer = MemoryPool::Peer(nid, name, port);
   auto cm = std::make_unique<MemoryPool::cm_type>(peer.id);
   lock_pool_ = std::make_unique<MemoryPool>(peer, std::move(cm));
-  lock_table_ = std::make_unique<std::vector<lock_type>>();
+  lock_table_ = std::make_unique<LockTable>(self, &lock_pool_);
+
+  std::vector<MemoryPool::Peer> peers;
+  peers.reserve(cluster_.nodes_size())
+  for (auto n : cluster_.nodes()){
+    if (n.node().nid() == nid) { continue; }
+    auto peer = MemoryPool::Peer(n.node().nid(), n.node().name(), n.node().port());
+  }
 
   // Init `MemoryPool` for locks
   ROME_ASSERT_OK(lock_pool_->Init(kPoolSize, peers));
@@ -44,7 +51,6 @@ Node<K, V>::Node(const NodeProto& self, const ClusterProto& cluster, uint32_t nu
   if (prefill){
     ROME_ASSERT_OK(Prefill(self_.range().low(), self_.range().high()));
   } else {
-    // Just create one lock
     auto root_lock_ptr_ = lock_pool_.Allocate<lock_type>();
   }
   RemoteObjectProto proto;
@@ -52,24 +58,18 @@ Node<K, V>::Node(const NodeProto& self, const ClusterProto& cluster, uint32_t nu
 
   ROME_DEBUG("Root Lock pointer {:x}", static_cast<uint64_t>(root_lock_ptr_));
 
-  // tell all the peers where to find the addr of the first lock
-  for (auto n : cluster_.nodes()) {
-    // Dont need to send lock/get lock from self
-    if (n.node().nid() == self_.node().nid()) { continue; }
-
+  // tell all the peers where to find the addr of the first lock on this node
+  for (auto p : peers) {
     // Send all peers the root of the lock on self
-    auto conn_or = lock_pool_.connection_manager()->GetConnection(n.node().nid());
+    auto conn_or = lock_pool_.connection_manager()->GetConnection(p.id);
     ROME_CHECK_OK(ROME_RETURN(conn_or.status()), conn_or);
     status = conn_or.value()->channel()->Send(proto);
     ROME_CHECK_OK(ROME_RETURN(status), status);
   }
 
   // Wait until roots of all other alocks on other nodes are shared
-  for (auto n : cluster_.nodes()) {
-     // Dont need to send lock/get lock from self
-    if (n.node().nid() == self_.node().nid()) { continue; }
-    
-    auto conn_or = lock_pool_->connection_manager()->GetConnection(n.node().nid());
+  for (auto p : peers) {
+    auto conn_or = lock_pool_->connection_manager()->GetConnection(p.id);
     ROME_CHECK_OK(ROME_RETURN(conn_or.status()), conn_or);
     auto got = conn_or.value()->channel()->TryDeliver<RemoteObjectProto>();
     while (got.status().code() == absl::StatusCode::kUnavailable) {
@@ -77,12 +77,10 @@ Node<K, V>::Node(const NodeProto& self, const ClusterProto& cluster, uint32_t nu
     }
     ROME_CHECK_OK(ROME_RETURN(got.status()), got);
     // set lock pointer to the base address of the lock on the host
-    auto root = decltype(root_lock_ptr_)(n.node().nid(), got->raddr());
-    ROME_DEBUG("Node {} Lock pointer {:x}", n.node().nid(), static_cast<uint64_t>(root));
+    auto root = decltype(root_lock_ptr_)(p.id, got->raddr());
+    ROME_DEBUG("Node {} Lock pointer {:x}", p.id, static_cast<uint64_t>(root));
 
-    peers_ctx_.emplace(
-        n.node().nid(),
-        node_ctx_t{std::move(root), conn_or});
+    root_ptrs_.emplace(p.id, root);
   }
   return absl::OkStatus();
 }
@@ -92,19 +90,9 @@ template <typename K, typename V>
 absl::Status Node<K, V>::Prefill(const key_type& min_key,
                                    const key_type& max_key) {
   ROME_INFO("Prefilling lock table... [{}, {})", min_key, max_key);
-  auto num_locks = max_key - min_key + 1;
+ 
+  root_lock_ptr_ = lock_table_.AllocateLocks(min_key, max_key);
 
-  keys_.reserve(num_locks)
-
-  keys.insert(min_key)
-  auto lock = lock_pool_.Allocate<lock_type>();
-  root_lock_ptr_ = lock;
-  // Store pointer to first lock in lock pool before creating the rest
-  for (auto i = min_key + 1; i <= max_key; i++){
-    keys_.insert(i);
-    auto lock = lock_pool_.Allocate<lock_type>();
-  }
-  
   ROME_INFO("Finished prefilling lock table");
 
   return absl::OkStatus();

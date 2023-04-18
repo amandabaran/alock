@@ -20,7 +20,7 @@
 #include "setup.h"
 
 class Worker : public rome::ClientAdaptor<rome::NoOp>  {
-  using LockTable = X::Node<X::key_type, X::value_type>::ds_type;
+  using LockTable = X::LockTable<X::key_type, LockType>;
 
  public:
   static std::unique_ptr<Worker> Create(LockTable* ds, const X::NodeProto& node_proto,
@@ -108,9 +108,9 @@ class Worker : public rome::ClientAdaptor<rome::NoOp>  {
  private:
   Worker(LockTable* ds, const X::NodeProto& node_proto, const ExperimentParams& params,
          std::barrier<>* barrier)
-      : ds_(ds), node_proto_(node_proto), experiment_params_(params), barrier_(barrier), lock_handle_() {}
+      : lock_table_(ds), node_proto_(node_proto), experiment_params_(params), barrier_(barrier), lock_handle_() {}
 
-  LockTable* ds_;
+  LockTable* lock_table_;
   const X::NodeProto node_proto_;
   const ExperimentParams experiment_params_;
   std::barrier<>* barrier_;
@@ -125,7 +125,7 @@ class NodeHarness {
   ~NodeHarness() = default;
 
   static std::unique_ptr<NodeHarness> Create(
-      std::unique_ptr<X::Node<X::key_type, X::value_type>> node,
+      std::unique_ptr<X::Node<X::key_type, LockType>> node,
       const X::NodeProto& node_proto, ExperimentParams params) {
     return std::unique_ptr<NodeHarness>(
         new NodeHarness(std::move(node), node_proto, params));
@@ -135,7 +135,7 @@ class NodeHarness {
     std::vector<std::unique_ptr<Worker>> workers;
     for (auto i = 0; i < experiment_params.num_threads(); ++i) {
       workers.emplace_back(
-          Worker::Create(node_->GetDatastore(), node_proto_, params_, &barrier_));
+          Worker::Create(node_->GetLockTable(), node_proto_, params_, &barrier_));
     }
 
     std::for_each(workers.begin(), workers.end(), [&](auto& worker) {
@@ -165,14 +165,14 @@ class NodeHarness {
   std::vector<ResultProto> GetResults() { return result_protos_; }
 
  private:
-  NodeHarness(std::unique_ptr<X::Node<X::key_type, X::value_type>> node,
+  NodeHarness(std::unique_ptr<X::Node<X::key_type, LockType>> node,
                 const X::NodeProto& node_proto, ExperimentParams params)
       : node_(std::move(node)),
         node_proto_(node_proto),
         params_(params),
         barrier_(params.num_threads()) {}
 
-  std::unique_ptr<X::Node<X::key_type, X::value_type>> node_;
+  std::unique_ptr<X::Node<X::key_type, LockType>> node_;
   const X::NodeProto& node_proto_;
   ExperimentParams params_;
 

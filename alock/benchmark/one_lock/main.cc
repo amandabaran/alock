@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
     while (iter != cluster.nodes().end() && iter->nid() != n) ++iter;
     ROME_ASSERT(iter != cluster.nodes().end(), "Failed to find node: {}", n);
     
-    auto node = std::make_unique<X::Node<X::key_type, X::value_type>>(
+    auto node = std::make_unique<X::Node<X::key_type, LockType>>(
         *iter, cluster, experiment_params.num_threads(), experiment_params.prefill());
     auto harness = NodeHarness::Create(std::move(node), *iter,
                                          experiment_params);

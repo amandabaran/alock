@@ -29,7 +29,7 @@ class Node {
   using root_type = remote_ptr<lock_type>;
   
  public:
-  using ds_type = std::vector<key_type>;
+  using root_map = std::map<uint32_t, root_type>;
 
   ~Node();
   Node(const NodeProto& self, const ClusterProto& cluster, 
@@ -37,26 +37,19 @@ class Node {
 
   absl::Status Prefill(const key_type& min_key, const key_type& max_key);
 
-  ds_type* GetDatastore() { return keys_.get(); }
+  LockTable<K, V>* GetLockTable() { return lock_table_.get(); }
+
+  root_map* GetRootPtrMap(){ return root_ptrs_.get(); }
 
  private:
   std::unique_ptr<MemoryPool> lock_pool_;
+  std::unique_ptr<LockTable<K,V> lock_table_;
+  std::unique_ptr<root_map> root_ptrs_;
 
-  // index of key is used to find correct offset into lock_pool_
-  std::unique_ptr<ds_type> keys_;
-  remote_ptr<lock_type> root_lock_ptr_;
+  root_type root_lock_ptr_;
 
   const ClusterProto cluster_;
   const NodeProto self_;
-
-  Sharder sharder_;
-
-  struct node_ctx_t {
-    std::unique_ptr<root_type> lock_root;
-    // ! Not really sure below is needed?
-    MemoryPool::conn_type* conn;
-  };
-  std::map<uint32_t, node_ctx_t> peers_ctx_;
 
   uint32_t num_threads_;
   // std::vector<std::thread> threads_;
