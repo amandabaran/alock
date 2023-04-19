@@ -14,10 +14,12 @@ sync() {
 }
 
 # takes in a bazel build target to build on luigi (i.e. "--lock_type=alock //alock/benchmark/one_lock:main", "//alock/locks/a_lock:a_lock")
-build() {
+build() { 
   tmp=$(pwd)
   cd ../rome/scripts
-  python rexec.py -n ${nodefile} --remote_user=amanda --remote_root=/home/amanda/alock --local_root=/Users/amandabaran/Desktop/sss/async_locks/alock --cmd="cd ~/alock/alock && ~/go/bin/bazelisk build -c opt $1"
+  array=("$@")
+  build_str=${array[*]}
+  python rexec.py -n ${nodefile} --remote_user=amanda --remote_root=/home/amanda/alock --local_root=/Users/amandabaran/Desktop/sss/async_locks/alock --cmd="cd ~/alock/alock && ~/go/bin/bazelisk build -c opt $build_str"
   cd ${tmp}
   echo "Build Complete\n"
 }
