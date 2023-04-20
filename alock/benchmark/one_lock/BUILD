@@ -47,6 +47,7 @@ cc_library(
         ":experiment_cc_proto",
         ":setup",
         "//alock/cluster:node",
+        "//alock/cluster:lock_table",
         "//alock/locks/rdma_mcs_lock:rdma_mcs_lock",
         "//alock/locks/spin_lock:rdma_spin_lock",
         "//alock/locks/a_lock:a_lock",
@@ -96,7 +97,7 @@ cc_binary(
         {
             # ":mcs": ["LOCK_TYPE=::X::RdmaMcsLock"],
             # ":spin": ["LOCK_TYPE=::X::RdmaSpinLock"],
-            ":alock": ["LOCK_TYPE=::X::ALockHandle"],
+            ":alock": ["LOCK_TYPE=::X::ALock", "LOCK_HANDLE=::X::ALockHandle"],
         },
     ),
     deps = [

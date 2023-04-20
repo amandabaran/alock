@@ -31,10 +31,9 @@ class ALockHandle{
 public:
   using conn_type = MemoryPool::conn_type;
 
-  ALockHandle(MemoryPool::Peer self, MemoryPool& pool);
+  ALockHandle(MemoryPool::Peer self, MemoryPool& lock_pool);
 
-  absl::Status Init(MemoryPool::Peer host,
-                      const std::vector<MemoryPool::Peer> &peers);
+  absl::Status Init(const std::vector<MemoryPool::Peer> &peers);
 
   bool IsLocked();
   void Lock(remote_ptr<ALock> alock);

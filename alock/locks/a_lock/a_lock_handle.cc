@@ -8,11 +8,10 @@ using ::rome::rdma::remote_nullptr;
 using ::rome::rdma::remote_ptr;
 using ::rome::rdma::RemoteObjectProto;
 
-ALockHandle::ALockHandle(MemoryPool::Peer self, MemoryPool &pool)
-    : self_(self), lock_pool_(pool) {}
+ALockHandle::ALockHandle(MemoryPool::Peer self, MemoryPool &lock_pool)
+    : self_(self), lock_pool_(lock_pool) {}
 
-absl::Status ALockHandle::Init(MemoryPool::Peer host,
-                               const std::vector<MemoryPool::Peer> &peers) {
+absl::Status ALockHandle::Init(const std::vector<MemoryPool::Peer> &peers) {
   auto capacity = 1 << kPoolSize;
   // Allocate pool for Remote Descriptors
   auto status = desc_pool_->Init(capacity, peers);
@@ -22,8 +21,9 @@ absl::Status ALockHandle::Init(MemoryPool::Peer host,
   // allocate local and remote descriptors for this worker to use
   AllocateDescriptors();
 
-  //TODO: Figure out how/if descriptor pool needs to be shared amongst workers
+  //TODO: Connect descriptor pool to other workers
 
+  
   //Used as preallocated memory for RDMA writes
   prealloc_ = desc_pool_->Allocate<remote_ptr<RdmaDescriptor>>();
   

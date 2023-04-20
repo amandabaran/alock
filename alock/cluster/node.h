@@ -26,9 +26,9 @@ class Node {
   using key_type = K; // some int (uint16)
   using lock_type = V; // ALock
   using MemoryPool = rome::rdma::MemoryPool;
-  using root_type = remote_ptr<lock_type>;
   
  public:
+  using root_type = remote_ptr<lock_type>;
   using root_map = std::map<uint32_t, root_type>;
 
   ~Node();
@@ -43,7 +43,7 @@ class Node {
 
  private:
   std::unique_ptr<MemoryPool> lock_pool_;
-  std::unique_ptr<LockTable<K,V> lock_table_;
+  std::unique_ptr<LockTable<K,V>> lock_table_;
   std::unique_ptr<root_map> root_ptrs_;
 
   root_type root_lock_ptr_;

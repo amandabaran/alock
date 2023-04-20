@@ -13,15 +13,22 @@
 #include "rome/colosseum/workload_driver.h"
 #include "rome/rdma/connection_manager/connection_manager.h"
 #include "rome/rdma/memory_pool/memory_pool.h"
+#include "rome/rdma/memory_pool/remote_ptr.h"
 #include "rome/util/clocks.h"
 #include "rome/util/distribution_util.h"
 #include "alock/cluster/node.h"
+#include "alock/cluster/lock_table.h"
+#include "alock/cluster/common.h"
 
 #include "setup.h"
 
+struct Op {
+  key_type key; 
+};
+// TODO: uniform int stream isn't working right now
+// std::make_unique<rome::RandomDistributionStream<std::uniform_int_distribution<key_type>, key_type, key_type>>(0, 100)
 class Worker : public rome::ClientAdaptor<rome::NoOp>  {
-  using LockTable = X::LockTable<X::key_type, LockType>;
-  using lock_ptr = X::Node<X::key_type, LockType>::root_type;
+ using LockTable = X::LockTable<key_type, LockType>;
 
  public:
   static std::unique_ptr<Worker> Create(LockTable* ds, const X::NodeProto& node_proto,
@@ -45,8 +52,8 @@ class Worker : public rome::ClientAdaptor<rome::NoOp>  {
     auto* worker_ptr = worker.get();
 
     // Create and start the workload driver
-    auto driver = rome::WorkloadDriver<int>::Create(
-        std::move(worker), std::make_unique<rome::UniformIntStream>(),
+    auto driver = rome::WorkloadDriver<rome::NoOp>::Create(
+        std::move(worker), std::make_unique<rome::NoOpStream>(),
         qps_controller.get(),
         std::chrono::milliseconds(experiment_params.sampling_rate_ms()));
     ROME_ASSERT_OK(driver->Start());
@@ -79,16 +86,17 @@ class Worker : public rome::ClientAdaptor<rome::NoOp>  {
 
   absl::Status Start() override {
     // ds_->RegisterThisThread();
+    lock_handle_.Init();
     barrier_->arrive_and_wait();
     return absl::OkStatus();
   }
 
-  absl::Status Apply(const int &op) override {
+  absl::Status Apply(const rome::NoOp &op) override {
     ROME_DEBUG("Attempting to lock key {}", op);
-    lock_ptr lock_addr = lock_table_->GetLock(op);
+    X::remote_ptr<LockType> lock_addr = lock_table_->GetLock();
     ROME_DEBUG("Address for lock is {x}", static_cast<uint64_t>(lock_addr));
     ROME_DEBUG("Locking...");
-    lock_handle_.Lock(lock_ptr);
+    lock_handle_.Lock(lock_addr);
     auto start = util::SystemClock::now();
     if (experiment_params_.workload().has_think_time_ns()) {
       while (util::SystemClock::now() - start <
@@ -96,7 +104,7 @@ class Worker : public rome::ClientAdaptor<rome::NoOp>  {
        ;
     }
     ROME_DEBUG("Unlocking...");
-    lock_handle_.Unlock(lock_ptr);
+    lock_handle_.Unlock(lock_addr);
     return absl::OkStatus();
   }
 
@@ -118,7 +126,7 @@ class Worker : public rome::ClientAdaptor<rome::NoOp>  {
   const X::NodeProto node_proto_;
   const ExperimentParams experiment_params_;
   std::barrier<>* barrier_;
-  LockType lock_handle_; //Handle to interact with descriptors, local per worker
+  LockHandle lock_handle_; //Handle to interact with descriptors, local per worker
 
   std::random_device rd_;
   std::default_random_engine rand_;

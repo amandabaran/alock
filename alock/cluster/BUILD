@@ -32,6 +32,7 @@ cc_library(
     deps = [
         ":cluster_cc_proto",
         ":common",
+        "@rome//rome/rdma/memory_pool",
     ],
 )
 

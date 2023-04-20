@@ -38,6 +38,14 @@ using Peer = ::rome::rdma::MemoryPool::Peer;
 using cm_type = ::rome::rdma::MemoryPool::cm_type;
 using conn_type = ::rome::rdma::MemoryPool::conn_type;
 
+using key_type = uint64_t;
+
+#ifdef LOCK_HANDLE
+using LockHandle = LOCK_HANDLE;
+#else
+#error "LOCK_HANDLE is undefined"
+#endif
+
 #ifdef LOCK_TYPE
 using LockType = LOCK_TYPE;
 #else

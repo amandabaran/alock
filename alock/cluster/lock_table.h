@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cstdint>
 #include "alock/cluster/cluster.pb.h"
 #include "alock/cluster/common.h"
+#include "rome/rdma/memory_pool/remote_ptr.h"
 
 namespace X {
 
@@ -34,6 +36,10 @@ class LockTable {
     return root_lock_ptr_;
   }
 
+  root_type GetLock() {
+    return root_lock_ptr_; 
+  }
+
   root_type GetLock(const key_type& key) {
     if (key > max_key_ || key < min_key_){
         ROME_DEBUG("Attempting to get lock from from incorrect LockTable.");
@@ -43,7 +49,9 @@ class LockTable {
         // calculate the address of the desired key
         auto diff = key - min_key_;
         auto bytes_to_jump = lock_byte_size_ * diff;
-        auto lock_ptr = root_lock_ptr_ + bytes_to_jump;
+        auto temp_ptr = rome::rdma::remote_ptr<uint8_t>(root_lock_ptr_);
+        temp_ptr += bytes_to_jump;
+        auto lock_ptr = root_type(temp_ptr);
         return lock_ptr;
     }
     return root_lock_ptr_; 
