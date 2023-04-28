@@ -25,10 +25,12 @@ class LockTable {
     }
 
   root_type AllocateLocks(const key_type& min_key, const key_type& max_key){
+    ROME_DEBUG("Allocating first Lock in LockTable");
     auto lock = lock_pool_.Allocate<lock_type>();
     root_lock_ptr_ = lock;
     // Allocate one lock per key
     for (auto i = min_key_ + 1; i <= max_key_; i++){
+        ROME_DEBUG("Allocating lock for key {} in LockTable", i);
         lock_pool_.Allocate<lock_type>();
     }
     // return pointer to first lock in table

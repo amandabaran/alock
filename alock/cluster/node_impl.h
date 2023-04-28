@@ -37,13 +37,14 @@ Node<K, V>::Node(const NodeProto& self, const ClusterProto& cluster, bool prefil
     if (n.nid() == self_.nid()) { continue; }
     auto peer = MemoryPool::Peer(n.nid(), n.name(), n.port());
   }
-
-  // Init `MemoryPool` for locks
+  
+  ROME_DEBUG("Init MemoryPool for locks");
   ROME_ASSERT_OK(lock_pool_.Init(kLockPoolSize, peers));
 
   if (prefill){
     ROME_ASSERT_OK(Prefill(self_.range().low(), self_.range().high()));
   } else {
+    ROME_DEBUG("Using one lock, no locktable");
     root_lock_ptr_ = lock_pool_.Allocate<lock_type>();
   }
   RemoteObjectProto proto;

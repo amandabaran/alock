@@ -88,9 +88,11 @@ int main(int argc, char *argv[]) {
     
     Peer self = MemoryPool::Peer(iter->nid(), iter->name(), iter->port());
     
+    ROME_DEBUG("Creating nodes");
     auto node = std::make_shared<X::Node<key_type, LockType>>(*iter, cluster, experiment_params.prefill());
     // Create 1 NodeHarness per thread on each node
     for (int i = 0; i < num_threads; i++) {
+      ROME_DEBUG("Creating NodeHarness {} on Node {}", i, n);
       // Create vector of peers not including self
       std::vector<Peer> others;
       std::copy_if(peers.begin(), peers.end(), std::back_inserter(others),

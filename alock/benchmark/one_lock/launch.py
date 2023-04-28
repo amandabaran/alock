@@ -49,6 +49,7 @@ flags.DEFINE_multi_integer('think_ns', 500, 'Think times in nanoseconds')
 
 flags.DEFINE_integer('min_key', 0, 'Minimum key')
 flags.DEFINE_integer('max_key', int(1e6), 'Maximum key')
+flags.DEFINE_integer('threads', 1, 'Number of NodeHarnesses (threads) to launch per node')
 flags.DEFINE_float('theta', 0.99, 'Theta in Zipfian distribution')
 
 flags.DEFINE_integer('runtime', 10, 'Number of seconds to run experiment')
@@ -231,6 +232,7 @@ def fill_experiment_params(
     proto.workload.max_key = FLAGS.max_key
     # proto.workload.theta = FLAGS.theta
     proto.prefill = FLAGS.prefill
+    proto.num_threads = FLAGS.threads
     return proto
 
 def build_get_data_command(lock, node, cluster):

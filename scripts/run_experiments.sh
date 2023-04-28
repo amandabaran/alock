@@ -40,7 +40,7 @@ sync
 
 
 lock="alock"
-log_level='debug'
+log_level='trace'
 echo "Building ${lock}..."
 build ${lock}
 
