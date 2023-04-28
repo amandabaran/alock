@@ -14,12 +14,14 @@
 #include "common.h"
 #include "lock_table.h"
 
+
 namespace X {
 
 using ::rome::rdma::ConnectionManager;
 using ::rome::rdma::MemoryPool;
 using ::rome::rdma::remote_nullptr;
 using ::rome::rdma::remote_ptr;
+using ::rome::rdma::RemoteObjectProto;
 
 template <typename K, typename V>
 class Node {
@@ -32,27 +34,28 @@ class Node {
   using root_map = std::map<uint32_t, root_type>;
 
   ~Node();
-  Node(const NodeProto& self, const ClusterProto& cluster, 
-        uint32_t num_threads, bool prefill);
+  Node(const NodeProto& self, const ClusterProto& cluster, bool prefill);
 
   absl::Status Prefill(const key_type& min_key, const key_type& max_key);
 
-  LockTable<K, V>* GetLockTable() { return lock_table_.get(); }
+  LockTable<K, V>* GetLockTable() { return &lock_table_; }
 
-  root_map* GetRootPtrMap(){ return root_ptrs_.get(); }
+  root_map* GetRootPtrMap(){ return &root_ptrs_; }
+
+  MemoryPool* GetLockPool(){ return &lock_pool_; }
 
  private:
-  std::unique_ptr<MemoryPool> lock_pool_;
-  std::unique_ptr<LockTable<K,V>> lock_table_;
-  std::unique_ptr<root_map> root_ptrs_;
+  const NodeProto self_;
+  const ClusterProto cluster_;
+  MemoryPool::Peer self_peer_;
+
+  MemoryPool lock_pool_;
+  LockTable<K,V> lock_table_;
+  root_map root_ptrs_;
 
   root_type root_lock_ptr_;
-
-  const ClusterProto cluster_;
-  const NodeProto self_;
-
-  uint32_t num_threads_;
-  // std::vector<std::thread> threads_;
 };
 
-}  // namespace X
+}  // namespace X 
+
+#include "node_impl.h"

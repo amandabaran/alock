@@ -24,6 +24,7 @@ py_proto_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//alock/cluster:cluster_py_proto",
         "@rome//protos:colosseum_py_proto",
         "@rome//protos:metrics_py_proto",
     ],
@@ -33,6 +34,7 @@ cc_library(
     name = "setup",
     hdrs = ["setup.h"],
     deps = [
+        "//alock/cluster:cluster_cc_proto",
         "@absl//absl/status",
         "@rome//rome/logging",
         "@rome//rome/rdma/channel:sync_accessor",
@@ -103,6 +105,7 @@ cc_binary(
     deps = [
         ":node_harness",
         ":experiment_cc_proto",
+        "//alock/cluster:cluster_cc_proto",
         "@absl//absl/flags:flag",
         "@absl//absl/flags:parse",
         "@absl//absl/status",

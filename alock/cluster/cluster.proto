@@ -17,4 +17,4 @@ message NodeProto {
 
 message ClusterProto {
   repeated NodeProto nodes = 1;
-};
+}

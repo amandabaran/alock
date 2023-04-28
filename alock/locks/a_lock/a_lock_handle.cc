@@ -9,35 +9,34 @@ using ::rome::rdma::remote_ptr;
 using ::rome::rdma::RemoteObjectProto;
 
 ALockHandle::ALockHandle(MemoryPool::Peer self, MemoryPool &lock_pool)
-    : self_(self), lock_pool_(lock_pool) {}
+    : self_(self), lock_pool_(lock_pool), desc_pool_(self, std::make_unique<MemoryPool::cm_type>(self.id)) {}
 
 absl::Status ALockHandle::Init(const std::vector<MemoryPool::Peer> &peers) {
   auto capacity = 1 << kPoolSize;
   // Allocate pool for Remote Descriptors
-  auto status = desc_pool_->Init(capacity, peers);
+  auto status = desc_pool_.Init(capacity, peers);
   // ROME_ASSERT_OK(status);
   ROME_CHECK_OK(ROME_RETURN(status), status);
  
   // allocate local and remote descriptors for this worker to use
   AllocateDescriptors();
 
-  //TODO: Connect descriptor pool to other workers
-
+  //TODO: Connect descriptor pool to other workers?
   
   //Used as preallocated memory for RDMA writes
-  prealloc_ = desc_pool_->Allocate<remote_ptr<RdmaDescriptor>>();
+  prealloc_ = desc_pool_.Allocate<remote_ptr<RdmaDescriptor>>();
   
   return absl::OkStatus();
 }
 
 void ALockHandle::AllocateDescriptors(){
   // Pointer to first remote descriptor
-  r_desc_pointer_ = desc_pool_->Allocate<RdmaDescriptor>();
+  r_desc_pointer_ = desc_pool_.Allocate<RdmaDescriptor>();
   r_desc_ = reinterpret_cast<RdmaDescriptor *>(r_desc_pointer_.address());
   ROME_INFO("First RdmaDescriptor @ {:x}", static_cast<uint64_t>(r_desc_pointer_));
   r_bitset[0] = 0;
   for (int i = 1; i < DESCS_PER_CLIENT; i++){
-    auto temp = desc_pool_->Allocate<RdmaDescriptor>();
+    auto temp = desc_pool_.Allocate<RdmaDescriptor>();
     ROME_DEBUG("RdmaDescriptor @ {:x}", static_cast<uint64_t>(temp));
     r_bitset[i] = 0;
   }
@@ -46,12 +45,12 @@ void ALockHandle::AllocateDescriptors(){
   std::atomic_thread_fence(std::memory_order_release);
 
   // Pointer to first local descriptor
-  l_desc_pointer_ = desc_pool_->Allocate<LocalDescriptor>();
+  l_desc_pointer_ = desc_pool_.Allocate<LocalDescriptor>();
   l_desc_ = reinterpret_cast<LocalDescriptor *>(l_desc_pointer_.address());
   ROME_DEBUG("First LocalDescriptor @ {:x}", static_cast<uint64_t>(l_desc_pointer_));
   l_bitset[0] = 0;
   for (int i = 1; i < DESCS_PER_CLIENT; i++){
-    auto temp = desc_pool_->Allocate<LocalDescriptor>();
+    auto temp = desc_pool_.Allocate<LocalDescriptor>();
     ROME_DEBUG("LocalDescriptor @ {:x}", static_cast<uint64_t>(temp));
     l_bitset[i] = 0;
   }

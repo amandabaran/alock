@@ -41,6 +41,7 @@ cc_library(
     hdrs = ["node_impl.h"],
     deps = [
         ":common",
+        ":lock_table",
         ":cluster_cc_proto",
         "@rome//rome/logging",
         "@rome//rome/rdma/memory_pool",
@@ -53,7 +54,6 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":node_impl",
-        ":common",
         ":cluster_cc_proto",
         ":lock_table",
         "@absl//absl/strings",

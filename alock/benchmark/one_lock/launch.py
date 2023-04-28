@@ -11,6 +11,7 @@ from os import abort
 from time import sleep
 
 import alock.benchmark.one_lock.experiment_pb2 as experiment_pb2
+import alock.cluster.cluster_pb2 as cluster_pb2
 import pandas
 from absl import app, flags
 from alive_progress import alive_bar
@@ -66,11 +67,11 @@ flags.DEFINE_bool('gdb', False, 'Run in gdb')
 
 # Experiment configuration
 flags.DEFINE_multi_integer(
-    'nodes', 1, 'Number of nodes in cluster', short_name='n')
+    'nodes', 1, 'Number of nodes in cluster', short_name='N')
 
 flags.DEFINE_integer(
     'port', 18018, 'Port to listen for incoming connections on')
-flags.DEFINE_string('log_dest', '/home/amanda/logs/alock',
+flags.DEFINE_string('log_dest', '/Users/amandabaran/Desktop/sss/async_locks/alock/logs/alock',
                     'Name of local log directory for ssh commands')
 flags.DEFINE_boolean(
     'dry_run', False,
@@ -119,24 +120,35 @@ def partition_nodefile(path, num_nodes):
 
 def parse_nodes(csv, nid, num_nodes):
     csv_nodes = []
-    name, public_hostname, node_type = csv[0].strip().split(',')
-    csv_nodes.append((name, public_hostname))
+    name, public_name, node_type = csv[0].strip().split(',')
+    csv_nodes.append((name, public_name))
     for line in csv[1:]:
-        name, public_hostname, _ = line.strip().split(',')
-        csv_nodes.append((name, public_hostname))
+        name, public_name, _ = line.strip().split(',')
+        csv_nodes.append((name, public_name))
 
-    proto = experiment_pb2.ClusterProto()
+    proto = experiment_pb2.CloudlabClusterProto()
     proto.node_type = node_type
     proto.domain = get_domain(node_type)
     nodes = {}
     
+    total_keys = (FLAGS.max_key - FLAGS.min_key)
+    keys_per_node = total_keys / num_nodes
+    
     for r in range(0, num_nodes):
         i = nid % len(csv_nodes)
         n = csv_nodes[i]
-        c = experiment_pb2.NodeProto(
-            nid=nid, private_hostname=n[0], public_hostname=n[1],
-            port=FLAGS.port + nid)
-        proto.nodes.append(c)
+        
+        min_key = int(r * keys_per_node)
+        max_key = int((r + 1) * keys_per_node) if (r < num_nodes - 1) else FLAGS.max_key
+        
+        c = cluster_pb2.NodeProto(
+            nid=nid, name=n[0], public_name=n[1],
+            port=FLAGS.port + nid,
+            range=cluster_pb2.KeyRangeProto(
+                low=min_key,
+                high=max_key
+            ))
+        proto.cluster.nodes.append(c)
         if nodes.get(n[0]) is None:
             nodes[n[0]] = []
         nodes[n[0]].append(c)
@@ -202,17 +214,16 @@ def build_remote_save_dir(lock):
         FLAGS.save_root, FLAGS.remote_save_dir) + '/*'
 
 
-def build_local_save_dir(lock, public_hostname):
-    return os.path.join(FLAGS.local_save_dir, lock, public_hostname) + '/'
-
+def build_local_save_dir(lock, public_name):
+    return os.path.join(FLAGS.local_save_dir, lock, public_name) + '/'
 
 def fill_experiment_params(
-        nodes, proto, experiment_name, lock, think):
+        nodes, experiment_name, lock, think, num_nodes):
     proto = experiment_pb2.ExperimentParams()
     if nodes:
         proto.node_ids.extend(n.nid for n in nodes)
     proto.name = experiment_name
-    proto.num_nodes = FLAGS.nodes
+    proto.num_nodes = num_nodes
     proto.workload.runtime = FLAGS.runtime
     proto.workload.think_time_ns = think
     proto.save_dir = build_save_dir(lock)
@@ -222,24 +233,18 @@ def fill_experiment_params(
     proto.prefill = FLAGS.prefill
     return proto
 
-
-def build_experiment_params(server_id):
-    proto = experiment_pb2.ExperimentParams()
-    proto.server_id = server_id
-    return proto
-
 def build_get_data_command(lock, node, cluster):
     src = build_remote_save_dir(lock)
-    dest = build_local_save_dir(lock, node.public_hostname)
+    dest = build_local_save_dir(lock, node.public_name)
     os.makedirs(dest, exist_ok=True)
     return 'rsync -aq ' + FLAGS.ssh_user + '@' + build_hostname(
-        node.public_hostname, cluster.domain) + ':' + ' '.join(
+        node.public_name, cluster.domain) + ':' + ' '.join(
         [src, dest])
 
 
 def build_logfile_path(lock, experiment_name, node):
     return os.path.join(
-        FLAGS.log_dest, lock, experiment_name, node.public_hostname +
+        FLAGS.log_dest, lock, experiment_name, node.public_name +
         '_' + str(node.nid) + '.log')
 
 
@@ -343,16 +348,17 @@ def main(args):
                         node_list = nodes.get(n)
                         node = node_list[0]
                         ssh_command = build_ssh_command(
-                            node.public_hostname,
+                            node.public_name,
                             cluster_proto.domain)
-                        params  = fill_experiment_params(node_list, params, experiment_name, lock, think)
-                        run_command = build_run_command(lock, params, cluster_proto)
+                        params  = fill_experiment_params(node_list, experiment_name, lock, think, num_nodes=len(node_list))
+                        run_command = build_run_command(lock, params, cluster_proto.cluster)
+                        retries = 1
                         commands.append((
                             build_command(
                                 ssh_command, run_command),
                             build_logfile_path(
                                 lock, experiment_name,
-                                node), 100))
+                                node), 1))
 
                     # Execute the commands.
                     execute(experiment_name, commands)

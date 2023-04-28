@@ -11,7 +11,7 @@ namespace X {
 template <typename K, typename V>
 class LockTable {
  using key_type = K; // some int (uint16)
- using lock_type = V; // ALock
+ using lock_type = V; // ALock or MCSDescriptor or 
  using MemoryPool = rome::rdma::MemoryPool;
  using root_type = rome::rdma::remote_ptr<lock_type>;
 
@@ -27,10 +27,9 @@ class LockTable {
   root_type AllocateLocks(const key_type& min_key, const key_type& max_key){
     auto lock = lock_pool_.Allocate<lock_type>();
     root_lock_ptr_ = lock;
-    auto num_locks = max_key - min_key + 1;
     // Allocate one lock per key
     for (auto i = min_key_ + 1; i <= max_key_; i++){
-        auto lock = lock_pool_.Allocate<lock_type>();
+        lock_pool_.Allocate<lock_type>();
     }
     // return pointer to first lock in table
     return root_lock_ptr_;

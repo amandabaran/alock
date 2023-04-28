@@ -59,7 +59,7 @@ message CloudlabClusterProto {
 };
 
 message ResultProto {
-  optional X.NodeProto worker = 1;
+  optional X.NodeProto node = 1;
   optional rome.WorkloadDriverProto driver = 2;
 };
 
