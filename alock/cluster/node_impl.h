@@ -27,10 +27,12 @@ template <typename K, typename V>
 Node<K, V>::Node(const NodeProto& self, const ClusterProto& cluster, bool prefill)
     : self_(self),
       cluster_(cluster),
-      self_peer_(self.nid(), self.name(), self.port()),
-      lock_pool_(self_peer_, std::make_unique<MemoryPool::cm_type>(self.nid())),
-      lock_table_(self, lock_pool_) {
+      prefill_(prefill),
+      lock_pool_(MemoryPool::Peer(self.nid(), self.name(), self.port()), std::make_unique<MemoryPool::cm_type>(self.nid())),
+      lock_table_(self, lock_pool_) {}
 
+template <typename K, typename V>
+absl::Status Node<K,V>::Connect(){
   std::vector<MemoryPool::Peer> peers;
   peers.reserve(cluster_.nodes_size());
   for (auto n : cluster_.nodes()){

@@ -14,6 +14,7 @@ ALockHandle::ALockHandle(MemoryPool::Peer self, MemoryPool &lock_pool)
 absl::Status ALockHandle::Init(const std::vector<MemoryPool::Peer> &peers) {
   auto capacity = 1 << kPoolSize;
   // Allocate pool for Remote Descriptors
+  ROME_DEBUG("[ALockHandle] Initializing descriptor pool.");
   auto status = desc_pool_.Init(capacity, peers);
   // ROME_ASSERT_OK(status);
   ROME_CHECK_OK(ROME_RETURN(status), status);

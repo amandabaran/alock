@@ -36,6 +36,8 @@ class Node {
   ~Node();
   Node(const NodeProto& self, const ClusterProto& cluster, bool prefill);
 
+  absl::Status Connect();
+
   absl::Status Prefill(const key_type& min_key, const key_type& max_key);
 
   LockTable<K, V>* GetLockTable() { return &lock_table_; }
@@ -47,12 +49,11 @@ class Node {
  private:
   const NodeProto self_;
   const ClusterProto cluster_;
-  MemoryPool::Peer self_peer_;
+  bool prefill_:
 
   MemoryPool lock_pool_;
   LockTable<K,V> lock_table_;
   root_map root_ptrs_;
-
   root_type root_lock_ptr_;
 };
 
