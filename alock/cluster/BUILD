@@ -57,5 +57,6 @@ cc_library(
         ":cluster_cc_proto",
         ":lock_table",
         "@absl//absl/strings",
+        "@rome//rome/rdma/memory_pool",
     ],
 )

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 workspace=/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock
-nodefile=/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/nodefiles/xl170.csv
+nodefile=/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/nodefiles/r6525.csv
 
 #** FUNCTION DEFINITIONS **#
 

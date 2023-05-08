@@ -61,11 +61,6 @@ private:
   
   MemoryPool::Peer self_;
   MemoryPool &lock_pool_; // pool of alocks that the handle is local to (initalized in cluster/node_impl.h)
-  MemoryPool desc_pool_;  //pool used for descriptors local to this handle
-
-  // Bitsets to track the usage status of the remote and local descriptors
-  std::bitset<DESCS_PER_CLIENT> r_bitset{0x0};
-  std::bitset<DESCS_PER_CLIENT> l_bitset{0x0};
 
   //Pointer to alock to allow it to be read/write via rdma
   remote_ptr<ALock> a_lock_pointer_;

@@ -113,7 +113,6 @@ def partition_nodefile(path, num_nodes):
     assert(os.path.exists(path))
     with open(path, 'r') as __file:
         nodes_csv = [line for line in __file]
-    assert num_nodes < len(nodes_csv), "No machines left"
     if num_nodes == -1:  # Conveniece for getting data
         return nodes_csv
     return nodes_csv
@@ -354,13 +353,13 @@ def main(args):
                             cluster_proto.domain)
                         params  = fill_experiment_params(node_list, experiment_name, lock, think, num_nodes=len(node_list))
                         run_command = build_run_command(lock, params, cluster_proto.cluster)
-                        retries = 1
+                        retries = 0
                         commands.append((
                             build_command(
                                 ssh_command, run_command),
                             build_logfile_path(
                                 lock, experiment_name,
-                                node), 1))
+                                node), retries))
 
                     # Execute the commands.
                     execute(experiment_name, commands)

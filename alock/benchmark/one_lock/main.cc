@@ -79,17 +79,24 @@ int main(int argc, char *argv[]) {
     signal(SIGINT, signal_handler);
   }
 
-  std::vector<std::future<absl::StatusOr<ResultProto>>> node_tasks;
-  std::barrier barrier(num_nodes * num_threads);
+  
+  std::vector<std::pair<X::NodeProto, std::shared_ptr<X::Node<key_type, LockType>>>> nodes_vec;
   for (const auto& n : node_ids) {
     auto iter = cluster.nodes().begin();
     while (iter != cluster.nodes().end() && iter->nid() != n) ++iter;
     ROME_ASSERT(iter != cluster.nodes().end(), "Failed to find node: {}", n);
     
-    Peer self = MemoryPool::Peer(iter->nid(), iter->name(), iter->port());
-    
     ROME_DEBUG("Creating nodes");
     auto node = std::make_shared<X::Node<key_type, LockType>>(*iter, cluster, experiment_params.prefill());
+    nodes_vec.emplace_back(std::make_pair(*iter, node));
+    ROME_ASSERT_OK(node->Connect());
+  }
+
+  std::vector<std::future<absl::StatusOr<ResultProto>>> node_tasks;
+  std::barrier barrier(num_nodes * num_threads);
+  for (int n = 0; n < num_nodes; n++) {
+    auto node_pair = nodes_vec[n];
+    Peer self = MemoryPool::Peer(node_pair.first.nid(), node_pair.first.name(), node_pair.first.port());
     // Create 1 NodeHarness per thread on each node
     for (int i = 0; i < num_threads; i++) {
       ROME_DEBUG("Creating NodeHarness {} on Node {}", i, n);
@@ -98,7 +105,7 @@ int main(int argc, char *argv[]) {
       std::copy_if(peers.begin(), peers.end(), std::back_inserter(others),
                     [self](auto &p) { return p.id != self.id; });
       node_tasks.emplace_back(std::async([=, &barrier]() {
-        auto harness = NodeHarness::Create(self, others, node, *iter, experiment_params, &barrier);
+        auto harness = NodeHarness::Create(self, others, node_pair.second, node_pair.first, experiment_params, &barrier);
         return NodeHarness::Run(std::move(harness), experiment_params, &done);
       }));
     }

@@ -43,12 +43,8 @@ absl::Status Node<K,V>::Connect(){
   ROME_DEBUG("Init MemoryPool for locks");
   ROME_ASSERT_OK(lock_pool_.Init(kLockPoolSize, peers));
 
-  if (prefill){
-    ROME_ASSERT_OK(Prefill(self_.range().low(), self_.range().high()));
-  } else {
-    ROME_DEBUG("Using one lock, no locktable");
-    root_lock_ptr_ = lock_pool_.Allocate<lock_type>();
-  }
+  ROME_ASSERT_OK(Prefill(self_.range().low(), self_.range().high()));
+
   RemoteObjectProto proto;
   proto.set_raddr(root_lock_ptr_.address());
 
@@ -78,6 +74,8 @@ absl::Status Node<K,V>::Connect(){
 
     root_ptrs_.emplace(p.id, root);
   }
+
+  return absl::OkStatus();
 }
 
 
@@ -85,9 +83,11 @@ template <typename K, typename V>
 absl::Status Node<K, V>::Prefill(const key_type& min_key,
                                    const key_type& max_key) {
   ROME_INFO("Prefilling lock table... [{}, {})", min_key, max_key);
- 
-  root_lock_ptr_ = lock_table_.AllocateLocks(min_key, max_key);
-
+  if (prefill_){
+    root_lock_ptr_ = lock_table_.AllocateLocks(min_key, max_key);
+  } else {
+    root_lock_ptr_ = lock_table_.AllocateLocks(0, 0);
+  }
   ROME_INFO("Finished prefilling lock table");
 
   return absl::OkStatus();

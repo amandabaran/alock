@@ -34,11 +34,11 @@ void ALockHandle::AllocateDescriptors(){
   // Pointer to first remote descriptor
   r_desc_pointer_ = desc_pool_.Allocate<RdmaDescriptor>();
   r_desc_ = reinterpret_cast<RdmaDescriptor *>(r_desc_pointer_.address());
-  ROME_INFO("First RdmaDescriptor @ {:x}", static_cast<uint64_t>(r_desc_pointer_));
+  ROME_DEBUG("First RdmaDescriptor @ {:x}", static_cast<uint64_t>(r_desc_pointer_));
   r_bitset[0] = 0;
   for (int i = 1; i < DESCS_PER_CLIENT; i++){
     auto temp = desc_pool_.Allocate<RdmaDescriptor>();
-    ROME_DEBUG("RdmaDescriptor @ {:x}", static_cast<uint64_t>(temp));
+    ROME_TRACE("RdmaDescriptor @ {:x}", static_cast<uint64_t>(temp));
     r_bitset[i] = 0;
   }
   
@@ -52,7 +52,7 @@ void ALockHandle::AllocateDescriptors(){
   l_bitset[0] = 0;
   for (int i = 1; i < DESCS_PER_CLIENT; i++){
     auto temp = desc_pool_.Allocate<LocalDescriptor>();
-    ROME_DEBUG("LocalDescriptor @ {:x}", static_cast<uint64_t>(temp));
+    ROME_TRACE("LocalDescriptor @ {:x}", static_cast<uint64_t>(temp));
     l_bitset[i] = 0;
   }
 
@@ -112,6 +112,7 @@ void ALockHandle::LockRemoteMcsQueue(){
     r_desc_->budget = -1;
     r_desc_->next = remote_nullptr;
 
+    ROME_DEBUG("Swapping r_tail: {:x} with r_desc_pointer: {:x} ", static_cast<uint64_t>(r_tail_), static_cast<uint64_t>(r_desc_pointer_));
     // swap RdmaDescriptor onto the remote tail of the alock 
     auto prev =
       lock_pool_.AtomicSwap(r_tail_, static_cast<uint64_t>(r_desc_pointer_));

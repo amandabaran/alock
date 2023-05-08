@@ -49,7 +49,7 @@ class Node {
  private:
   const NodeProto self_;
   const ClusterProto cluster_;
-  bool prefill_:
+  bool prefill_;
 
   MemoryPool lock_pool_;
   LockTable<K,V> lock_table_;
