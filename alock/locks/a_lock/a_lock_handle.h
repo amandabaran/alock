@@ -31,9 +31,9 @@ class ALockHandle{
 public:
   using conn_type = MemoryPool::conn_type;
 
-  ALockHandle(MemoryPool::Peer self, MemoryPool& lock_pool);
+  ALockHandle(MemoryPool::Peer self, MemoryPool& lock_pool, int worker_id);
 
-  absl::Status Init(const std::vector<MemoryPool::Peer> &peers);
+  absl::Status Init();
 
   bool IsLocked();
   void Lock(remote_ptr<ALock> alock);
@@ -60,7 +60,8 @@ private:
   bool is_l_leader_;
   
   MemoryPool::Peer self_;
-  MemoryPool &lock_pool_; // pool of alocks that the handle is local to (initalized in cluster/node_impl.h)
+  int worker_id_;
+  MemoryPool &pool_; // pool of alocks that the handle is local to (initalized in cluster/node_impl.h)
 
   //Pointer to alock to allow it to be read/write via rdma
   remote_ptr<ALock> a_lock_pointer_;

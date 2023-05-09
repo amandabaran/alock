@@ -46,9 +46,9 @@ build ${lock}
 
 save_dir="exp1"
 
-for num_nodes in 2
+for num_nodes in 10
 do
-  bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --ssh_user=adb321 -N ${num_nodes} --lock_type=${lock} --think_ns=500 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level}
+  bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --ssh_user=adb321 -N ${num_nodes} --lock_type=${lock} --think_ns=500 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=True
 done
 # bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile}  --ssh_user=adb321 --lock_type=${lock} --get_data  --local_save_dir=${workspace}/benchmark/one_lock/results/${save_dir}/ --remote_save_dir=${save_dir} --lock_type=${lock}
 

@@ -52,6 +52,12 @@ using LockType = LOCK_TYPE;
 #error "LOCK_TYPE is undefined"
 #endif
 
+
+// struct LockOp {
+//   key_type key; 
+//   std::chrono::nanoseconds think;
+// };
+
 static constexpr uint16_t kServerPort = 18000;
 static constexpr uint16_t kBaseClientPort = 18001;
 
@@ -80,6 +86,11 @@ inline void PopulateDefaultValues(ExperimentParams* params) {
   }
 }
 
+inline auto CreateOpStream(const ExperimentParams& params) {
+  return std::make_unique<rome::RandomDistributionStream<
+      std::uniform_int_distribution<key_type>, key_type, key_type>>(
+      params.workload().min_key(), params.workload().max_key());
+}
 
 inline void RecordResults(const ExperimentParams &experiment_params,
                           const std::vector<ResultProto> &experiment_results) {

@@ -49,6 +49,7 @@ volatile bool done = false;
 std::function<void(int)> signal_handler_internal;
 void signal_handler(int signum) { signal_handler_internal(signum); }
 
+// THIS IS BEING LAUNCHED ON EACH NODE!!! SO, IT SHOULDN'T LOOP THROUGH ALL THE NODEIDS
 int main(int argc, char *argv[]) {
   ROME_INIT_LOG();
   absl::ParseCommandLine(argc, argv);
@@ -57,7 +58,7 @@ int main(int argc, char *argv[]) {
   auto experiment_params = absl::GetFlag(FLAGS_experiment_params);
   ROME_ASSERT_OK(ValidateExperimentParams(experiment_params));
 
-  auto node_ids = experiment_params.node_ids();
+  auto node_id = experiment_params.node_ids(); 
   auto num_nodes = experiment_params.num_nodes();
   auto num_threads = experiment_params.num_threads();
 
@@ -79,52 +80,27 @@ int main(int argc, char *argv[]) {
     signal(SIGINT, signal_handler);
   }
 
+  auto iter = cluster.nodes().begin();
+  while (iter != cluster.nodes().end() && iter->nid() != node_id) ++iter;
+  ROME_ASSERT(iter != cluster.nodes().end(), "Failed to find node: {}", node_id);
   
-  std::vector<std::pair<X::NodeProto, std::shared_ptr<X::Node<key_type, LockType>>>> nodes_vec;
-  for (const auto& n : node_ids) {
-    auto iter = cluster.nodes().begin();
-    while (iter != cluster.nodes().end() && iter->nid() != n) ++iter;
-    ROME_ASSERT(iter != cluster.nodes().end(), "Failed to find node: {}", n);
-    
-    ROME_DEBUG("Creating nodes");
-    auto node = std::make_shared<X::Node<key_type, LockType>>(*iter, cluster, experiment_params.prefill());
-    nodes_vec.emplace_back(std::make_pair(*iter, node));
-    ROME_ASSERT_OK(node->Connect());
-  }
+  ROME_DEBUG("Creating node {}", node_id);
+  auto node = std::make_shared<X::Node<key_type, LockType>>(*iter, cluster, experiment_params.prefill());
+  ROME_ASSERT_OK(node->Connect());
 
-  std::vector<std::future<absl::StatusOr<ResultProto>>> node_tasks;
-  std::barrier barrier(num_nodes * num_threads);
-  for (int n = 0; n < num_nodes; n++) {
-    auto node_pair = nodes_vec[n];
-    Peer self = MemoryPool::Peer(node_pair.first.nid(), node_pair.first.name(), node_pair.first.port());
-    // Create 1 NodeHarness per thread on each node
-    for (int i = 0; i < num_threads; i++) {
-      ROME_DEBUG("Creating NodeHarness {} on Node {}", i, n);
-      // Create vector of peers not including self
-      std::vector<Peer> others;
-      std::copy_if(peers.begin(), peers.end(), std::back_inserter(others),
-                    [self](auto &p) { return p.id != self.id; });
-      node_tasks.emplace_back(std::async([=, &barrier]() {
-        auto harness = NodeHarness::Create(self, others, node_pair.second, node_pair.first, experiment_params, &barrier);
-        return NodeHarness::Run(std::move(harness), experiment_params, &done);
-      }));
-    }
-  }
+  // Create a vector of "peers" in the system not including yourself
+  Peer self = MemoryPool::Peer(*iter.nid(), *iter.name(), *iter.port());
+  std::vector<Peer> others;
+  std::copy_if(peers.begin(), peers.end(), std::back_inserter(others),
+                [self](auto &p) { return p.id != self.id; });
 
-  // number of node_tasks should equal num_nodes * num_threads
-  std::for_each(node_tasks.begin(), node_tasks.end(),
-                [](auto& result) { result.wait(); });
-
-  std::vector<ResultProto> result_protos;
-  for (auto& r : node_tasks) {
-    auto result_or = r.get();
-    if (!result_or.ok()) {
-      ROME_ERROR("{}", result_or.status().message());
-    } else {
-      result_protos.push_back(result_or.value());
-    }
+  auto harness = NodeHarness::Create(self, others, node, *iter, experiment_params);
+  auto status = harness->Launch(&done, experiment_params);
+  ROME_ASSERT_OK(status);
+  
+  if (num_threads > 0) {
+      RecordResults(experiment_params, harness->GetResults());
   }
-  RecordResults(experiment_params, result_protos);
   
   ROME_INFO("Done");
   return 0;

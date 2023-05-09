@@ -37,7 +37,7 @@ build() {
 
 sync
 
-setup
+# setup
 
 
 if [ "$#" -eq  "0" ]
