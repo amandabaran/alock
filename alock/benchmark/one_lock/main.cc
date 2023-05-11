@@ -58,7 +58,9 @@ int main(int argc, char *argv[]) {
   auto experiment_params = absl::GetFlag(FLAGS_experiment_params);
   ROME_ASSERT_OK(ValidateExperimentParams(experiment_params));
 
-  auto node_id = experiment_params.node_ids(); 
+  auto node_ids = experiment_params.node_ids(); 
+  // Only using one nodeid per physical node:
+  auto node_id = node_ids[0];
   auto num_nodes = experiment_params.num_nodes();
   auto num_threads = experiment_params.num_threads();
 
@@ -85,16 +87,16 @@ int main(int argc, char *argv[]) {
   ROME_ASSERT(iter != cluster.nodes().end(), "Failed to find node: {}", node_id);
   
   ROME_DEBUG("Creating node {}", node_id);
-  auto node = std::make_shared<X::Node<key_type, LockType>>(*iter, cluster, experiment_params.prefill());
+  auto node = std::make_unique<X::Node<key_type, LockType>>(*iter, cluster, experiment_params.prefill());
   ROME_ASSERT_OK(node->Connect());
 
   // Create a vector of "peers" in the system not including yourself
-  Peer self = MemoryPool::Peer(*iter.nid(), *iter.name(), *iter.port());
+  Peer self = MemoryPool::Peer(iter->nid(), iter->name(), iter->port());
   std::vector<Peer> others;
   std::copy_if(peers.begin(), peers.end(), std::back_inserter(others),
                 [self](auto &p) { return p.id != self.id; });
 
-  auto harness = NodeHarness::Create(self, others, node, *iter, experiment_params);
+  auto harness = NodeHarness::Create(self, others, std::move(node), *iter, experiment_params);
   auto status = harness->Launch(&done, experiment_params);
   ROME_ASSERT_OK(status);
   

@@ -72,14 +72,11 @@ class Worker : public rome::ClientAdaptor<key_type> {
     ResultProto result;
     result.mutable_node()->CopyFrom(worker_ptr->ToProto());
     result.mutable_driver()->CopyFrom(driver->ToProto());
-
+    return result;
     // Sleep for a hot sec to let the node receive the messages sent by the
     // clients before disconnecting.
     // (see https://github.com/jacnel/project-x/issues/15)
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    // results_.at(std::this_thread::get_id()) = result; 
-    
-    return result;
+    // std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 
   absl::Status Start() override {
@@ -92,7 +89,7 @@ class Worker : public rome::ClientAdaptor<key_type> {
 
   absl::Status Apply(const key_type &op) override {
     // ROME_DEBUG("Attempting to lock key {}", op);
-    X::remote_ptr<LockType> lock_addr = lock_table_->GetLock();
+    X::remote_ptr<LockType> lock_addr = lock_table_->GetLock(op);
     ROME_DEBUG("Address for lock is {}", static_cast<uint64_t>(lock_addr));
     ROME_DEBUG("Locking...");
     lock_handle_.Lock(lock_addr);
@@ -119,13 +116,11 @@ class Worker : public rome::ClientAdaptor<key_type> {
  private:
   Worker(LockTable* lt, MemoryPool& pool, const X::NodeProto& node, const Peer &self, 
          int worker_id, const ExperimentParams& params, std::barrier<>* barrier)
-      : lock_table_(lt), pool_(pool), node_(node), self_(self), worker_id_(worker_id), params_(params), barrier_(barrier), lock_handle_(self, pool, worker_id) {}
+      : lock_table_(lt), node_(node), self_(self), params_(params), barrier_(barrier), lock_handle_(self, pool, worker_id) {}
 
   LockTable* lock_table_;
-  MemoryPool& pool_;
   const X::NodeProto node_;
   const Peer self_;
-  int worker_id_;
   const ExperimentParams params_;
   std::barrier<>* barrier_;
 
@@ -143,19 +138,13 @@ class NodeHarness {
   ~NodeHarness() = default;
 
   static std::unique_ptr<NodeHarness> Create(
-      const Peer &self, const std::vector<Peer> &peers, std::shared_ptr<X::Node<X::key_type, LockType>> node,
-      const X::NodeProto& node_proto, ExperimentParams params, std::barrier<> *barrier) {
+      const Peer &self, const std::vector<Peer> &peers, std::unique_ptr<X::Node<X::key_type, LockType>> node,
+      const X::NodeProto& node_proto, ExperimentParams params) {
     return std::unique_ptr<NodeHarness>(
-        new NodeHarness(self, peers, node, node_proto, params, barrier));
+        new NodeHarness(self, peers, std::move(node), node_proto, params));
   }
 
-  static void signal_handler(int signal) { 
-    ROME_INFO("SIGNAL: ", signal, " HANDLER!!!\n");
-    exit(signal);
-  }
-
-
-   absl::Status Launch(volatile bool* done, ExperimentParams experiment_params) {
+  absl::Status Launch(volatile bool* done, ExperimentParams experiment_params) {
     std::vector<std::unique_ptr<Worker>> workers;
     for (auto i = 0; i < experiment_params.num_threads(); ++i) {
       workers.emplace_back(
@@ -190,14 +179,14 @@ class NodeHarness {
   X::NodeProto ToProto() { return node_proto_; }
 
  private:
-  NodeHarness(const Peer &self, const std::vector<Peer> &peers, std::shared_ptr<X::Node<X::key_type, LockType>> node,
+  NodeHarness(const Peer &self, const std::vector<Peer> &peers, std::unique_ptr<X::Node<X::key_type, LockType>> node,
                 const X::NodeProto& node_proto, ExperimentParams params)
-      : node_(node),
-        node_proto_(node_proto),
-        self_(self),
+      : self_(self),
         peers_(peers),
+        node_(std::move(node)),
+        node_proto_(node_proto),
         params_(params),
-        barrier_(params_.num_threads()) {}
+        barrier_(params.num_threads()) {}
 
   std::unique_ptr<X::Node<X::key_type, LockType>> node_;
   const X::NodeProto& node_proto_;
@@ -209,7 +198,7 @@ class NodeHarness {
 
   std::barrier<> barrier_;
 
-  std::vector<absl::StatusOr<ResultProto>> results_;
+  std::vector<std::future<absl::StatusOr<ResultProto>>> results_;
   std::vector<ResultProto> result_protos_;
 };
 
