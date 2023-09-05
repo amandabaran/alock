@@ -1,7 +1,8 @@
 #!/bin/bash
 
+nodetype=r6525
 workspace=/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock
-nodefile=/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/nodefiles/r6525.csv
+nodefile=/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/nodefiles/${nodetype}.csv
 
 #** FUNCTION DEFINITIONS **#
 
@@ -24,7 +25,7 @@ clean() {
 build() {
   tmp=$(pwd)
   cd ../../rome/scripts
-  python rexec.py -n ${nodefile} --remote_user=adb321 --remote_root=/users/adb321/alock --local_root=/Users/amandabaran/Desktop/sss/async_locks/alock --cmd="cd alock/alock && ~/go/bin/bazelisk build -c opt --lock_type=$1 //alock/benchmark/one_lock:main"
+  python rexec.py -n ${nodefile} --remote_user=adb321 --remote_root=/users/adb321/alock --local_root=/Users/amandabaran/Desktop/sss/async_locks/alock --cmd="cd alock/alock && ~/go/bin/bazelisk build -c opt --lock_type=$1 //alock/benchmark/one_lock:main --action_env=BAZEL_CXXOPTS='-std=c++20'"
   cd ${tmp}
   echo "Build Complete\n"
 }
@@ -46,10 +47,10 @@ build ${lock}
 
 save_dir="exp1"
 
-for num_nodes in 1
-do
-  bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --ssh_user=adb321 -N ${num_nodes} --lock_type=${lock} --think_ns=500 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=True
-done
+# for num_nodes in 2
+# do
+#   bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --ssh_user=adb321 -N ${num_nodes} --lock_type=${lock} --think_ns=500 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=True
+# done
 # bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile}  --ssh_user=adb321 --lock_type=${lock} --get_data  --local_save_dir=${workspace}/benchmark/one_lock/results/${save_dir}/ --remote_save_dir=${save_dir} --lock_type=${lock}
 
 

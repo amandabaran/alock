@@ -24,13 +24,13 @@
 #include "setup.h"
 
 using ::rome::rdma::MemoryPool;
-using LockTable = X::LockTable<key_type, LockType>;
+
 class Worker : public rome::ClientAdaptor<key_type> {
   
  public:
   static std::unique_ptr<Worker> Create(LockTable* lt, MemoryPool& pool, const X::NodeProto& node, const Peer &self,
-                                        int worker_id, const ExperimentParams& params, std::barrier<>* barrier) {
-    return std::unique_ptr<Worker>(new Worker(lt, pool, node, self, worker_id, params, barrier));
+                                        int worker_id, const ExperimentParams& params, std::barrier<>* barrier, key_map* kr_map, root_map* root_ptrs) {
+    return std::unique_ptr<Worker>(new Worker(lt, pool, node, self, worker_id, params, barrier, kr_map, root_ptrs));
   }
 
   static absl::StatusOr<ResultProto> Run(
@@ -79,8 +79,53 @@ class Worker : public rome::ClientAdaptor<key_type> {
     // std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 
+  inline X::remote_ptr<LockType> CalcLockAddr(const key_type &key){
+    auto min_key = node_.range().low();
+    auto max_key = node_.range().high();
+    ROME_DEBUG("Calculating lock addr for key {}", key);
+    if (key > max_key || key < min_key){
+      // find which node key belongs to
+      ROME_DEBUG("Key {} is remote to node {}", key, self_.id);
+      for(const auto& elem : *key_range_map_) {
+        auto nid = elem.first;
+        auto low = elem.second.first;
+        auto high = elem.second.second; 
+        ROME_DEBUG("CalcRemoteLockAddr: key: {} node: {} low: {}, high: {}", key, nid, low, high);
+        if (key > high) continue;
+        if (key <= high && key > low){
+          ROME_DEBUG("Desired key is on Node {}", nid);
+          // get root lock pointer of correct node
+          auto root_ptr = root_ptrs_->at(nid);
+          // calculate address of desired key and return 
+          auto diff = key - low;
+          auto bytes_to_jump = lock_byte_size_ * diff;
+          auto temp_ptr = rome::rdma::remote_ptr<uint8_t>(root_ptr);
+          temp_ptr -= bytes_to_jump;
+          auto lock_ptr = root_type(temp_ptr);
+          return lock_ptr;
+        } else if (key == low){
+          ROME_DEBUG("Desired key is on Node {}", nid);
+          return root_ptrs_->at(nid);
+        }
+        ROME_DEBUG("ERROR IN LOCK TABLE - COULD NOT FIND KEY: {}", key);
+      }
+    } else if (key >= min_key && key <= max_key){
+        ROME_DEBUG("Calculating local address for key {}", key);
+        // calculate the address of the desired key
+        auto diff = key - min_key;
+        auto bytes_to_jump = lock_byte_size_ * diff;
+        auto temp_ptr = rome::rdma::remote_ptr<uint8_t>(root_lock_ptr_);
+        temp_ptr -= bytes_to_jump;
+        auto lock_ptr = root_type(temp_ptr);
+        return lock_ptr;
+    }
+  }
+
   absl::Status Start() override {
     ROME_INFO("Starting NodeHarness...");
+    ROME_DEBUG("Attempting to get root_ptr at {}", self_.id);
+    ROME_DEBUG("Size of root ptr map is {}", root_ptrs_->size());
+    root_lock_ptr_ = root_ptrs_->at(self_.id);
     auto status = lock_handle_.Init();
     ROME_ASSERT_OK(status);
     barrier_->arrive_and_wait();
@@ -88,10 +133,11 @@ class Worker : public rome::ClientAdaptor<key_type> {
   }
 
   absl::Status Apply(const key_type &op) override {
-    // ROME_DEBUG("Attempting to lock key {}", op);
-    X::remote_ptr<LockType> lock_addr = lock_table_->GetLock(op);
-    ROME_DEBUG("Address for lock is {}", static_cast<uint64_t>(lock_addr));
-    ROME_DEBUG("Locking...");
+    ROME_DEBUG("Attempting to lock key {}", 100);
+    //! OVERRIDE FOR DEBUGGING --> key 100 for both nodes
+    X::remote_ptr<LockType> lock_addr = CalcLockAddr(100);
+    ROME_DEBUG("Address for lock is {:x}", static_cast<uint64_t>(lock_addr));
+    ROME_DEBUG("Locking key {}...", 100);
     lock_handle_.Lock(lock_addr);
     auto start = util::SystemClock::now();
     if (params_.workload().has_think_time_ns()) {
@@ -115,8 +161,15 @@ class Worker : public rome::ClientAdaptor<key_type> {
 
  private:
   Worker(LockTable* lt, MemoryPool& pool, const X::NodeProto& node, const Peer &self, 
-         int worker_id, const ExperimentParams& params, std::barrier<>* barrier)
-      : lock_table_(lt), node_(node), self_(self), params_(params), barrier_(barrier), lock_handle_(self, pool, worker_id) {}
+         int worker_id, const ExperimentParams& params, std::barrier<>* barrier, key_map* kr_map, root_map* root_ptrs)
+      : lock_table_(lt), 
+        node_(node), 
+        self_(self), 
+        params_(params), 
+        barrier_(barrier), 
+        lock_handle_(self, pool, worker_id), 
+        key_range_map_(kr_map), 
+        root_ptrs_(root_ptrs) {}
 
   LockTable* lock_table_;
   const X::NodeProto node_;
@@ -125,6 +178,9 @@ class Worker : public rome::ClientAdaptor<key_type> {
   std::barrier<>* barrier_;
 
   LockHandle lock_handle_; //Handle to interact with descriptors, one per worker
+  key_map* key_range_map_;
+  root_map* root_ptrs_;
+  root_type root_lock_ptr_;
   
   // For generating a random key to lock if stream doesnt work
   std::random_device rd_;
@@ -147,8 +203,9 @@ class NodeHarness {
   absl::Status Launch(volatile bool* done, ExperimentParams experiment_params) {
     std::vector<std::unique_ptr<Worker>> workers;
     for (auto i = 0; i < experiment_params.num_threads(); ++i) {
+      ROME_DEBUG("Creating Worker {} on Node {}", i, self_.id);
       workers.emplace_back(
-          Worker::Create(node_->GetLockTable(), *(node_->GetLockPool()), node_proto_, self_, i, params_, &barrier_));
+          Worker::Create(node_->GetLockTable(), *(node_->GetLockPool()), node_proto_, self_, i, params_, &barrier_, node_->GetKeyRangeMap(), node_->GetRootPtrMap()));
     }
 
     std::for_each(workers.begin(), workers.end(), [&](auto& worker) {

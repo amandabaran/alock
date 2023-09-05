@@ -14,57 +14,39 @@ class LockTable {
  using lock_type = V; // ALock or MCSDescriptor or 
  using MemoryPool = rome::rdma::MemoryPool;
  using root_type = rome::rdma::remote_ptr<lock_type>;
+//  using root_map = std::map<uint32_t, root_type>;
+//  using key_map = std::map<uint32_t, std::pair<key_type, key_type>>;
 
  public:
   LockTable(const NodeProto& node, MemoryPool &lock_pool)
-    : self_(node),
-      lock_pool_(lock_pool) {
-        min_key_ = self_.range().low();
-        max_key_= self_.range().high();
-        lock_byte_size_ = sizeof(lock_type);
-    }
+    :   self_(node),
+        node_id_(node.nid()),
+        lock_pool_(lock_pool) {
+          min_key_ = self_.range().low();
+          max_key_= self_.range().high();
+  }
 
   root_type AllocateLocks(const key_type& min_key, const key_type& max_key){
-    ROME_DEBUG("Allocating first Lock in LockTable");
     auto lock = lock_pool_.Allocate<lock_type>();
     root_lock_ptr_ = lock;
+    ROME_DEBUG("Allocated root lock for key {}", static_cast<key_type>(min_key));
     // Allocate one lock per key
-    for (auto i = min_key_ + 1; i <= max_key_; i++){
-        ROME_DEBUG("Allocating lock for key {} in LockTable", i);
+    for (auto i = min_key + 1; i <= max_key; i++){
         lock_pool_.Allocate<lock_type>();
+        ROME_DEBUG("Allocated lock for key {}", i);
     }
+    ROME_DEBUG("Root Ptr on Node {} is {:x}", node_id_, static_cast<uint64_t>(root_lock_ptr_));
     // return pointer to first lock in table
     return root_lock_ptr_;
   }
 
-  root_type GetLock() {
-    return root_lock_ptr_; 
-  }
-
-  root_type GetLock(const key_type& key) {
-    if (key > max_key_ || key < min_key_){
-        ROME_DEBUG("Attempting to get lock from from incorrect LockTable.");
-        // TODO : return a more meaningful error
-        return rome::rdma::remote_nullptr;
-    } else if (key > min_key_){
-        // calculate the address of the desired key
-        auto diff = key - min_key_;
-        auto bytes_to_jump = lock_byte_size_ * diff;
-        auto temp_ptr = rome::rdma::remote_ptr<uint8_t>(root_lock_ptr_);
-        temp_ptr += bytes_to_jump;
-        auto lock_ptr = root_type(temp_ptr);
-        return lock_ptr;
-    }
-    return root_lock_ptr_; 
-  }
-
  private:
   const NodeProto& self_;
+  const uint32_t node_id_;
   MemoryPool &lock_pool_;
   root_type root_lock_ptr_;
   key_type max_key_;
   key_type min_key_;
-  uint64_t lock_byte_size_;
 };
 
 }  // namespace X

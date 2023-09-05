@@ -86,7 +86,7 @@ private:
 
   // Pointers to pre-allocated descriptor to be used remotely
   remote_ptr<RdmaDescriptor> r_desc_pointer_;
-  volatile RdmaDescriptor *r_desc_;
+  volatile RdmaDescriptor* r_desc_;
 
   
 };

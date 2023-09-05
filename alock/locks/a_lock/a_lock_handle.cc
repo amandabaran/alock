@@ -15,8 +15,6 @@ absl::Status ALockHandle::Init() {
   // allocate local and remote descriptors for this worker to use
   AllocateDescriptors();
 
-  //TODO: Connect descriptor pool to other workers?
-  
   //Used as preallocated memory for RDMA writes
   prealloc_ = pool_.Allocate<remote_ptr<RdmaDescriptor>>();
   
@@ -27,12 +25,12 @@ void ALockHandle::AllocateDescriptors(){
   // Pointer to first remote descriptor
   r_desc_pointer_ = pool_.Allocate<RdmaDescriptor>();
   r_desc_ = reinterpret_cast<RdmaDescriptor *>(r_desc_pointer_.address());
-  ROME_DEBUG("Worker {} on Node {}: RdmaDescriptor @ {:x}", worker_id_, self_.nid(), static_cast<uint64_t>(r_desc_pointer_));
+  ROME_DEBUG("Worker {} on Node {}: RdmaDescriptor @ {:x}", worker_id_, self_.id, static_cast<uint64_t>(r_desc_pointer_));
 
   // Pointer to first local descriptor
   l_desc_pointer_ = pool_.Allocate<LocalDescriptor>();
   l_desc_ = reinterpret_cast<LocalDescriptor *>(l_desc_pointer_.address());
-  ROME_DEBUG("Worker {} on Node {}: LocalDescriptor @ {:x}", worker_id_, self_.nid(), static_cast<uint64_t>(l_desc_pointer_));
+  ROME_DEBUG("Worker {} on Node {}: LocalDescriptor @ {:x}", worker_id_, self_.id, static_cast<uint64_t>(l_desc_pointer_));
  
   // Make sure remote and local descriptors are done allocating
   std::atomic_thread_fence(std::memory_order_release);
@@ -147,19 +145,18 @@ void ALockHandle::LockLocalMcsQueue(){
     ROME_DEBUG("LOCKING LOCAL MCS QUEUE...");
     // to acquire the lock a thread atomically appends its own local node at the
     // tail of the list returning tail's previous contents
-    // ROME_DEBUG("l_tail_ @ {:x}", (&l_tail_));
     auto prior_node = l_l_tail_.exchange(l_desc_, std::memory_order_acquire);
     if (prior_node != nullptr) {
         l_desc_->budget = -1;
         // if the list was not previously empty, it sets the predecessor’s next
         // field to refer to its own local node
+        //TODO: SEG FAUlT
         prior_node->next = l_desc_;
         // thread then spins on its local locked field, waiting until its
         // predecessor sets this field to false
         //!STUCK IN THIS LOOP!!!!!!!! 
         while (l_desc_->budget < 0) {
-            cpu_relax();
-            ROME_DEBUG("WAITING IN HERE...");
+            cpu_relax(); 
         }
 
         // If budget exceeded, then reinitialize.

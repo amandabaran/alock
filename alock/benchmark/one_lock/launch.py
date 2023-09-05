@@ -54,7 +54,7 @@ flags.DEFINE_float('theta', 0.99, 'Theta in Zipfian distribution')
 
 flags.DEFINE_integer('runtime', 10, 'Number of seconds to run experiment')
 
-flags.DEFINE_bool('prefill', False, 'Prefill range of locks or just one')
+flags.DEFINE_bool('prefill', True, 'Prefill range of locks or just one')
 
 flags.DEFINE_string('ssh_user', 'adb321', '')
 flags.DEFINE_string('ssh_keyfile', '~/.ssh/id_ed25519', '')
@@ -140,7 +140,7 @@ def parse_nodes(csv, nid, num_nodes):
         
         min_key = int(r * keys_per_node)
         max_key = int((r + 1) * keys_per_node) if (r < num_nodes - 1) else FLAGS.max_key
-        
+        print("Max key is ", max_key, " on node ", r)
         c = cluster_pb2.NodeProto(
             nid=nid, name=n[0], public_name=n[1],
             port=FLAGS.port + nid,

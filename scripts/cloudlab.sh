@@ -1,7 +1,8 @@
 #!/bin/bash
 
+nodetype=r6525
 workspace=/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock
-nodefile=/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/nodefiles/r6525.csv
+nodefile=/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/nodefiles/${nodetype}.csv
 
 #** FUNCTION DEFINITIONS **#
 
@@ -37,7 +38,7 @@ build() {
 
 sync
 
-# setup
+setup
 
 
 if [ "$#" -eq  "0" ]

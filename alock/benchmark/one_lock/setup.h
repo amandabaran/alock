@@ -52,6 +52,13 @@ using LockType = LOCK_TYPE;
 #error "LOCK_TYPE is undefined"
 #endif
 
+using LockTable = X::LockTable<key_type, LockType>;
+using root_type = X::remote_ptr<LockType>;
+using root_map = std::map<uint32_t, root_type>;
+using key_map = std::map<uint32_t, std::pair<key_type, key_type>>;
+
+uint64_t lock_byte_size_ = sizeof(LockType);
+
 
 // struct LockOp {
 //   key_type key; 

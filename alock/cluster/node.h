@@ -28,11 +28,11 @@ class Node {
   using key_type = K; // some int (uint16)
   using lock_type = V; // ALock
   using MemoryPool = rome::rdma::MemoryPool;
-  
- public:
   using root_type = remote_ptr<lock_type>;
   using root_map = std::map<uint32_t, root_type>;
-
+  using key_map = std::map<uint32_t, std::pair<key_type, key_type>>;
+  
+ public:
   ~Node();
   Node(const NodeProto& self, const ClusterProto& cluster, bool prefill);
 
@@ -42,7 +42,9 @@ class Node {
 
   LockTable<K, V>* GetLockTable() { return &lock_table_; }
 
-  root_map* GetRootPtrMap(){ return &root_ptrs_; }
+  key_map* GetKeyRangeMap() { return &key_range_map_; }
+
+  root_map* GetRootPtrMap() { return &root_ptrs_; }
 
   MemoryPool* GetLockPool(){ return &lock_pool_; }
 
@@ -53,8 +55,9 @@ class Node {
 
   MemoryPool lock_pool_;
   LockTable<K,V> lock_table_;
-  root_map root_ptrs_;
   root_type root_lock_ptr_;
+  key_map key_range_map_;
+  root_map root_ptrs_;
 };
 
 }  // namespace X 

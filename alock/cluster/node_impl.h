@@ -35,9 +35,11 @@ template <typename K, typename V>
 absl::Status Node<K,V>::Connect(){
   std::vector<MemoryPool::Peer> peers;
   peers.reserve(cluster_.nodes_size());
+  //Create a vector of peers of everyone but yourself
   for (auto n : cluster_.nodes()){
     if (n.nid() == self_.nid()) { continue; }
     auto peer = MemoryPool::Peer(n.nid(), n.name(), n.port());
+    peers.push_back(peer);
   }
   
   ROME_DEBUG("Init MemoryPool for locks");
@@ -50,6 +52,7 @@ absl::Status Node<K,V>::Connect(){
 
   ROME_DEBUG("Root Lock pointer {:x}", static_cast<uint64_t>(root_lock_ptr_));
 
+  //TODO: FIX THIS. Not sharing root pointers correctly
   // tell all the peers where to find the addr of the first lock on this node
   for (auto p : peers) {
     // Send all peers the root of the lock on self
@@ -74,7 +77,8 @@ absl::Status Node<K,V>::Connect(){
 
     root_ptrs_.emplace(p.id, root);
   }
-
+  std::atomic_thread_fence(std::memory_order_release);
+  
   return absl::OkStatus();
 }
 
@@ -82,15 +86,21 @@ absl::Status Node<K,V>::Connect(){
 template <typename K, typename V>
 absl::Status Node<K, V>::Prefill(const key_type& min_key,
                                    const key_type& max_key) {
-  ROME_INFO("Prefilling lock table... [{}, {})", min_key, max_key);
   if (prefill_){
+    ROME_INFO("Prefilling lock table... [{}, {})", min_key, max_key);
     root_lock_ptr_ = lock_table_.AllocateLocks(min_key, max_key);
   } else {
-    root_lock_ptr_ = lock_table_.AllocateLocks(0, 0);
+    ROME_INFO("Prefilling set to false, one lock per lock table");
+    root_lock_ptr_ = lock_table_.AllocateLocks(min_key, min_key);
   }
   ROME_INFO("Finished prefilling lock table");
-
+  root_ptrs_.emplace(self_.nid(), root_lock_ptr_);
   return absl::OkStatus();
 }
+
+// template <typename K, typename V>
+// absl::Status Node<K, V>::FillKeyRangeMap(){
+  
+// }
 
 } //namespace X
