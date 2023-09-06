@@ -79,38 +79,33 @@ class Worker : public rome::ClientAdaptor<key_type> {
     // std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 
-  inline X::remote_ptr<LockType> CalcLockAddr(const key_type &key){
+  X::remote_ptr<LockType> CalcLockAddr(const key_type &key){
     auto min_key = node_.range().low();
     auto max_key = node_.range().high();
-    ROME_DEBUG("Calculating lock addr for key {}", key);
     if (key > max_key || key < min_key){
       // find which node key belongs to
-      ROME_DEBUG("Key {} is remote to node {}", key, self_.id);
-      for(const auto& elem : *key_range_map_) {
+      for(const auto &elem : *key_range_map_) {
         auto nid = elem.first;
-        auto low = elem.second.first;
-        auto high = elem.second.second; 
-        ROME_DEBUG("CalcRemoteLockAddr: key: {} node: {} low: {}, high: {}", key, nid, low, high);
-        if (key > high) continue;
-        if (key <= high && key > low){
-          ROME_DEBUG("Desired key is on Node {}", nid);
+        auto min_key = elem.second.first;
+        auto max_key = elem.second.second; 
+        if (key > max_key) continue;
+        if (key <= max_key && key > min_key){
           // get root lock pointer of correct node
-          auto root_ptr = root_ptrs_->at(nid);
+          root_type root_ptr = root_ptrs_->at(nid);
           // calculate address of desired key and return 
-          auto diff = key - low;
+          auto diff = key - min_key;
           auto bytes_to_jump = lock_byte_size_ * diff;
           auto temp_ptr = rome::rdma::remote_ptr<uint8_t>(root_ptr);
           temp_ptr -= bytes_to_jump;
           auto lock_ptr = root_type(temp_ptr);
           return lock_ptr;
-        } else if (key == low){
-          ROME_DEBUG("Desired key is on Node {}", nid);
+        } else if (key == min_key){
+          // TODO: change to ? : for returning min vs max key
           return root_ptrs_->at(nid);
         }
-        ROME_DEBUG("ERROR IN LOCK TABLE - COULD NOT FIND KEY: {}", key);
       }
+      ROME_DEBUG("ERROR - COULD NOT FIND KEY: {}", key);
     } else if (key >= min_key && key <= max_key){
-        ROME_DEBUG("Calculating local address for key {}", key);
         // calculate the address of the desired key
         auto diff = key - min_key;
         auto bytes_to_jump = lock_byte_size_ * diff;
@@ -119,12 +114,14 @@ class Worker : public rome::ClientAdaptor<key_type> {
         auto lock_ptr = root_type(temp_ptr);
         return lock_ptr;
     }
+    return X::remote_nullptr;
   }
 
   absl::Status Start() override {
     ROME_INFO("Starting NodeHarness...");
     ROME_DEBUG("Attempting to get root_ptr at {}", self_.id);
     ROME_DEBUG("Size of root ptr map is {}", root_ptrs_->size());
+    ROME_DEBUG("Size of key range map is {}", key_range_map_->size());
     root_lock_ptr_ = root_ptrs_->at(self_.id);
     auto status = lock_handle_.Init();
     ROME_ASSERT_OK(status);
@@ -132,12 +129,12 @@ class Worker : public rome::ClientAdaptor<key_type> {
     return status;
   }
 
+//! OVERRIDE FOR DEBUGGING --> key 10 for both nodes
   absl::Status Apply(const key_type &op) override {
-    ROME_DEBUG("Attempting to lock key {}", 100);
-    //! OVERRIDE FOR DEBUGGING --> key 100 for both nodes
-    X::remote_ptr<LockType> lock_addr = CalcLockAddr(100);
+    ROME_DEBUG("Attempting to lock key {}", 10);
+    X::remote_ptr<LockType> lock_addr = CalcLockAddr(10);
     ROME_DEBUG("Address for lock is {:x}", static_cast<uint64_t>(lock_addr));
-    ROME_DEBUG("Locking key {}...", 100);
+    ROME_DEBUG("Locking key {}...", 10);
     lock_handle_.Lock(lock_addr);
     auto start = util::SystemClock::now();
     if (params_.workload().has_think_time_ns()) {
@@ -145,7 +142,7 @@ class Worker : public rome::ClientAdaptor<key_type> {
              std::chrono::nanoseconds(params_.workload().think_time_ns()))
        ;
     }
-    ROME_DEBUG("Unlocking...");
+    ROME_DEBUG("Unlocking key {}...", 10);
     lock_handle_.Unlock(lock_addr);
     return absl::OkStatus();
   }

@@ -48,7 +48,7 @@ flags.DEFINE_multi_string('lock_type', 'spin', 'Lock type used in experiment (on
 flags.DEFINE_multi_integer('think_ns', 500, 'Think times in nanoseconds')
 
 flags.DEFINE_integer('min_key', 0, 'Minimum key')
-flags.DEFINE_integer('max_key', int(1e6), 'Maximum key')
+flags.DEFINE_integer('max_key', int(1e2), 'Maximum key') #int(1e6), changeed to 100 for debugging
 flags.DEFINE_integer('threads', 1, 'Number of NodeHarnesses (threads) to launch per node')
 flags.DEFINE_float('theta', 0.99, 'Theta in Zipfian distribution')
 
@@ -89,11 +89,11 @@ config = configparser.ConfigParser(
 launch = None
 workload = None
 
+
 __lehigh__ = ['luigi']
 __utah__ = ['xl170', 'c6525-100g', 'c6525-25g', 'd6515']
-__clemson__ = ['r6525']
+__clemson__ = ['r6525', 'r650']
 __emulab__ = ['r320']
-
 
 def get_domain(node_type):
     if node_type in __utah__:

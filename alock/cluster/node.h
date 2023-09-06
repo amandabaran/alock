@@ -40,6 +40,8 @@ class Node {
 
   absl::Status Prefill(const key_type& min_key, const key_type& max_key);
 
+  absl::Status FillKeyRangeMap();
+
   LockTable<K, V>* GetLockTable() { return &lock_table_; }
 
   key_map* GetKeyRangeMap() { return &key_range_map_; }
@@ -47,6 +49,7 @@ class Node {
   root_map* GetRootPtrMap() { return &root_ptrs_; }
 
   MemoryPool* GetLockPool(){ return &lock_pool_; }
+
 
  private:
   const NodeProto self_;
@@ -60,6 +63,6 @@ class Node {
   root_map root_ptrs_;
 };
 
-}  // namespace X 
+}  // namespace X å
 
 #include "node_impl.h"

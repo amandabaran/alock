@@ -47,6 +47,8 @@ absl::Status Node<K,V>::Connect(){
 
   ROME_ASSERT_OK(Prefill(self_.range().low(), self_.range().high()));
 
+  ROME_ASSERT_OK(FillKeyRangeMap());
+
   RemoteObjectProto proto;
   proto.set_raddr(root_lock_ptr_.address());
 
@@ -98,9 +100,14 @@ absl::Status Node<K, V>::Prefill(const key_type& min_key,
   return absl::OkStatus();
 }
 
-// template <typename K, typename V>
-// absl::Status Node<K, V>::FillKeyRangeMap(){
-  
-// }
+template <typename K, typename V>
+absl::Status Node<K, V>::FillKeyRangeMap(){
+  auto node_list = cluster_.nodes();
+  for (auto node : node_list){
+    auto key_range = node.range();
+    key_range_map_.emplace(node.nid(), std::make_pair(key_range.low(), key_range.high()));
+  }
+  return absl::OkStatus();
+}
 
 } //namespace X
