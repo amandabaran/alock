@@ -100,11 +100,9 @@ class Worker : public rome::ClientAdaptor<key_type> {
           auto lock_ptr = root_type(temp_ptr);
           return lock_ptr;
         } else if (key == min_key){
-          // TODO: change to ? : for returning min vs max key
           return root_ptrs_->at(nid);
         }
       }
-      ROME_DEBUG("ERROR - COULD NOT FIND KEY: {}", key);
     } else if (key >= min_key && key <= max_key){
         // calculate the address of the desired key
         auto diff = key - min_key;
@@ -114,14 +112,12 @@ class Worker : public rome::ClientAdaptor<key_type> {
         auto lock_ptr = root_type(temp_ptr);
         return lock_ptr;
     }
+    ROME_DEBUG("ERROR - COULD NOT FIND KEY: {}", key);
     return X::remote_nullptr;
   }
 
   absl::Status Start() override {
     ROME_INFO("Starting NodeHarness...");
-    ROME_DEBUG("Attempting to get root_ptr at {}", self_.id);
-    ROME_DEBUG("Size of root ptr map is {}", root_ptrs_->size());
-    ROME_DEBUG("Size of key range map is {}", key_range_map_->size());
     root_lock_ptr_ = root_ptrs_->at(self_.id);
     auto status = lock_handle_.Init();
     ROME_ASSERT_OK(status);
@@ -129,12 +125,10 @@ class Worker : public rome::ClientAdaptor<key_type> {
     return status;
   }
 
-//! OVERRIDE FOR DEBUGGING --> key 10 for both nodes
   absl::Status Apply(const key_type &op) override {
-    ROME_DEBUG("Attempting to lock key {}", 10);
-    X::remote_ptr<LockType> lock_addr = CalcLockAddr(10);
+    ROME_DEBUG("Attempting to lock key {}", op);
+    X::remote_ptr<LockType> lock_addr = CalcLockAddr(op);
     ROME_DEBUG("Address for lock is {:x}", static_cast<uint64_t>(lock_addr));
-    ROME_DEBUG("Locking key {}...", 10);
     lock_handle_.Lock(lock_addr);
     auto start = util::SystemClock::now();
     if (params_.workload().has_think_time_ns()) {
@@ -142,7 +136,7 @@ class Worker : public rome::ClientAdaptor<key_type> {
              std::chrono::nanoseconds(params_.workload().think_time_ns()))
        ;
     }
-    ROME_DEBUG("Unlocking key {}...", 10);
+    ROME_DEBUG("Unlocking key {}...", op);
     lock_handle_.Unlock(lock_addr);
     return absl::OkStatus();
   }

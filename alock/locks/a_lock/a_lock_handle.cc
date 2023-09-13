@@ -78,8 +78,7 @@ bool ALockHandle::IsRemoteVictim() {
 
 bool ALockHandle::LockRemoteMcsQueue(){
     ROME_DEBUG("Locking remote MCS queue...");
-
-    ROME_DEBUG("Swapping r_tail: {:x} with r_desc_pointer: {:x} ", static_cast<uint64_t>(r_tail_), static_cast<uint64_t>(r_desc_pointer_));
+    
     // swap RemoteDescriptor onto the remote tail of the alock 
     auto prev =
       pool_.AtomicSwap(r_tail_, static_cast<uint64_t>(r_desc_pointer_));
@@ -136,9 +135,7 @@ bool ALockHandle::LockLocalMcsQueue(){
     ROME_DEBUG("LOCKING LOCAL MCS QUEUE...");
     // to acquire the lock a thread atomically appends its own local node at the
     // tail of the list returning tail's previous contents
-    ROME_DEBUG("l_l_tail_ is {:x}", reinterpret_cast<uint64_t>(l_l_tail_->load()));
     auto prior_node = l_l_tail_->exchange(&l_desc_, std::memory_order_acquire);
-    ROME_DEBUG("Prior node is {:x}", reinterpret_cast<uint64_t>(&prior_node));
     if (prior_node != nullptr) {
         // l_desc_.budget = -1;
         // if the list was not previously empty, it sets the predecessor’s next
@@ -146,10 +143,7 @@ bool ALockHandle::LockLocalMcsQueue(){
         prior_node->next = &l_desc_;
         // thread then spins on its local locked field, waiting until its
         // predecessor sets this field to false
-        //!STUCK IN THIS LOOP!!!!!!!! 
-        ROME_DEBUG("AM I HERE\n");
         while (l_desc_.budget < 0) cpu_relax(); 
-        ROME_DEBUG("GOT OUT OF LOOP\n");
 
         // If budget exceeded, then reinitialize.
         if (l_desc_.budget == 0) {
@@ -162,7 +156,6 @@ bool ALockHandle::LockLocalMcsQueue(){
     } else {
       l_desc_.budget = kInitBudget;
     }
-    ROME_DEBUG("First in local queue");
     // now first in the queue, own the lock and enter the critical section...
     return true;
 }
@@ -172,7 +165,6 @@ void ALockHandle::LocalLock(){
     bool is_leader = LockLocalMcsQueue();
     if (is_leader){
         auto prev = l_victim_->exchange(LOCAL_VICTIM, std::memory_order_acquire);
-        ROME_DEBUG("l_r_tail is {:x}", reinterpret_cast<uint64_t>(l_r_tail_->load()));
         while (l_victim_->load() == LOCAL_VICTIM && l_r_tail_->load() != 0){
             cpu_relax();
         } 
@@ -237,7 +229,6 @@ void ALockHandle::LocalUnlock(){
     // in either case, once the successor has appeared, the unlock() method sets
     // its successor’s locked field to false, indicating that the lock is now free
     l_desc_.next->budget = l_desc_.budget - 1;
-    // ! THIS IS HOW WE KNOW WHEN TO ALLOW REUSING (CHECK IF NEXT IS NULLPTR AND ALWAYS MOVE FORWARD)
     // at this point no other thread can access this node and it can be reused
     l_desc_.next = nullptr;
 }
