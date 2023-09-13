@@ -29,14 +29,14 @@ static constexpr uint32_t kPoolSize = 22;
 #define DESC_PTR_OFFSET 16
 #define VICTIM_OFFSET 32
 
-struct alignas(64) RdmaDescriptor {
+struct alignas(64) RemoteDescriptor {
     int8_t budget{-1};
     uint8_t pad1[NEXT_PTR_OFFSET - sizeof(budget)];
-    remote_ptr<RdmaDescriptor> next{0};
+    remote_ptr<RemoteDescriptor> next{0};
     uint8_t pad2[CACHELINE_SIZE - NEXT_PTR_OFFSET - sizeof(next)];
 };
-static_assert(alignof(RdmaDescriptor) == CACHELINE_SIZE);
-static_assert(sizeof(RdmaDescriptor) == CACHELINE_SIZE);
+static_assert(alignof(RemoteDescriptor) == CACHELINE_SIZE);
+static_assert(sizeof(RemoteDescriptor) == CACHELINE_SIZE);
 
 struct alignas(64) LocalDescriptor {
     int8_t budget{-1}; //budget == -1 indicates its locked, unlocked and passed off when it can proceed to critical section
@@ -49,7 +49,7 @@ static_assert(sizeof(LocalDescriptor) == CACHELINE_SIZE);
 
 struct alignas(64) ALock {
     // pointer to the pointer of the remote tail
-    remote_ptr<RdmaDescriptor> r_tail;
+    remote_ptr<RemoteDescriptor> r_tail;
     // pad so local tail starts at addr+16
     uint8_t pad1[DESC_PTR_OFFSET - sizeof(r_tail)]; 
     // pointer to the local tail

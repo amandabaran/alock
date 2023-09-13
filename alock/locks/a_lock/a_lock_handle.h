@@ -25,7 +25,8 @@ using ::rome::rdma::remote_nullptr;
 using ::rome::rdma::remote_ptr;
 using ::rome::rdma::RemoteObjectProto;
 
-#define DESCS_PER_CLIENT 100
+template <typename T>
+using local_ptr = std::atomic<T>*;
 
 class ALockHandle{
 public:
@@ -35,29 +36,26 @@ public:
 
   absl::Status Init();
 
-  bool IsLocked();
+  bool inline IsLocked();
   void Lock(remote_ptr<ALock> alock);
   void Unlock(remote_ptr<ALock> alock);
 
-private:
-  void AllocateDescriptors();
-
-  bool inline IsLocal();
+private:  
   bool IsRTailLocked();
   bool IsLTailLocked();
   bool IsRemoteVictim();
  
-  void LockRemoteMcsQueue();
+  bool LockRemoteMcsQueue();
   void RemoteLock();
-  void LockLocalMcsQueue();
+  bool LockLocalMcsQueue();
   void LocalLock();
   void RemoteUnlock();
   void LocalUnlock();
 
-  void Reacquire(bool isLocal);
+  void Reacquire();
 
-  bool is_r_leader_;
-  bool is_l_leader_;
+  //! ALL OF THIS IS THREAD LOCAL AND APPLIES TO ONE LOCKING OPERATION ---> NEED TO RETHINK SOME THINGS
+  bool is_local_; //resued for each call to lock for easy check on whether worker is local to key we are attempting to lock
   
   MemoryPool::Peer self_;
   int worker_id_;
@@ -69,24 +67,25 @@ private:
 
   // TODO: NOT SURE ITS NECESSARY TO STORE ALL THIS STUFF SINCE WE KNOW THE OFFSETS....
   // Access to fields remotely
-  remote_ptr<remote_ptr<RdmaDescriptor>> r_tail_;
+  remote_ptr<remote_ptr<RemoteDescriptor>> r_tail_;
   remote_ptr<remote_ptr<LocalDescriptor>> r_l_tail_;
   remote_ptr<uint64_t> r_victim_;
 
   // Access to fields locally
-  std::atomic<LocalDescriptor*> l_l_tail_;
-  std::atomic<uint64_t*> l_victim_;
+  local_ptr<RemoteDescriptor*> l_r_tail_;
+  local_ptr<LocalDescriptor*> l_l_tail_;
+  local_ptr<uint64_t*> l_victim_;
   
   // Prealloc used for rdma writes of rdma descriptor in RemoteUnlock
-  remote_ptr<remote_ptr<RdmaDescriptor>> prealloc_;
+  remote_ptr<remote_ptr<RemoteDescriptor>> prealloc_;
 
   // Pointers to pre-allocated descriptor to be used locally
   remote_ptr<LocalDescriptor> l_desc_pointer_;
-  LocalDescriptor* l_desc_; // static thread_local causes undefined ref error
+  LocalDescriptor l_desc_;
 
   // Pointers to pre-allocated descriptor to be used remotely
-  remote_ptr<RdmaDescriptor> r_desc_pointer_;
-  volatile RdmaDescriptor* r_desc_;
+  remote_ptr<RemoteDescriptor> r_desc_pointer_;
+  volatile RemoteDescriptor* r_desc_;
 
   
 };
