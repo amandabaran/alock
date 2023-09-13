@@ -172,8 +172,8 @@ void ALockHandle::LocalLock(){
     bool is_leader = LockLocalMcsQueue();
     if (is_leader){
         auto prev = l_victim_->exchange(LOCAL_VICTIM, std::memory_order_acquire);
-        //TODO: Local does not need to read remote tail like this because it is local... add l_r_tail_
-        while (l_victim_->load() == LOCAL_VICTIM && IsRTailLocked()){
+        ROME_DEBUG("l_r_tail is {:x}", reinterpret_cast<uint64_t>(l_r_tail_->load()));
+        while (l_victim_->load() == LOCAL_VICTIM && l_r_tail_->load() != 0){
             cpu_relax();
         } 
     }
@@ -252,15 +252,13 @@ void ALockHandle::Lock(remote_ptr<ALock> alock){
   if (is_local_){ 
     a_lock_ = decltype(a_lock_)(alock.raw());
     l_r_tail_ = reinterpret_cast<local_ptr<RemoteDescriptor*>>(alock.address());
-    ROME_DEBUG("l_r_tail addr is {:x}", reinterpret_cast<uint64_t>(l_r_tail_->load()));
+    ROME_DEBUG("l_r_tail addr is {:x}", reinterpret_cast<uint64_t>(&(*l_r_tail_->load())));
     l_l_tail_ = reinterpret_cast<local_ptr<LocalDescriptor*>>(alock.address() + DESC_PTR_OFFSET);
-    ROME_DEBUG("l_l_tail_ addr is {:x}", reinterpret_cast<uint64_t>(l_l_tail_->load()));
+    ROME_DEBUG("l_l_tail_ addr is {:x}", reinterpret_cast<uint64_t>(&(*l_l_tail_->load())));
     l_victim_ = reinterpret_cast<local_ptr<uint64_t*>>(alock.address() + VICTIM_OFFSET);
-    ROME_DEBUG("l_victim_ addr is {:x}", reinterpret_cast<uint64_t>(l_victim_->load()));
+    ROME_DEBUG("l_victim_ addr is {:x}", reinterpret_cast<uint64_t>(&(*l_victim_->load())));
     LocalLock();
   } else {
-    //! FORCE LOCAL TO WIN
-    sleep(5);
     RemoteLock();
   }
 }
