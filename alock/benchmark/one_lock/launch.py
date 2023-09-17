@@ -29,7 +29,7 @@ flags.DEFINE_bool(
     'Whether or not to print commands to retrieve data from client nodes')
 flags.DEFINE_string(
     'save_root',
-    'alock/alock/',
+    '~/alock/alock/bazel-bin/alock/benchmark/one_lock/main.runfiles/alock/',
     'Directory results are saved under when running')
 flags.DEFINE_string('nodefile', None, 'Path to nodefile',
                     short_name='n', required=True)
@@ -108,13 +108,11 @@ def get_domain(node_type):
         abort()
 
 
-def partition_nodefile(path, num_nodes):
+def partition_nodefile(path):
     nodes_csv = []
     assert(os.path.exists(path))
     with open(path, 'r') as __file:
         nodes_csv = [line for line in __file]
-    if num_nodes == -1:  # Conveniece for getting data
-        return nodes_csv
     return nodes_csv
 
 
@@ -285,7 +283,7 @@ def execute(experiment_name, commands):
 def main(args):
     debugpy_hook() 
     if FLAGS.get_data:
-        nodes_csv, _ = partition_nodefile(FLAGS.nodefile, -1)
+        nodes_csv = partition_nodefile(FLAGS.nodefile)
         cluster_proto, nodes = parse_nodes(nodes_csv, 0, len(nodes_csv))
         commands = []
         with alive_bar(len(nodes.keys()), title="Getting data...") as bar:
@@ -295,7 +293,7 @@ def main(args):
                 execute('get_data',
                         [(build_get_data_command(
                             '', n, cluster_proto),
-                            build_logfile_path('', '', 'get_data', n), 0)])
+                            build_logfile_path('', 'get_data', n), 0)])
                 bar()
     elif FLAGS.plot:
         datafile = FLAGS.datafile
@@ -333,8 +331,7 @@ def main(args):
                 n_count = row['n']
                 think = row['t']
 
-                nodes_csv = partition_nodefile(
-                    FLAGS.nodefile, n_count)
+                nodes_csv = partition_nodefile(FLAGS.nodefile)
                 if nodes_csv is None:
                     continue
                 cluster_proto = experiment_pb2.CloudlabClusterProto()

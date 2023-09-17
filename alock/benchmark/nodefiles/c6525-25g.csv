@@ -1,3 +1,5 @@
-node0,amd225,c6525-25g
-node1,amd235,c6525-25g
-node2,amd233,c6525-25g
+node0,amd244,c6525-25g
+node1,amd233,c6525-25g
+node2,amd205,c6525-25g
+node3,amd221,c6525-25g
+node4,amd211,c6525-25g
