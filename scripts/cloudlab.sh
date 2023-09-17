@@ -1,8 +1,7 @@
 #!/bin/bash
 
-nodetype=r6525
-workspace=/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock
-nodefile=/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/nodefiles/${nodetype}.csv
+# Source cluster-dependent variables
+source "config.conf"
 
 #** FUNCTION DEFINITIONS **#
 

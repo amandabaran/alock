@@ -1,8 +1,7 @@
 #!/bin/bash
 
-nodetype=r6525
-workspace=/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock
-nodefile=/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/nodefiles/${nodetype}.csv
+# Source cluster-dependent variables
+source "config.conf"
 
 #** FUNCTION DEFINITIONS **#
 
@@ -50,7 +49,7 @@ sync
 # command
 
 lock="alock"
-log_level='trace'
+log_level='info'
 echo "Building ${lock}..."
 build ${lock}
 
@@ -58,10 +57,9 @@ save_dir="exp1"
 
 for num_nodes in 2
 do
-  bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --ssh_user=adb321 -N ${num_nodes} --lock_type=${lock} --think_ns=500 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=True
+  bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --ssh_user=adb321 -N ${num_nodes} --lock_type=${lock} --think_ns=500 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=False
 done
-# bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile}  --ssh_user=adb321 --lock_type=${lock} --get_data  --local_save_dir=${workspace}/benchmark/one_lock/results/${save_dir}/ --remote_save_dir=${save_dir} --lock_type=${lock}
-
+bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile}  --ssh_user=adb321 --lock_type=${lock} --get_data  --local_save_dir=${workspace}/benchmark/one_lock/results/${save_dir}/ --remote_save_dir=${save_dir} --lock_type=${lock}
 
 
 #  LOCAL WORKLOAD PERFORMANCE
