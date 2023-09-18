@@ -49,7 +49,7 @@ flags.DEFINE_multi_integer('think_ns', 500, 'Think times in nanoseconds')
 
 flags.DEFINE_integer('min_key', 0, 'Minimum key')
 flags.DEFINE_integer('max_key', int(1e2), 'Maximum key') #int(1e6), changeed to 100 for debugging
-flags.DEFINE_integer('threads', 1, 'Number of NodeHarnesses (threads) to launch per node')
+flags.DEFINE_integer('threads', 1, 'Number of Workers (threads) to launch per node')
 flags.DEFINE_float('theta', 0.99, 'Theta in Zipfian distribution')
 
 flags.DEFINE_integer('runtime', 10, 'Number of seconds to run experiment')
