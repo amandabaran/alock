@@ -28,9 +28,9 @@ using ::rome::rdma::MemoryPool;
 class Worker : public rome::ClientAdaptor<key_type> {
   
  public:
-  static std::unique_ptr<Worker> Create(LockTable* lt, MemoryPool& pool, const X::NodeProto& node, const Peer &self,
+  static std::unique_ptr<Worker> Create(MemoryPool& pool, const X::NodeProto& node, const Peer &self,
                                         int worker_id, const ExperimentParams& params, std::barrier<>* barrier, key_map* kr_map, root_map* root_ptrs) {
-    return std::unique_ptr<Worker>(new Worker(lt, pool, node, self, worker_id, params, barrier, kr_map, root_ptrs));
+    return std::unique_ptr<Worker>(new Worker(pool, node, self, worker_id, params, barrier, kr_map, root_ptrs));
   }
 
   static absl::StatusOr<ResultProto> Run(
@@ -54,29 +54,24 @@ class Worker : public rome::ClientAdaptor<key_type> {
         std::chrono::milliseconds(experiment_params.sampling_rate_ms()));
     ROME_ASSERT_OK(driver->Start());
 
-    // Sleep while driver is running then stop it.
-    if (experiment_params.workload().has_runtime() && experiment_params.workload().runtime() > 0) {
-      ROME_INFO("Running workload for {}s", experiment_params.workload().runtime());
-      auto runtime = std::chrono::seconds(experiment_params.workload().runtime());
-      std::this_thread::sleep_for(runtime);
-    } else {
-      ROME_INFO("Running workload indefinitely");
-      while (!(*done)) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-      }
-    }
+    // Sleep while driver is running
+    ROME_INFO("Running workload for {}s", experiment_params.workload().runtime());
+    auto runtime = std::chrono::seconds(experiment_params.workload().runtime());
+    std::this_thread::sleep_for(runtime);
+
     ROME_INFO("Stopping worker...");
     ROME_ASSERT_OK(driver->Stop());
+
+    // Sleep for a hot sec to let the node receive the messages sent by the
+    // clients before disconnecting.
+    // (see https://github.com/jacnel/project-x/issues/15)
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     // Output results.
     ResultProto result;
     result.mutable_node()->CopyFrom(worker_ptr->ToProto());
     result.mutable_driver()->CopyFrom(driver->ToProto());
-    return result;
-    // Sleep for a hot sec to let the node receive the messages sent by the
-    // clients before disconnecting.
-    // (see https://github.com/jacnel/project-x/issues/15)
-    // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    return result; 
   }
 
   X::remote_ptr<LockType> CalcLockAddr(const key_type &key){
@@ -144,6 +139,7 @@ class Worker : public rome::ClientAdaptor<key_type> {
     
   absl::Status Stop() override {
     ROME_DEBUG("Stopping...");
+    // Waits for all workers (threads) on node to arrive  at barrier
     barrier_->arrive_and_wait();
     return absl::OkStatus();
   }
@@ -151,10 +147,9 @@ class Worker : public rome::ClientAdaptor<key_type> {
   X::NodeProto ToProto() { return node_; }
 
  private:
-  Worker(LockTable* lt, MemoryPool& pool, const X::NodeProto& node, const Peer &self, 
+  Worker(MemoryPool& pool, const X::NodeProto& node, const Peer &self, 
          int worker_id, const ExperimentParams& params, std::barrier<>* barrier, key_map* kr_map, root_map* root_ptrs)
-      : lock_table_(lt), 
-        node_(node), 
+      : node_(node), 
         self_(self), 
         params_(params), 
         barrier_(barrier), 
@@ -162,7 +157,6 @@ class Worker : public rome::ClientAdaptor<key_type> {
         key_range_map_(kr_map), 
         root_ptrs_(root_ptrs) {}
 
-  LockTable* lock_table_;
   const X::NodeProto node_;
   const Peer self_;
   const ExperimentParams params_;
@@ -196,9 +190,10 @@ class NodeHarness {
     for (auto i = 0; i < experiment_params.num_threads(); ++i) {
       ROME_DEBUG("Creating Worker {} on Node {}", i, self_.id);
       workers.emplace_back(
-          Worker::Create(node_->GetLockTable(), *(node_->GetLockPool()), node_proto_, self_, i, params_, &barrier_, node_->GetKeyRangeMap(), node_->GetRootPtrMap()));
+          Worker::Create(*(node_->GetLockPool()), node_proto_, self_, i, params_, &barrier_, node_->GetKeyRangeMap(), node_->GetRootPtrMap()));
     }
-
+    
+    // Launch an async thread for each worker
     std::for_each(workers.begin(), workers.end(), [&](auto& worker) {
       results_.emplace_back(std::async([&]() {
         return Worker::Run(std::move(worker), experiment_params, done);

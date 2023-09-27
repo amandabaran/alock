@@ -77,7 +77,9 @@ private:
   local_ptr<uint64_t*> l_victim_;
   
   // Prealloc used for rdma writes of rdma descriptor in RemoteUnlock
-  remote_ptr<remote_ptr<RemoteDescriptor>> prealloc_;
+  remote_ptr<remote_ptr<RemoteDescriptor>> r_prealloc_;
+  remote_ptr<remote_ptr<LocalDescriptor>> l_prealloc_;
+  remote_ptr<uint64_t> v_prealloc_;
 
   // Pointers to pre-allocated descriptor to be used locally
   remote_ptr<LocalDescriptor> l_desc_pointer_;

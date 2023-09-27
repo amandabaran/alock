@@ -52,6 +52,9 @@ def getData(proto, path=''):
                         result[k] = [r[k]]
                     else:
                         result[k].append(r[k])
+            print(data)
+            print("\n\n\n\n")
+            print(result)
             data |= result
         else:
             data[path + ('.' if len(path) !=
@@ -295,70 +298,26 @@ def generate_csv(results_dir, datafile):
     data.to_csv(datafile, index_label='row')
 
 
-configs = {
-    'exp1': {
-        'c': {},
-        'r': {},
-        'w': {'nclients': 0, 'nreadonly': 0, 'nservers': 1, 'hue': 'c', 'xlabel': '', 'hlabel': ''},
-    },
-    'exp2': {
-        'c': {},
-        'r': {'nclients': 0,
-              'nworkers': None,  'nservers': 1, 'hue': 'w', 'xlabel': 'Num. read-only clients', 'hlabel': 'Num. workers'},
-        'w': {'nclients': 0,
-              'nreadonly': None, 'nservers': 1, 'hue': 'r', 'xlabel': 'Num. workers', 'hlabel': 'Num. read-only clients'},
-    },
-    'exp3': {
-        'c': {'nreadonly': 20, 'nworkers': 0, 'nservers': None, 'hue': 's', 'xlabel': 'Num. clients', 'hlabel': 'Num. servers'},
-        'r': {'nclients': None,
-              'nworkers': 0,  'nservers': 5, 'hue': 'c', 'xlabel': 'Num. read-only', 'hlabel': 'Num. clients'},
-        'w': {},
-    },
-    'exp4': {
-        'c': {},
-        'r': {'nclients': 0,
-              'nworkers': None,  'nservers': 1, 'hue': 'w', 'xlabel': 'Num. read-only clients', 'hlabel': 'Num. workers'},
-        'w': {'nclients': 0,
-              'nreadonly': None, 'nservers': 1, 'hue': 'r', 'xlabel': 'Num. workers', 'hlabel': 'Num. read-only clients'},
-    },
-    'exp5': {
-        'c': {},
-        'r': {'nclients': 0,
-              'nworkers': None,  'nservers': 1, 'hue': 'w', 'xlabel': 'Num. read-only clients', 'hlabel': 'Num. workers'},
-        'w': {'nclients': 0,
-              'nreadonly': None, 'nservers': 1, 'hue': 'r', 'xlabel': 'Num. workers', 'hlabel': 'Num. read-only'},
-    },
-    'exp6': {
-        'c': {},
-        'r': {'nclients': 0,
-              'nworkers': None,  'nservers': 1, 'hue': 'w', 'xlabel': 'Num. read-only clients', 'hlabel': 'Num. workers'},
-        'w': {'nclients': 0,
-              'nreadonly': None, 'nservers': 1, 'hue': 'r', 'xlabel': 'Num. workers', 'hlabel': 'Num. read-only'},
-    },
-}
-
-
 def plot(datafile, ycsb_list):
     data = pandas.read_csv(datafile)
     # TODO: THIS LINE CHANGES WHICH LOCK HOLD TIME WE ARE PLOTTING
-    data = data[data['experiment_params.workload.think_time_ns'] == 0] #modify what this takes to plot differernt set of
+    data = data[data['experiment_params.workload.think_time_ns'] == 5000] #modify what this takes to plot differernt set of
     # data = data[data['experiment_params.num_clients'] % 4 == 0]
                 # [data['experiment_params.num_clients'] >= 30]
 
-    mcs = data[data['experiment_params.name'].str.count("lmcs.*") == 1]
+    mcs = data[data['experiment_params.name'].str.count("mcs.*") == 1]
     mcs['lock_type'] = 'MCS'
 
-    spin = data[data['experiment_params.name'].str.count("lspin.*") == 1]
+    spin = data[data['experiment_params.name'].str.count("spin.*") == 1]
     spin['lock_type'] = 'Spin'
+    
+    alock = data[data['experiment_params.name'].str.count("alock.*") == 1]
+    alock['lock_type'] = 'ALock'
 
     data = pandas.concat([mcs, spin])
     data = data[['lock_type', 'experiment_params.cluster_size',
                  'results.driver.qps.summary.mean']]
 
-    # y_data[y_] = y_data[y_].apply(
-    #     lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
-    # y_data = y_data.explode(y_)
-    # y_data = y_data.reset_index(drop=True)
     data['results.driver.qps.summary.mean'] = data['results.driver.qps.summary.mean'].apply(
         lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
     data = data.explode('results.driver.qps.summary.mean')
@@ -366,53 +325,6 @@ def plot(datafile, ycsb_list):
     print(data)
     summary = get_summary(data)
 
-    plot_throughput(x1_, data, summary, 'lock_type', 'Num. clients',
+    plot_throughput(x1_, data, summary, 'lock_type', 'Num. nodes',
                     'Lock type', os.path.join(FLAGS.figdir, 'test'))
     print(data)
-    # for ycsb in ycsb_list:
-    #     client_data = get_client_data(data, ycsb)
-
-    #     c = configs[FLAGS.exp]
-    #     client_config = c['c']
-    #     readonly_config = c['r']
-    #     worker_config = c['w']
-
-    #     if len(client_config.keys()) != 0:
-    #         client_tput = client_throughput(
-    #             client_data, client_config['nreadonly'],
-    #             client_config['nworkers'],
-    #             client_config['nservers'])
-    #         save = os.path.join(FLAGS.figdir, ycsb, client_tput[-1])
-    #         plot_throughput(
-    #             *(client_tput[: -1]),
-    #             client_config['hue'],
-    #             client_config['xlabel'],
-    #             client_config['hlabel'],
-    #             save)
-
-    #     if len(readonly_config.keys()) != 0:
-    #         readonly_tput = readonly_throughput(
-    #             client_data, readonly_config['nclients'],
-    #             readonly_config['nworkers'],
-    #             readonly_config['nservers'])
-    #         save = os.path.join(FLAGS.figdir, ycsb, readonly_tput[-1])
-    #         plot_throughput(
-    #             *(readonly_tput[: -1]),
-    #             readonly_config['hue'],
-    #             readonly_config['xlabel'],
-    #             readonly_config['hlabel'],
-    #             save)
-
-    #     if len(worker_config.keys()) != 0:
-    #         server_data = get_server_data(data, ycsb)
-    #         worker_tput = worker_throughput(
-    #             server_data, worker_config['nclients'],
-    #             worker_config['nreadonly'],
-    #             worker_config['nservers'])
-    #         save = os.path.join(FLAGS.figdir, ycsb, worker_tput[-1])
-    #         plot_throughput(
-    #             *(worker_tput[: -1]),
-    #             worker_config['hue'],
-    #             worker_config['xlabel'],
-    #             worker_config['hlabel'],
-    #             save)

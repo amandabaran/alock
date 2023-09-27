@@ -150,6 +150,7 @@ def parse_clients(csv, nid, num_clients):
     proto.node_type = node_type
     proto.domain = get_domain(node_type)
     clients = {}
+    # This takes in the number of client nodes and turns it into the number of desired clients (i.e. 10 clients per physical node)
     for r in range(0, num_clients):
         i = nid % len(nodes)
         n = nodes[i]

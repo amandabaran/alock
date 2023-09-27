@@ -29,8 +29,10 @@ absl::Status ALockHandle::Init() {
   // Make sure remote and local descriptors are done allocating
   std::atomic_thread_fence(std::memory_order_release);
 
-  //Used as preallocated memory for RDMA writes
-  prealloc_ = pool_.Allocate<remote_ptr<RemoteDescriptor>>();
+  //Used as preallocated memory for RDMA reads/writes
+  r_prealloc_ = pool_.Allocate<remote_ptr<RemoteDescriptor>>();
+  l_prealloc_ = pool_.Allocate<remote_ptr<LocalDescriptor>>();
+  v_prealloc_ = pool_.Allocate<uint64_t>();
   
   return absl::OkStatus();
 }
@@ -41,7 +43,7 @@ bool inline ALockHandle::IsLocked() {
 
 bool ALockHandle::IsRTailLocked(){
     // read in value of current r_tail on host
-    auto remote = pool_.Read<remote_ptr<RemoteDescriptor>>(r_tail_);
+    auto remote = pool_.Read<remote_ptr<RemoteDescriptor>>(r_tail_, r_prealloc_);
     // store result of if its locked (0 = unlocked)
     auto locked = static_cast<uint64_t>(*(std::to_address(remote))) != 0;
     ROME_DEBUG("Read r_tail: r-tail={:x}, locked={}", static_cast<uint64_t>(remote), locked);
@@ -54,7 +56,7 @@ bool ALockHandle::IsRTailLocked(){
 
 bool ALockHandle::IsLTailLocked(){
     // remotely read in value of current l_tail on host
-    auto remote = pool_.Read<remote_ptr<LocalDescriptor>>(r_l_tail_);
+    auto remote = pool_.Read<remote_ptr<LocalDescriptor>>(r_l_tail_, l_prealloc_);
     // store result of if its locked
     auto locked = static_cast<uint64_t>(*(std::to_address(remote))) != 0;
     // deallocate the ptr used as a landing spot for reading in (which is created in Read)
@@ -66,7 +68,7 @@ bool ALockHandle::IsLTailLocked(){
 
 bool ALockHandle::IsRemoteVictim() {
     // read in value of victim var on host
-    auto remote = pool_.Read<uint64_t>(r_victim_);
+    auto remote = pool_.Read<uint64_t>(r_victim_, v_prealloc_);
     // store result of if its locked
     auto check_victim = static_cast<uint64_t>(*(std::to_address(remote))) == REMOTE_VICTIM;
     // deallocate the ptr used as a landing spot for reading in (which is created in Read)
@@ -91,8 +93,8 @@ bool ALockHandle::LockRemoteMcsQueue(){
         // set the address of the current tail's next field = to the addr of our local RemoteDescriptor
         pool_.Write<remote_ptr<RemoteDescriptor>>(
             static_cast<remote_ptr<remote_ptr<RemoteDescriptor>>>(prev), r_desc_pointer_,
-            prealloc_);
-        ROME_DEBUG("[Lock] Enqueued: {} --> (id={})",
+            r_prealloc_);
+        ROME_INFO("[Lock] Enqueued: {} --> (id={})",
                 static_cast<uint64_t>(prev.id()),
                 static_cast<uint64_t>(r_desc_pointer_.id()));
         // spins locally, waits for current tail/lockholder to write to budget when it unlocks
@@ -100,7 +102,7 @@ bool ALockHandle::LockRemoteMcsQueue(){
             cpu_relax();
         }
         if (r_desc_->budget == 0) {
-            ROME_DEBUG("Remote Budget exhausted (id={})",
+            ROME_INFO("Remote Budget exhausted (id={})",
                         static_cast<uint64_t>(r_desc_pointer_.id()));
             // Release the lock before trying to continue
             Reacquire();
@@ -129,10 +131,11 @@ void ALockHandle::RemoteLock(){
             cpu_relax();
         } 
     }
+    std::atomic_thread_fence(std::memory_order_release);
+    ROME_DEBUG("Remote wins");
 }
 
 bool ALockHandle::LockLocalMcsQueue(){
-    ROME_DEBUG("LOCKING LOCAL MCS QUEUE...");
     // to acquire the lock a thread atomically appends its own local node at the
     // tail of the list returning tail's previous contents
     auto prior_node = l_l_tail_->exchange(&l_desc_, std::memory_order_acquire);
@@ -141,6 +144,8 @@ bool ALockHandle::LockLocalMcsQueue(){
         // if the list was not previously empty, it sets the predecessor’s next
         // field to refer to its own local node
         prior_node->next = &l_desc_;
+        ROME_INFO("[Lock] Local Enqueued: (id={})",
+                static_cast<uint64_t>(self_.id));
         // thread then spins on its local locked field, waiting until its
         // predecessor sets this field to false
         while (l_desc_.budget < 0) cpu_relax(); 
@@ -164,11 +169,13 @@ void ALockHandle::LocalLock(){
     ROME_DEBUG("ALockHandle::LocalLock()");
     bool is_leader = LockLocalMcsQueue();
     if (is_leader){
+
         auto prev = l_victim_->exchange(LOCAL_VICTIM, std::memory_order_acquire);
         while (l_victim_->load() == LOCAL_VICTIM && l_r_tail_->load() != 0){
             cpu_relax();
         } 
     }
+    ROME_DEBUG("Local wins");
     std::atomic_thread_fence(std::memory_order_release);
 }
 
@@ -194,7 +201,7 @@ void ALockHandle::RemoteUnlock(){
         //writes to the the next descriptors budget which lets it know it has the lock now
         pool_.Write<uint64_t>(static_cast<remote_ptr<uint64_t>>(next),
                             r_desc_->budget - 1,
-                            static_cast<remote_ptr<uint64_t>>(prealloc_));
+                            static_cast<remote_ptr<uint64_t>>(r_prealloc_));
     } 
     
     //else: successful CAS, we unlocked our RemoteDescriptor and no one is queued after us
@@ -213,12 +220,13 @@ void ALockHandle::LocalUnlock(){
         // if so, then either:
         //  1. no other thread is contending for the lock
         //  2. there is a race condition with another thread about to
-        // to distinguish between these cases atomic compare exchange the tail field
+        // in order to distinguish between these cases atomic compare exchange the tail field
         // if the call succeeds, then no other thread is trying to acquire the lock,
         // tail is set to nullptr, and unlock() returns
         LocalDescriptor* p = &l_desc_;
         if (l_l_tail_->compare_exchange_strong(p, nullptr, std::memory_order_release,
                                         std::memory_order_relaxed)) {
+            ROME_DEBUG("Should hit every time since local only has 1 thread right now");                     
             return;
         }
         // otherwise, another thread is in the process of trying to acquire the
@@ -227,14 +235,14 @@ void ALockHandle::LocalUnlock(){
         };
     }
     // in either case, once the successor has appeared, the unlock() method sets
-    // its successor’s locked field to false, indicating that the lock is now free
+    // its successor’s budget, indicating that the lock is now free
     l_desc_.next->budget = l_desc_.budget - 1;
     // at this point no other thread can access this node and it can be reused
     l_desc_.next = nullptr;
 }
 
 void ALockHandle::Lock(remote_ptr<ALock> alock){
-  ROME_ASSERT(a_lock_pointer_ == remote_nullptr, "Attempting to lock handle that is already locked.")
+  ROME_ASSERT(a_lock_pointer_ == remote_nullptr, "Attempting to lock handle that is already locked.");
   a_lock_pointer_ = alock;
   r_tail_ = decltype(r_tail_)(alock.id(), alock.address());
   r_l_tail_ = decltype(r_l_tail_)(alock.id(), alock.address() + DESC_PTR_OFFSET);
@@ -243,11 +251,8 @@ void ALockHandle::Lock(remote_ptr<ALock> alock){
   if (is_local_){ 
     a_lock_ = decltype(a_lock_)(alock.raw());
     l_r_tail_ = reinterpret_cast<local_ptr<RemoteDescriptor*>>(alock.address());
-    ROME_DEBUG("l_r_tail addr is {:x}", reinterpret_cast<uint64_t>(&(*l_r_tail_->load())));
     l_l_tail_ = reinterpret_cast<local_ptr<LocalDescriptor*>>(alock.address() + DESC_PTR_OFFSET);
-    ROME_DEBUG("l_l_tail_ addr is {:x}", reinterpret_cast<uint64_t>(&(*l_l_tail_->load())));
     l_victim_ = reinterpret_cast<local_ptr<uint64_t*>>(alock.address() + VICTIM_OFFSET);
-    ROME_DEBUG("l_victim_ addr is {:x}", reinterpret_cast<uint64_t>(&(*l_victim_->load())));
     LocalLock();
   } else {
     RemoteLock();
@@ -255,7 +260,7 @@ void ALockHandle::Lock(remote_ptr<ALock> alock){
 }
 
 void ALockHandle::Unlock(remote_ptr<ALock> alock){
-  ROME_ASSERT(alock.address() == a_lock_pointer_.address(), "Attempting to unlock alock that is not locked.")
+  ROME_ASSERT(alock.address() == a_lock_pointer_.address(), "Attempting to unlock alock that is not locked.");
   if (is_local_){
     LocalUnlock();
   } else {
@@ -265,8 +270,9 @@ void ALockHandle::Unlock(remote_ptr<ALock> alock){
 }
 
 void ALockHandle::Reacquire(){
+  ROME_DEBUG("REACQUIRE ON {}", self_.id);
   if (is_local_) {
-    while (l_victim_->load() == LOCAL_VICTIM && IsRTailLocked()){
+    while (l_victim_->load() == LOCAL_VICTIM &&  l_r_tail_->load() != 0){
         cpu_relax();
     } 
   } else {

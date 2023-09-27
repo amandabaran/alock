@@ -54,7 +54,6 @@ absl::Status Node<K,V>::Connect(){
 
   ROME_DEBUG("Root Lock pointer {:x}", static_cast<uint64_t>(root_lock_ptr_));
 
-  //TODO: FIX THIS. Not sharing root pointers correctly
   // tell all the peers where to find the addr of the first lock on this node
   for (auto p : peers) {
     // Send all peers the root of the lock on self
@@ -95,7 +94,6 @@ absl::Status Node<K, V>::Prefill(const key_type& min_key,
     ROME_INFO("Prefilling set to false, one lock per lock table");
     root_lock_ptr_ = lock_table_.AllocateLocks(min_key, min_key);
   }
-  ROME_INFO("Finished prefilling lock table");
   root_ptrs_.emplace(self_.nid(), root_lock_ptr_);
   return absl::OkStatus();
 }

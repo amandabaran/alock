@@ -72,8 +72,7 @@ int main(int argc, char *argv[]) {
             Peer(c.nid(), c.name(), c.port());
       });
 
-  if (!experiment_params.workload().has_runtime() ||
-      experiment_params.workload().runtime() < 0) {
+  if (!experiment_params.workload().has_runtime() || experiment_params.workload().runtime() < 0) {
     signal_handler_internal = std::function([](int signum) {
       if (done) exit(1);
       ROME_INFO("Shutting down...");

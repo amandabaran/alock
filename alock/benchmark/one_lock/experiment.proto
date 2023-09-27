@@ -18,6 +18,8 @@ message Workload {
 
   optional double theta = 5;
   
+  optional double p_local = 6;
+  
 };
 
 message RemotePtrProto {

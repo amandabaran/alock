@@ -29,11 +29,11 @@ class LockTable {
   root_type AllocateLocks(const key_type& min_key, const key_type& max_key){
     auto lock = lock_pool_.Allocate<lock_type>();
     root_lock_ptr_ = lock;
-    ROME_DEBUG("Allocated root lock for key {}", static_cast<key_type>(min_key));
+    ROME_TRACE("Allocated root lock for key {}", static_cast<key_type>(min_key));
     // Allocate one lock per key
     for (auto i = min_key + 1; i <= max_key; i++){
         lock_pool_.Allocate<lock_type>();
-        ROME_DEBUG("Allocated lock for key {}", i);
+        ROME_TRACE("Allocated lock for key {}", i);
     }
     ROME_DEBUG("Root Ptr on Node {} is {:x}", node_id_, static_cast<uint64_t>(root_lock_ptr_));
     // return pointer to first lock in table

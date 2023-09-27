@@ -33,11 +33,11 @@ build() {
   tmp=$(pwd)
   cd ../../rome/scripts
   python rexec.py -n ${nodefile} --remote_user=adb321 --remote_root=/users/adb321/alock --local_root=/Users/amandabaran/Desktop/sss/async_locks/alock --cmd="cd alock/alock && ~/go/bin/bazelisk build -c opt --lock_type=$1 //alock/benchmark/one_lock:main --action_env=BAZEL_CXXOPTS='-std=c++20'"
-  if [[ $(ls -A) ]] 
-  then 
-    echo "Build Error. See Logs." 
-    exit
-  fi
+  # if [[ $(ls -A) ]] 
+  # then 
+  #   echo "Build Error. See Logs." 
+  #   exit
+  # fi
   echo "Build Complete\n"
   cd ${tmp}
 }
@@ -54,7 +54,7 @@ sync
 # command
 
 lock="alock"
-log_level='info'
+log_level='debug'
 echo "Building ${lock}..."
 build ${lock}
 
@@ -70,9 +70,9 @@ save_dir="exp6"
 
 for num_nodes in 10
 do
-  bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=500 --runtime=120 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=1 --gdb=False
+  bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=500 --runtime=120 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=1 --gdb=False --max_key=100
 done
-bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --ssh_user=adb321 --lock_type=${lock} --get_data  --local_save_dir=${workspace}/benchmark/one_lock/results/${save_dir}/ --remote_save_dir=${save_dir}
+# bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --ssh_user=adb321 --lock_type=${lock} --get_data  --local_save_dir=${workspace}/benchmark/one_lock/results/${save_dir}/ --remote_save_dir=${save_dir}
 
 #  LOCAL WORKLOAD PERFORMANCE
 # echo "Running Experiment #1: Spin Lock vs MCS vs A-Lock, 1 lock on 1 server"

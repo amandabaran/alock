@@ -52,7 +52,8 @@ def getData(proto, path=''):
                         result[k] = [r[k]]
                     else:
                         result[k].append(r[k])
-            data |= result
+            # data |= result
+            data.update(result)
         else:
             data[path + ('.' if len(path) !=
                          0 else '') + field.name] = getattr(proto, field.name)
@@ -61,10 +62,8 @@ def getData(proto, path=''):
 
 x1_ = 'experiment_params.cluster_size'
 x2_ = 'lock_type'
-# x2_ = 'experiment_params.num_readonly'
 # x3_ = 'experiment_params.workload.worker_threads'
-# x4_ = 'experiment_params.num_servers'
-# x_ = [x1_, x2_, x3_, x4_]
+# x_ = [x1_, x2_, x3_]
 x_ = [x1_, x2_]
 y_ = 'results.driver.qps.summary.mean'
 cols_ = [x1_, x2_,  y_]
@@ -72,56 +71,6 @@ cols_ = [x1_, x2_,  y_]
 r_ = 'results.read_only'
 n_ = 'results.client.name'
 c_ = 'results.client.nid'
-
-
-def get_data_common(data, ycsb):
-    global cols_, y_, r_, n_, c_
-    data = data[data['experiment_params.workload.ycsb']
-                == common.get_ycsb(ycsb)]
-
-    y_data = data[cols_]
-    y_data = y_data.reset_index(drop=True)
-
-    y_data[y_] = y_data[y_].apply(
-        lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
-    y_data = y_data.explode(y_)
-    y_data = y_data.reset_index(drop=True)
-
-    r_data = data[r_]
-    r_data = r_data.reset_index(drop=True)
-    r_data = r_data.apply(lambda s: [True if x.strip(
-        ' []').lower() == 'true' else False for x in s.strip(' []').split(',')])
-    r_data = r_data.explode()
-    r_data = r_data.reset_index(drop=True)
-
-    n_data = data[n_]
-    n_data = n_data.reset_index(drop=True)
-    n_data = n_data.apply(lambda s: [x.strip(' \'')
-                          for x in s.strip(' []').split(',')])
-    n_data = n_data.explode()
-    n_data = n_data.reset_index(drop=True)
-
-    c_data = data[c_]
-    c_data = c_data.reset_index(drop=True)
-    c_data = c_data.apply(lambda s: [int(x) for x in s.strip(' []').split(',')])
-    c_data = c_data.explode()
-    c_data = c_data.reset_index(drop=True)
-
-    data = pandas.concat([y_data, r_data, n_data, c_data], axis=1)
-    print(data)
-    return data
-
-
-def get_client_data(data, ycsb):
-    data = data[data['experiment_params.mode'] == 1]
-    data = data[data[x3_] <= 64]
-    # data = data[data[x1_] + data[x2_] <= 64]
-    return get_data_common(data, ycsb)
-
-
-def get_server_data(data, ycsb):
-    data = data[data['experiment_params.mode'] == 0]
-    return get_data_common(data, ycsb)
 
 
 def get_originals(data):
@@ -147,26 +96,6 @@ def get_summary(data):
     summary['total'] = _total
     print(summary)
     return summary
-
-
-def client_throughput(data, nreadonly, nworkers, nservers):
-    global x1_, x2_, x3_, y_, r_, n_, c_
-
-    data = data[data[r_] == False]
-    if nreadonly != None:
-        data = data[data[x2_] == nreadonly]
-    if nworkers != None:
-        data = data[data[x3_] == nworkers]
-    if nservers != None:
-        data = data[data[x4_] == nservers]
-
-    originals = get_originals(data)
-    summary = get_summary(data)
-
-    name = 'client'
-
-    return 'c', originals,  summary,  name
-
 
 def plot_throughput(
         xcol, originals, summary, hue, xlabel, hue_label, name):
@@ -262,12 +191,14 @@ def generate_csv(results_dir, datafile):
     result_files = os.walk(results_dir)
     results_protos = []
     data_files = []
+    # builds list of data files to read
     for root, _, files in result_files:
         if len(files) == 0:
             continue
         for name in files:
             data_files.append(os.path.join(root, name))
 
+    # combines ResultsProto from each data file into list
     with alive_bar(len(data_files), title="Reading data...") as bar:
         for f in data_files:
             with open(f) as result_file:
@@ -281,7 +212,7 @@ def generate_csv(results_dir, datafile):
         for proto in results_protos:
             results.append(getData(proto))
             bar()
-
+    print("RESULTS ", results, "\n\n\n\n")
     data = pandas.DataFrame()
     dfs = []
     with alive_bar(len(results), title="Generating datafile: {}".format(datafile)) as bar:
@@ -295,70 +226,28 @@ def generate_csv(results_dir, datafile):
     data.to_csv(datafile, index_label='row')
 
 
-configs = {
-    'exp1': {
-        'c': {},
-        'r': {},
-        'w': {'nclients': 0, 'nreadonly': 0, 'nservers': 1, 'hue': 'c', 'xlabel': '', 'hlabel': ''},
-    },
-    'exp2': {
-        'c': {},
-        'r': {'nclients': 0,
-              'nworkers': None,  'nservers': 1, 'hue': 'w', 'xlabel': 'Num. read-only clients', 'hlabel': 'Num. workers'},
-        'w': {'nclients': 0,
-              'nreadonly': None, 'nservers': 1, 'hue': 'r', 'xlabel': 'Num. workers', 'hlabel': 'Num. read-only clients'},
-    },
-    'exp3': {
-        'c': {'nreadonly': 20, 'nworkers': 0, 'nservers': None, 'hue': 's', 'xlabel': 'Num. clients', 'hlabel': 'Num. servers'},
-        'r': {'nclients': None,
-              'nworkers': 0,  'nservers': 5, 'hue': 'c', 'xlabel': 'Num. read-only', 'hlabel': 'Num. clients'},
-        'w': {},
-    },
-    'exp4': {
-        'c': {},
-        'r': {'nclients': 0,
-              'nworkers': None,  'nservers': 1, 'hue': 'w', 'xlabel': 'Num. read-only clients', 'hlabel': 'Num. workers'},
-        'w': {'nclients': 0,
-              'nreadonly': None, 'nservers': 1, 'hue': 'r', 'xlabel': 'Num. workers', 'hlabel': 'Num. read-only clients'},
-    },
-    'exp5': {
-        'c': {},
-        'r': {'nclients': 0,
-              'nworkers': None,  'nservers': 1, 'hue': 'w', 'xlabel': 'Num. read-only clients', 'hlabel': 'Num. workers'},
-        'w': {'nclients': 0,
-              'nreadonly': None, 'nservers': 1, 'hue': 'r', 'xlabel': 'Num. workers', 'hlabel': 'Num. read-only'},
-    },
-    'exp6': {
-        'c': {},
-        'r': {'nclients': 0,
-              'nworkers': None,  'nservers': 1, 'hue': 'w', 'xlabel': 'Num. read-only clients', 'hlabel': 'Num. workers'},
-        'w': {'nclients': 0,
-              'nreadonly': None, 'nservers': 1, 'hue': 'r', 'xlabel': 'Num. workers', 'hlabel': 'Num. read-only'},
-    },
-}
-
-
 def plot(datafile, ycsb_list):
     data = pandas.read_csv(datafile)
     # TODO: THIS LINE CHANGES WHICH LOCK HOLD TIME WE ARE PLOTTING
-    data = data[data['experiment_params.workload.think_time_ns'] == 0] #modify what this takes to plot differernt set of
+    data = data[data['experiment_params.workload.think_time_ns'] == 5000] #modify what this takes to plot differernt set of
     # data = data[data['experiment_params.num_clients'] % 4 == 0]
                 # [data['experiment_params.num_clients'] >= 30]
+    print("DATA1", data)    
+    
+    alock = data[data['experiment_params.name'].str.count("alock.*") == 1]
+    print("ALOCK", alock)
+    alock['lock_type'] = 'ALock'
+    data = alock
+    # mcs = data[data['experiment_params.name'].str.count("mcs.*") == 1]
+    # mcs['lock_type'] = 'MCS'
 
-    mcs = data[data['experiment_params.name'].str.count("lmcs.*") == 1]
-    mcs['lock_type'] = 'MCS'
-
-    spin = data[data['experiment_params.name'].str.count("lspin.*") == 1]
-    spin['lock_type'] = 'Spin'
-
-    data = pandas.concat([mcs, spin])
-    data = data[['lock_type', 'experiment_params.cluster_size',
-                 'results.driver.qps.summary.mean']]
-
-    # y_data[y_] = y_data[y_].apply(
-    #     lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
-    # y_data = y_data.explode(y_)
-    # y_data = y_data.reset_index(drop=True)
+    # spin = data[data['experiment_params.name'].str.count("spin.*") == 1]
+    # spin['lock_type'] = 'Spin'
+    
+    # data = pandas.concat([mcs, spin])
+    
+    data = data[['lock_type', 'results.driver.qps.summary.mean']]
+    print("DATA", data)
     data['results.driver.qps.summary.mean'] = data['results.driver.qps.summary.mean'].apply(
         lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
     data = data.explode('results.driver.qps.summary.mean')
@@ -366,53 +255,6 @@ def plot(datafile, ycsb_list):
     print(data)
     summary = get_summary(data)
 
-    plot_throughput(x1_, data, summary, 'lock_type', 'Num. clients',
+    plot_throughput(x1_, data, summary, 'lock_type', 'Num. nodes',
                     'Lock type', os.path.join(FLAGS.figdir, 'test'))
     print(data)
-    # for ycsb in ycsb_list:
-    #     client_data = get_client_data(data, ycsb)
-
-    #     c = configs[FLAGS.exp]
-    #     client_config = c['c']
-    #     readonly_config = c['r']
-    #     worker_config = c['w']
-
-    #     if len(client_config.keys()) != 0:
-    #         client_tput = client_throughput(
-    #             client_data, client_config['nreadonly'],
-    #             client_config['nworkers'],
-    #             client_config['nservers'])
-    #         save = os.path.join(FLAGS.figdir, ycsb, client_tput[-1])
-    #         plot_throughput(
-    #             *(client_tput[: -1]),
-    #             client_config['hue'],
-    #             client_config['xlabel'],
-    #             client_config['hlabel'],
-    #             save)
-
-    #     if len(readonly_config.keys()) != 0:
-    #         readonly_tput = readonly_throughput(
-    #             client_data, readonly_config['nclients'],
-    #             readonly_config['nworkers'],
-    #             readonly_config['nservers'])
-    #         save = os.path.join(FLAGS.figdir, ycsb, readonly_tput[-1])
-    #         plot_throughput(
-    #             *(readonly_tput[: -1]),
-    #             readonly_config['hue'],
-    #             readonly_config['xlabel'],
-    #             readonly_config['hlabel'],
-    #             save)
-
-    #     if len(worker_config.keys()) != 0:
-    #         server_data = get_server_data(data, ycsb)
-    #         worker_tput = worker_throughput(
-    #             server_data, worker_config['nclients'],
-    #             worker_config['nreadonly'],
-    #             worker_config['nservers'])
-    #         save = os.path.join(FLAGS.figdir, ycsb, worker_tput[-1])
-    #         plot_throughput(
-    #             *(worker_tput[: -1]),
-    #             worker_config['hue'],
-    #             worker_config['xlabel'],
-    #             worker_config['hlabel'],
-    #             save)
