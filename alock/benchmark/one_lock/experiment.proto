@@ -36,8 +36,8 @@ message ExperimentParams {
   // The number of nodes in the system
   optional uint32 num_nodes = 3;
 
-  // A list of node ids to run on this node when running multiple nodes/servers per physical node
-  repeated uint32 node_ids = 4;
+  // A list of node ids to run on this node when running multiple clients per physical node
+  repeated uint32 client_ids = 4;
 
   // The offered load in queries (or ops) per second
   optional int32 max_qps = 5;
@@ -61,8 +61,9 @@ message CloudlabClusterProto {
 };
 
 message ResultProto {
-  optional X.NodeProto node = 1;
-  optional rome.WorkloadDriverProto driver = 2;
+  optional ExperimentParams experiment_params = 1;
+  optional X.NodeProto client = 2;
+  optional rome.WorkloadDriverProto driver = 3;
 };
 
 message ResultsProto {

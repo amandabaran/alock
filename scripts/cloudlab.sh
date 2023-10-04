@@ -33,6 +33,6 @@ command() {
 
 sync
 
-# setup
+setup
 
-command
+# command

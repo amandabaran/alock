@@ -32,7 +32,7 @@ class ALockHandle{
 public:
   using conn_type = MemoryPool::conn_type;
 
-  ALockHandle(MemoryPool::Peer self, MemoryPool& lock_pool, int worker_id);
+  ALockHandle(MemoryPool::Peer self, MemoryPool& lock_pool);
 
   absl::Status Init();
 
@@ -54,12 +54,10 @@ private:
 
   void Reacquire();
 
-  //! ALL OF THIS IS THREAD LOCAL AND APPLIES TO ONE LOCKING OPERATION ---> NEED TO RETHINK SOME THINGS
   bool is_local_; //resued for each call to lock for easy check on whether worker is local to key we are attempting to lock
   
   MemoryPool::Peer self_;
-  int worker_id_;
-  MemoryPool &pool_; // pool of alocks that the handle is local to (initalized in cluster/node_impl.h)
+  MemoryPool& pool_; // pool of alocks that the handle is local to (initalized in cluster/node_impl.h)
 
   //Pointer to alock to allow it to be read/write via rdma
   remote_ptr<ALock> a_lock_pointer_;

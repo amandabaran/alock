@@ -8,17 +8,17 @@ using ::rome::rdma::remote_nullptr;
 using ::rome::rdma::remote_ptr;
 using ::rome::rdma::RemoteObjectProto;
 
-ALockHandle::ALockHandle(MemoryPool::Peer self, MemoryPool &pool, int worker_id)
-    : self_(self), pool_(pool), worker_id_(worker_id) {}
+ALockHandle::ALockHandle(MemoryPool::Peer self, MemoryPool& pool)
+    : self_(self), pool_(pool) {}
 
 absl::Status ALockHandle::Init() {
   // allocate local and remote descriptors for this worker to use
   r_desc_pointer_ = pool_.Allocate<RemoteDescriptor>();
   r_desc_ = reinterpret_cast<RemoteDescriptor *>(r_desc_pointer_.address());
-  ROME_DEBUG("Worker {} on Node {}: RemoteDescriptor @ {:x}", worker_id_, self_.id, static_cast<uint64_t>(r_desc_pointer_));
+  ROME_DEBUG("Node {}: RemoteDescriptor @ {:x}", self_.id, static_cast<uint64_t>(r_desc_pointer_));
   l_desc_pointer_ = pool_.Allocate<LocalDescriptor>();
   l_desc_ = *l_desc_pointer_;
-  ROME_DEBUG("Worker {} on Node {}: LocalDescriptor @ {:x}", worker_id_, self_.id, static_cast<uint64_t>(l_desc_pointer_));
+  ROME_DEBUG("Node {}: LocalDescriptor @ {:x}", self_.id, static_cast<uint64_t>(l_desc_pointer_));
  
   // Set local descriptors to initial values
   r_desc_->budget = -1;

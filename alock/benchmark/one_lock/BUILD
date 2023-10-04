@@ -43,8 +43,8 @@ cc_library(
 )
 
 cc_library(
-    name = "node_harness",
-    hdrs = ["node_harness.h"],
+    name = "client",
+    hdrs = ["client.h"],
     deps = [
         ":experiment_cc_proto",
         ":setup",
@@ -103,7 +103,7 @@ cc_binary(
         },
     ),
     deps = [
-        ":node_harness",
+        ":client",
         ":experiment_cc_proto",
         "//alock/cluster:cluster_cc_proto",
         "@absl//absl/flags:flag",

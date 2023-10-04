@@ -128,18 +128,20 @@ def parse_nodes(csv, nid, num_nodes):
     proto = experiment_pb2.CloudlabClusterProto()
     proto.node_type = node_type
     proto.domain = get_domain(node_type)
-    nodes = {}
+    node_protos = {}
+    num_node_protos = num_nodes * FLAGS.threads
     
     total_keys = (FLAGS.max_key - FLAGS.min_key)
-    keys_per_node = total_keys / num_nodes
-    
-    for r in range(0, num_nodes):
-        i = nid % len(csv_nodes)
+    keys_per_node = total_keys / num_node_protos
+
+    for r in range(0, num_node_protos):
+        i = nid % num_nodes
         n = csv_nodes[i]
-        
+       
         min_key = int(r * keys_per_node)
-        max_key = int((r + 1) * keys_per_node) if (r < num_nodes - 1) else FLAGS.max_key
+        max_key = int((r + 1) * keys_per_node) if (r < num_node_protos - 1) else FLAGS.max_key
         print("Max key is ", max_key, " on node ", r)
+        
         c = cluster_pb2.NodeProto(
             nid=nid, name=n[0], public_name=n[1],
             port=FLAGS.port + nid,
@@ -148,11 +150,11 @@ def parse_nodes(csv, nid, num_nodes):
                 high=max_key
             ))
         proto.cluster.nodes.append(c)
-        if nodes.get(n[0]) is None:
-            nodes[n[0]] = []
-        nodes[n[0]].append(c)
+        if node_protos.get(n[0]) is None:
+            node_protos[n[0]] = []
+        node_protos[n[0]].append(c)
         nid += 1
-    return proto, nodes
+    return proto, node_protos
 
 
 def build_hostname(name, domain):
@@ -220,7 +222,7 @@ def fill_experiment_params(
         nodes, experiment_name, lock, think, num_nodes):
     proto = experiment_pb2.ExperimentParams()
     if nodes:
-        proto.node_ids.extend(n.nid for n in nodes)
+        proto.client_ids.extend(n.nid for n in nodes)
     proto.name = experiment_name
     proto.num_nodes = num_nodes
     proto.workload.runtime = FLAGS.runtime
@@ -337,11 +339,13 @@ def main(args):
                 if nodes_csv is None:
                     continue
                 cluster_proto = experiment_pb2.CloudlabClusterProto()
+                print("NCOUNT: ", n_count)
                 temp, nodes = parse_nodes(nodes_csv, 0, n_count)
-                cluster_proto.MergeFrom(temp)
+                cluster_proto.MergeFrom(temp) 
+                num_clients = n_count * FLAGS.threads
 
                 commands = []
-                experiment_name = lock + '_n' + str(len(nodes)) + '_t' + str(think)
+                experiment_name = lock + '_n' + str(len(nodes)) + '_c' + str(num_clients) + '_t' + str(think)
                 bar.text = f'Lock type: {lock} | Current experiment: {experiment_name}'
                 if not FLAGS.get_data:
                     for n in set(nodes.keys()):

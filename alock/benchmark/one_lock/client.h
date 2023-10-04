@@ -25,17 +25,32 @@
 
 using ::rome::rdma::MemoryPool;
 
-class Worker : public rome::ClientAdaptor<key_type> {
-  
+class Client : public rome::ClientAdaptor<key_type> {
+
  public:
-  static std::unique_ptr<Worker> Create(MemoryPool& pool, const X::NodeProto& node, const Peer &self,
-                                        int worker_id, const ExperimentParams& params, std::barrier<>* barrier, key_map* kr_map, root_map* root_ptrs) {
-    return std::unique_ptr<Worker>(new Worker(pool, node, self, worker_id, params, barrier, kr_map, root_ptrs));
+
+  ~Client() = default;
+
+  static std::unique_ptr<Client> Create(const Peer &self, const X::NodeProto& node_proto, ExperimentParams params, std::barrier<> *barrier,
+          MemoryPool& pool, key_map* kr_map, root_map* root_ptr_map) {
+    return std::unique_ptr<Client>(new Client(self, node_proto, params, barrier, pool, kr_map, root_ptr_map));
+  }
+
+  static void signal_handler(int signal) { 
+    // this->Stop();
+    // Wait for all clients to be done shutting down
+    ROME_INFO("\nSIGNAL HANDLER\n");
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    exit(signal);
   }
 
   static absl::StatusOr<ResultProto> Run(
-      std::unique_ptr<Worker> worker, const ExperimentParams& experiment_params,
+      std::unique_ptr<Client> client, const ExperimentParams& experiment_params,
       volatile bool* done) {
+
+    //Signal Handler
+    signal(SIGINT, signal_handler);
+    
     // Setup qps_controller.
     std::unique_ptr<rome::LeakyTokenBucketQpsController<util::SystemClock>>
         qps_controller;
@@ -45,11 +60,11 @@ class Worker : public rome::ClientAdaptor<key_type> {
               experiment_params.max_qps());
     }
 
-    auto* worker_ptr = worker.get();
+    auto *client_ptr = client.get();
 
     // Create and start the workload driver (also starts client).
     auto driver = rome::WorkloadDriver<key_type>::Create(
-        std::move(worker), CreateOpStream(worker_ptr->params_),
+        std::move(client), CreateOpStream(client_ptr->params_),
         qps_controller.get(),
         std::chrono::milliseconds(experiment_params.sampling_rate_ms()));
     ROME_ASSERT_OK(driver->Start());
@@ -59,24 +74,25 @@ class Worker : public rome::ClientAdaptor<key_type> {
     auto runtime = std::chrono::seconds(experiment_params.workload().runtime());
     std::this_thread::sleep_for(runtime);
 
-    ROME_INFO("Stopping worker...");
+    ROME_INFO("Stopping client...");
     ROME_ASSERT_OK(driver->Stop());
+
+    // Output results.
+    ResultProto result;
+    result.mutable_experiment_params()->CopyFrom(experiment_params);
+    result.mutable_client()->CopyFrom(client_ptr->ToProto());
+    result.mutable_driver()->CopyFrom(driver->ToProto());
 
     // Sleep for a hot sec to let the node receive the messages sent by the
     // clients before disconnecting.
     // (see https://github.com/jacnel/project-x/issues/15)
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-    // Output results.
-    ResultProto result;
-    result.mutable_node()->CopyFrom(worker_ptr->ToProto());
-    result.mutable_driver()->CopyFrom(driver->ToProto());
     return result; 
   }
 
   X::remote_ptr<LockType> CalcLockAddr(const key_type &key){
-    auto min_key = node_.range().low();
-    auto max_key = node_.range().high();
+    auto min_key = node_proto_.range().low();
+    auto max_key = node_proto_.range().high();
     if (key > max_key || key < min_key){
       // find which node key belongs to
       for(const auto &elem : *key_range_map_) {
@@ -112,11 +128,11 @@ class Worker : public rome::ClientAdaptor<key_type> {
   }
 
   absl::Status Start() override {
-    ROME_INFO("Starting NodeHarness...");
+    ROME_INFO("Starting Client...");
     root_lock_ptr_ = root_ptrs_->at(self_.id);
     auto status = lock_handle_.Init();
     ROME_ASSERT_OK(status);
-    barrier_->arrive_and_wait();
+    barrier_->arrive_and_wait(); //waits for all clients to init lock handle
     return status;
   }
 
@@ -139,29 +155,34 @@ class Worker : public rome::ClientAdaptor<key_type> {
     
   absl::Status Stop() override {
     ROME_DEBUG("Stopping...");
-    // Waits for all workers (threads) on node to arrive  at barrier
+    // Waits for all other clients
     barrier_->arrive_and_wait();
     return absl::OkStatus();
   }
 
-  X::NodeProto ToProto() { return node_; }
+  X::NodeProto ToProto() {  
+    return node_proto_;
+  }
 
+ //TODO: ADD CLIENT HARNESS BC OF PASSING AROUND NODE SHIT OR DO THE Node->GetStuff() in main.cc
  private:
-  Worker(MemoryPool& pool, const X::NodeProto& node, const Peer &self, 
-         int worker_id, const ExperimentParams& params, std::barrier<>* barrier, key_map* kr_map, root_map* root_ptrs)
-      : node_(node), 
-        self_(self), 
-        params_(params), 
-        barrier_(barrier), 
-        lock_handle_(self, pool, worker_id), 
+  Client(const Peer &self, const X::NodeProto& node_proto, ExperimentParams params, std::barrier<> *barrier,
+          MemoryPool& pool, key_map* kr_map, root_map* root_ptr_map)
+      : self_(self),
+        node_proto_(node_proto),
+        params_(params),
+        barrier_(barrier),
+        pool_(pool),
+        lock_handle_(self, pool_), 
         key_range_map_(kr_map), 
-        root_ptrs_(root_ptrs) {}
+        root_ptrs_(root_ptr_map),
+        root_lock_ptr_(root_ptrs_->at(self.id)) {}
 
-  const X::NodeProto node_;
   const Peer self_;
   const ExperimentParams params_;
   std::barrier<>* barrier_;
 
+  MemoryPool& pool_;
   LockHandle lock_handle_; //Handle to interact with descriptors, one per worker
   key_map* key_range_map_;
   root_map* root_ptrs_;
@@ -170,76 +191,8 @@ class Worker : public rome::ClientAdaptor<key_type> {
   // For generating a random key to lock if stream doesnt work
   std::random_device rd_;
   std::default_random_engine rand_;
-};
 
-class NodeHarness {
-
- public:
-
-  ~NodeHarness() = default;
-
-  static std::unique_ptr<NodeHarness> Create(
-      const Peer &self, const std::vector<Peer> &peers, std::unique_ptr<X::Node<X::key_type, LockType>> node,
-      const X::NodeProto& node_proto, ExperimentParams params) {
-    return std::unique_ptr<NodeHarness>(
-        new NodeHarness(self, peers, std::move(node), node_proto, params));
-  }
-
-  absl::Status Launch(volatile bool* done, ExperimentParams experiment_params) {
-    std::vector<std::unique_ptr<Worker>> workers;
-    for (auto i = 0; i < experiment_params.num_threads(); ++i) {
-      ROME_DEBUG("Creating Worker {} on Node {}", i, self_.id);
-      workers.emplace_back(
-          Worker::Create(*(node_->GetLockPool()), node_proto_, self_, i, params_, &barrier_, node_->GetKeyRangeMap(), node_->GetRootPtrMap()));
-    }
-    
-    // Launch an async thread for each worker
-    std::for_each(workers.begin(), workers.end(), [&](auto& worker) {
-      results_.emplace_back(std::async([&]() {
-        return Worker::Run(std::move(worker), experiment_params, done);
-      }));
-    });
-
-    std::for_each(results_.begin(), results_.end(),
-                  [](auto& result) { result.wait(); });
-
-    for (auto& r : results_) {
-      auto result_or = r.get();
-      if (!result_or.ok()) {
-        ROME_ERROR("{}", result_or.status().message());
-      } else {
-        result_protos_.push_back(result_or.value());
-      }
-    }
-
-    ROME_DEBUG("Waiting for clients to disconnect (in destructor)...");
-    node_.reset();
-    return absl::OkStatus();
-  }
-
-  std::vector<ResultProto> GetResults() { return result_protos_; }
-
-  X::NodeProto ToProto() { return node_proto_; }
-
- private:
-  NodeHarness(const Peer &self, const std::vector<Peer> &peers, std::unique_ptr<X::Node<X::key_type, LockType>> node,
-                const X::NodeProto& node_proto, ExperimentParams params)
-      : self_(self),
-        peers_(peers),
-        node_(std::move(node)),
-        node_proto_(node_proto),
-        params_(params),
-        barrier_(params.num_threads()) {}
-
-  std::unique_ptr<X::Node<X::key_type, LockType>> node_;
   const X::NodeProto& node_proto_;
-
-  const Peer self_;
-  std::vector<Peer> peers_;
-
-  ExperimentParams params_;
-
-  std::barrier<> barrier_;
 
   std::vector<std::future<absl::StatusOr<ResultProto>>> results_;
   std::vector<ResultProto> result_protos_;

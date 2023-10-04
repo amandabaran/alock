@@ -24,8 +24,9 @@ Node<K, V>::~Node(){
 }
 
 template <typename K, typename V>
-Node<K, V>::Node(const NodeProto& self, const ClusterProto& cluster, bool prefill)
+Node<K, V>::Node(const NodeProto& self, std::vector<MemoryPool::Peer> others, const ClusterProto& cluster, bool prefill)
     : self_(self),
+      others_(others),
       cluster_(cluster),
       prefill_(prefill),
       lock_pool_(MemoryPool::Peer(self.nid(), self.name(), self.port()), std::make_unique<MemoryPool::cm_type>(self.nid())),
@@ -33,17 +34,8 @@ Node<K, V>::Node(const NodeProto& self, const ClusterProto& cluster, bool prefil
 
 template <typename K, typename V>
 absl::Status Node<K,V>::Connect(){
-  std::vector<MemoryPool::Peer> peers;
-  peers.reserve(cluster_.nodes_size());
-  //Create a vector of peers of everyone but yourself
-  for (auto n : cluster_.nodes()){
-    if (n.nid() == self_.nid()) { continue; }
-    auto peer = MemoryPool::Peer(n.nid(), n.name(), n.port());
-    peers.push_back(peer);
-  }
-  
   ROME_DEBUG("Init MemoryPool for locks");
-  ROME_ASSERT_OK(lock_pool_.Init(kLockPoolSize, peers));
+  ROME_ASSERT_OK(lock_pool_.Init(kLockPoolSize, others_));
 
   ROME_ASSERT_OK(Prefill(self_.range().low(), self_.range().high()));
 
@@ -55,7 +47,7 @@ absl::Status Node<K,V>::Connect(){
   ROME_DEBUG("Root Lock pointer {:x}", static_cast<uint64_t>(root_lock_ptr_));
 
   // tell all the peers where to find the addr of the first lock on this node
-  for (auto p : peers) {
+  for (auto p : others_) {
     // Send all peers the root of the lock on self
     auto conn_or = lock_pool_.connection_manager()->GetConnection(p.id);
     ROME_ASSERT_OK(conn_or.status());
@@ -64,7 +56,7 @@ absl::Status Node<K,V>::Connect(){
   }
 
   // Wait until roots of all other alocks on other nodes are shared
-  for (auto p : peers) {
+  for (auto p : others_) {
     auto conn_or = lock_pool_.connection_manager()->GetConnection(p.id);
     ROME_ASSERT_OK(conn_or.status());
     auto got = conn_or.value()->channel()->TryDeliver<RemoteObjectProto>();

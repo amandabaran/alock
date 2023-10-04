@@ -73,7 +73,7 @@ inline absl::Status ValidateExperimentParams(const ExperimentParams& params) {
     return util::InvalidArgumentErrorBuilder()
            << "No workload: " << params.DebugString();
   }
-  if (params.node_ids_size() != params.num_nodes()) {
+  if (params.client_ids_size() != params.num_nodes()) {
     return util::InvalidArgumentErrorBuilder()
             << "Number of nodes does not match node node_ids: " << params.DebugString();
   } 
@@ -123,7 +123,7 @@ inline void RecordResults(const ExperimentParams &experiment_params,
     std::filesystem::path outfile;
     outfile /= save_dir;
     std::string filename =
-        "node."+ (experiment_params.has_name() ? experiment_params.name() : "data") + ".pbtxt";
+        "client."+ (experiment_params.has_name() ? experiment_params.name() : "data") + ".pbtxt";
     outfile /= filename;
     filestream.open(outfile);
     ROME_ASSERT(filestream.is_open(), "Failed to open output file: {}",
