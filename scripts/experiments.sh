@@ -24,7 +24,7 @@ clean() {
 command() {
   tmp=$(pwd)
   cd ../../rome/scripts
-  python rexec.py -n ${nodefile} --remote_user=adb321 --remote_root=/users/adb321/alock --local_root=/Users/amandabaran/Desktop/sss/async_locks/alock --cmd="sudo apt install -y clang-12"
+  python rexec.py -n ${nodefile} --remote_user=adb321 --remote_root=/users/adb321/alock --local_root=/Users/amandabaran/Desktop/sss/async_locks/alock --cmd="$1"
   cd ${tmp}
   echo "Clean Complete\n"
 }
@@ -32,7 +32,7 @@ command() {
 build() {
   tmp=$(pwd)
   cd ../../rome/scripts
-  python rexec.py -n ${nodefile} --remote_user=adb321 --remote_root=/users/adb321/alock --local_root=/Users/amandabaran/Desktop/sss/async_locks/alock --cmd="cd alock/alock && ~/go/bin/bazelisk build -c opt --lock_type=$1 //alock/benchmark/one_lock:main --action_env=BAZEL_CXXOPTS='-std=c++20'"
+  python rexec.py -n ${nodefile} --N 1 --remote_user=adb321 --remote_root=/users/adb321/alock --local_root=/Users/amandabaran/Desktop/sss/async_locks/alock --cmd="cd alock/alock && ~/go/bin/bazelisk build -c opt --lock_type=$1 //alock/benchmark/one_lock:main --action_env=BAZEL_CXXOPTS='-std=c++20'"
   # if [[ $(ls -A) ]] 
   # then 
   #   echo "Build Error. See Logs." 
@@ -45,8 +45,8 @@ build() {
 
 #** START OF SCRIPT **#
 
-# echo "Cleaning..."
-# clean
+echo "Cleaning..."
+clean
 
 echo "Pushing local repo to remote nodes..."
 sync
@@ -66,12 +66,18 @@ build ${lock}
 # done
 # bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile}  --ssh_user=adb321 --lock_type=${lock} --get_data  --local_save_dir=${workspace}/benchmark/one_lock/results/${save_dir}/ --remote_save_dir=${save_dir}
 
-save_dir="exp7"
+save_dir="exp10"
 
 for num_nodes in 2
 do
-  bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=500 --runtime=120 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=1 --gdb=False --max_key=100 --dry_run=False
+  for num_threads in 90 100
+  do
+    bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=500 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --gdb=False --max_key=100000 --dry_run=False --port=12100
+    command "pkill -9 -f bazel"
+  done
 done
+
+command "pkill -9 -f bazel"
 # bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --ssh_user=adb321 --lock_type=${lock} --get_data  --local_save_dir=${workspace}/benchmark/one_lock/results/${save_dir}/ --remote_save_dir=${save_dir}
 
 #  LOCAL WORKLOAD PERFORMANCE

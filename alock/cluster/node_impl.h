@@ -53,6 +53,7 @@ absl::Status Node<K,V>::Connect(){
     ROME_ASSERT_OK(conn_or.status());
     auto status = conn_or.value()->channel()->Send(proto);
     ROME_ASSERT_OK(status);
+    ROME_DEBUG("Node {} sent lock pointer to node {}", self_.nid(), p.id);
   }
 
   // Wait until roots of all other alocks on other nodes are shared

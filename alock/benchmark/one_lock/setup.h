@@ -6,7 +6,7 @@
 
 #include "alock/benchmark/one_lock/experiment.pb.h"
 #include "alock/locks/rdma_mcs_lock/rdma_mcs_lock.h"
-#include "alock/locks/spin_lock/rdma_spin_lock.h"
+#include "alock/locks/spin_lock/rdma_spin_lock_handle.h"
 #include "alock/locks/a_lock/a_lock_handle.h"
 
 #include "absl/status/status.h"
@@ -56,6 +56,7 @@ using LockTable = X::LockTable<key_type, LockType>;
 using root_type = X::remote_ptr<LockType>;
 using root_map = std::map<uint32_t, root_type>;
 using key_map = std::map<uint32_t, std::pair<key_type, key_type>>;
+using Operation = key_type;
 
 uint64_t lock_byte_size_ = sizeof(LockType);
 
@@ -68,7 +69,7 @@ uint64_t lock_byte_size_ = sizeof(LockType);
 static constexpr uint16_t kServerPort = 18000;
 static constexpr uint16_t kBaseClientPort = 18001;
 
-inline absl::Status ValidateExperimentParams(const ExperimentParams& params) {
+absl::Status ValidateExperimentParams(const ExperimentParams& params) {
   if (!params.has_workload()) {
     return util::InvalidArgumentErrorBuilder()
            << "No workload: " << params.DebugString();
@@ -80,7 +81,7 @@ inline absl::Status ValidateExperimentParams(const ExperimentParams& params) {
   return absl::OkStatus();
 }
 
-inline void PopulateDefaultValues(ExperimentParams* params) {
+void PopulateDefaultValues(ExperimentParams* params) {
   if (!params->workload().has_min_key())
     params->mutable_workload()->set_min_key(0);
   if (!params->workload().has_max_key())
@@ -93,13 +94,34 @@ inline void PopulateDefaultValues(ExperimentParams* params) {
   }
 }
 
-inline auto CreateOpStream(const ExperimentParams& params) {
+auto CreateOpStream(const ExperimentParams& params, const X::NodeProto& node_proto) {
+  std::vector<Operation> operations = std::vector<Operation>();
+    
+  // initialize random number generator and key_range
+  int full_key_range = params.workload().max_key() - params.workload().min_key();
+  int local_range = node_proto.range().high() - node_proto.range().low();
+
+  double p_local = params.workload().p_local();
+  //TODO: figure out how to generate key based on result of bernoulli stream for each operation
+  auto bernoulli_stream = std::make_unique<
+      rome::RandomDistributionStream<std::bernoulli_distribution, double>>(p_local);
+  auto key_stream = std::make_unique<rome::RandomDistributionStream<
+      std::uniform_int_distribution<key_type>, key_type, key_type>>(
+      params.workload().min_key(), params.workload().max_key());
+  
+  return key_stream;
+  // return rome::MappedStream<X::RequestProto, rome::YcsbOp<key_type>, value_type,
+  //                           bool>::
+
+}
+
+auto CreateRDOpStream(const ExperimentParams& params) {
   return std::make_unique<rome::RandomDistributionStream<
       std::uniform_int_distribution<key_type>, key_type, key_type>>(
       params.workload().min_key(), params.workload().max_key());
 }
 
-inline void RecordResults(const ExperimentParams &experiment_params,
+void RecordResults(const ExperimentParams &experiment_params,
                           const std::vector<ResultProto> &experiment_results) {
   ResultsProto results;
   results.mutable_experiment_params()->CopyFrom(experiment_params);

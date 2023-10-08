@@ -51,7 +51,7 @@ flags.DEFINE_integer('min_key', 0, 'Minimum key')
 flags.DEFINE_integer('max_key', int(1e4), 'Maximum key')
 flags.DEFINE_integer('threads', 1, 'Number of Workers (threads) to launch per node')
 flags.DEFINE_float('theta', 0.99, 'Theta in Zipfian distribution')
-flags.DEFINE_integer('p_local', 50, 'Percentage of operations that are local to each node')
+flags.DEFINE_float('p_local', 0.5, 'Percentage of operations that are local to each node')
 
 flags.DEFINE_integer('runtime', 10, 'Number of seconds to run experiment')
 
@@ -129,18 +129,18 @@ def parse_nodes(csv, nid, num_nodes):
     proto.node_type = node_type
     proto.domain = get_domain(node_type)
     node_protos = {}
-    num_node_protos = num_nodes * FLAGS.threads
+    num_clients = num_nodes * FLAGS.threads
     
     total_keys = (FLAGS.max_key - FLAGS.min_key)
-    keys_per_node = total_keys / num_node_protos
-
-    for r in range(0, num_node_protos):
+    keys_per_node = total_keys / num_clients
+   
+    for r in range(0, num_clients):
         i = nid % num_nodes
         n = csv_nodes[i]
        
         min_key = int(r * keys_per_node)
-        max_key = int((r + 1) * keys_per_node) if (r < num_node_protos - 1) else FLAGS.max_key
-        print("Max key is ", max_key, " on node ", r)
+        max_key = int((r + 1) * keys_per_node) if (r < num_clients - 1) else FLAGS.max_key
+        print("node: ", n[0], " range: ", min_key, " - ", max_key)
         
         c = cluster_pb2.NodeProto(
             nid=nid, name=n[0], public_name=n[1],
@@ -154,6 +154,7 @@ def parse_nodes(csv, nid, num_nodes):
             node_protos[n[0]] = []
         node_protos[n[0]].append(c)
         nid += 1
+        
     return proto, node_protos
 
 

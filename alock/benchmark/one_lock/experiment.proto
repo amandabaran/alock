@@ -18,6 +18,7 @@ message Workload {
 
   optional double theta = 5;
   
+  //between 0 and 1
   optional double p_local = 6;
   
 };

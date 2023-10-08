@@ -50,6 +50,9 @@ class Client : public rome::ClientAdaptor<key_type> {
 
     //Signal Handler
     signal(SIGINT, signal_handler);
+
+    //Sleep for a second in case all clients aren't done connecting
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     
     // Setup qps_controller.
     std::unique_ptr<rome::LeakyTokenBucketQpsController<util::SystemClock>>
@@ -64,7 +67,7 @@ class Client : public rome::ClientAdaptor<key_type> {
 
     // Create and start the workload driver (also starts client).
     auto driver = rome::WorkloadDriver<key_type>::Create(
-        std::move(client), CreateOpStream(client_ptr->params_),
+        std::move(client), CreateRDOpStream(client_ptr->params_),
         qps_controller.get(),
         std::chrono::milliseconds(experiment_params.sampling_rate_ms()));
     ROME_ASSERT_OK(driver->Start());
@@ -86,7 +89,7 @@ class Client : public rome::ClientAdaptor<key_type> {
     // Sleep for a hot sec to let the node receive the messages sent by the
     // clients before disconnecting.
     // (see https://github.com/jacnel/project-x/issues/15)
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     return result; 
   }
 

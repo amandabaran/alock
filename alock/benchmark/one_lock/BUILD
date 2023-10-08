@@ -98,7 +98,7 @@ cc_binary(
     defines = select(
         {
             # ":mcs": ["LOCK_TYPE=::X::RdmaMcsLock"],
-            # ":spin": ["LOCK_TYPE=::X::RdmaSpinLock"],
+            ":spin": ["LOCK_TYPE=::X::RdmaSpinLock", "LOCK_HANDLE=::X::RdmaSpinLockHandle"],
             ":alock": ["LOCK_TYPE=::X::ALock", "LOCK_HANDLE=::X::ALockHandle"],
         },
     ),

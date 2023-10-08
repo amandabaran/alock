@@ -38,7 +38,7 @@ absl::Status ALockHandle::Init() {
 }
 
 bool inline ALockHandle::IsLocked() {
-  return (a_lock_pointer_ != remote_nullptr);
+  return a_lock_pointer_ != remote_nullptr;
 }
 
 bool ALockHandle::IsRTailLocked(){
@@ -94,7 +94,7 @@ bool ALockHandle::LockRemoteMcsQueue(){
         pool_.Write<remote_ptr<RemoteDescriptor>>(
             static_cast<remote_ptr<remote_ptr<RemoteDescriptor>>>(prev), r_desc_pointer_,
             r_prealloc_);
-        ROME_INFO("[Lock] Enqueued: {} --> (id={})",
+        ROME_DEBUG("[Lock] Enqueued: {} --> (id={})",
                 static_cast<uint64_t>(prev.id()),
                 static_cast<uint64_t>(r_desc_pointer_.id()));
         // spins locally, waits for current tail/lockholder to write to budget when it unlocks
@@ -247,6 +247,7 @@ void ALockHandle::Lock(remote_ptr<ALock> alock){
   r_tail_ = decltype(r_tail_)(alock.id(), alock.address());
   r_l_tail_ = decltype(r_l_tail_)(alock.id(), alock.address() + DESC_PTR_OFFSET);
   r_victim_ = decltype(r_victim_)(alock.id(), alock.address() + VICTIM_OFFSET);   
+  //TODO: check if alockptr.id is in a set of ids that client knows is local to it
   is_local_ = ((a_lock_pointer_).id() == self_.id);
   if (is_local_){ 
     a_lock_ = decltype(a_lock_)(alock.raw());
@@ -266,6 +267,7 @@ void ALockHandle::Unlock(remote_ptr<ALock> alock){
   } else {
     RemoteUnlock();
   }
+  std::atomic_thread_fence(std::memory_order_release);
   a_lock_pointer_ = remote_nullptr;
 }
 

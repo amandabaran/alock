@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
         nodes.push_back(p);
   });
 
-  ROME_DEBUG("num nodes: {}", nodes.size());
+  ROME_DEBUG("cluster size: {}", nodes.size());
 
   //vector of clients on this node in Peer form
   std::vector<Peer> clients;
