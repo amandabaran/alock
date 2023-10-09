@@ -42,8 +42,8 @@ sync
 
 clean
 
-lock="spin"
-log_level='debug'
+lock="alock"
+log_level='trace'
 echo "Building ${lock}..."
 build ${lock}
 

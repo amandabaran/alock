@@ -108,14 +108,16 @@ int main(int argc, char *argv[]) {
   // }
 
   // Create and Launch each of the clients.
-  std::vector<std::future<absl::StatusOr<ResultProto>>> client_tasks;
-  std::barrier client_barrier(experiment_params.client_ids().size());
-  for (const auto &c : clients) {
-    client_tasks.emplace_back(std::async([=, &client_barrier]() {
+  std::vector<std::thread> client_threads;
+  std::barrier client_barrier(num_threads);
+  ResultProto results[num_threads];
+  for (int i = 0; i < num_threads; i++){
+    client_threads.emplace_back(std::thread([&](int tidx){
+      auto c = clients[i];
       auto node_proto = cluster.nodes().begin();
       while (node_proto != cluster.nodes().end() && node_proto->nid() != c.id) ++node_proto;
       ROME_ASSERT(node_proto != cluster.nodes().end(), "Failed to find client: {}", c.id);
-      
+
       std::vector<Peer> others;
       std::copy_if(nodes.begin(), nodes.end(), std::back_inserter(others),
                     [c](auto &p) { return p.id != c.id; });
@@ -128,25 +130,31 @@ int main(int argc, char *argv[]) {
       // Make sure Connect() is done before launching clients
       std::atomic_thread_fence(std::memory_order_release);
 
-      
-      ROME_DEBUG("OTHERS SIZE {}", others.size());
       auto client = Client::Create(c, *node_proto, experiment_params, &client_barrier, 
                                     *(node->GetLockPool()), node->GetKeyRangeMap(), node->GetRootPtrMap());
-      return Client::Run(std::move(client), experiment_params, &done);
-    }));
+      auto result = Client::Run(std::move(client), experiment_params, &done);
+      if (result.ok()){
+        results[i] = result.value();
+        ROME_INFO("{}", results[i].DebugString());
+      } else {
+        ROME_ERROR("Client run failed. (id={})", c.id);
+      }
+      ROME_INFO("Client {} -- Execution Finished", c.id);
+    }, i));
   }
 
-  // Join clients.
-  std::vector<ResultProto> results;
-  for (auto &r : client_tasks) {
-    r.wait();
-    ROME_ASSERT(r.valid(), "WTF");
-    auto rproto = r.get();
-    results.push_back(VALUE_OR_DIE(rproto));
-    ROME_INFO("{}", VALUE_OR_DIE(rproto).DebugString());
+   // Join all client threads
+  ROME_DEBUG("Joining {} client threads", num_threads);
+  int i = 0;
+  for (auto it = client_threads.begin(); it != client_threads.end(); it++){
+      ROME_INFO("Syncing client {}", i++);
+      auto t = it;
+      t->join();
   }
 
-  RecordResults(experiment_params, results);
+  std::vector<ResultProto> results_vec;
+  results_vec.insert(results_vec.end(), &results[0], &results[num_threads]);
+  RecordResults(experiment_params, results_vec);
   
   ROME_INFO("Done");
   return 0;
