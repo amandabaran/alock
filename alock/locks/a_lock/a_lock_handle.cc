@@ -8,10 +8,13 @@ using ::rome::rdma::remote_nullptr;
 using ::rome::rdma::remote_ptr;
 using ::rome::rdma::RemoteObjectProto;
 
-ALockHandle::ALockHandle(MemoryPool::Peer self, MemoryPool& pool)
-    : self_(self), pool_(pool) {}
+ALockHandle::ALockHandle(MemoryPool::Peer self, MemoryPool& pool, std::set<int> local_clients)
+    : self_(self), pool_(pool), local_clients_(local_clients) {}
 
 absl::Status ALockHandle::Init() {
+  for(auto c : local_clients_){
+    ROME_DEBUG("Client {} is local to client {}", self_.id, c);
+  }
   // allocate local and remote descriptors for this worker to use
   r_desc_pointer_ = pool_.Allocate<RemoteDescriptor>();
   r_desc_ = reinterpret_cast<RemoteDescriptor *>(r_desc_pointer_.address());
@@ -247,8 +250,21 @@ void ALockHandle::Lock(remote_ptr<ALock> alock){
   r_tail_ = decltype(r_tail_)(alock.id(), alock.address());
   r_l_tail_ = decltype(r_l_tail_)(alock.id(), alock.address() + DESC_PTR_OFFSET);
   r_victim_ = decltype(r_victim_)(alock.id(), alock.address() + VICTIM_OFFSET);   
-  //TODO: check if alockptr.id is in a set of ids that client knows is local to it
-  is_local_ = ((a_lock_pointer_).id() == self_.id);
+  // if ((a_lock_pointer_).id() == self_.id) {
+  //     is_local_ = true;
+  // } else {
+  //   is_local_ = false;
+  //   for (auto c : local_clients_){
+  //     ROME_DEBUG("c is {}", c);
+  //     if ((a_lock_pointer_).id() == c) is_local_ = true;
+  //   }
+  // }
+  if (local_clients_.contains(a_lock_pointer_.id())){
+    is_local_ = true;
+  } else {
+    is_local_ = false;
+  }
+  ROME_DEBUG("is_local_ : {}", is_local_);
   if (is_local_){ 
     a_lock_ = decltype(a_lock_)(alock.raw());
     l_r_tail_ = reinterpret_cast<local_ptr<RemoteDescriptor*>>(alock.address());

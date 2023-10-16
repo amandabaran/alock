@@ -38,9 +38,14 @@ protected:
   }
 
   void InitTest() {
+    auto capacity = 1 << 20;
+    auto status = pools_[p.id].Init(capacity, peers_);
+    ROME_ASSERT_OK(status);
+    lock_ = pool.Allocate<RdmaSpinLock>();
+
     std::vector<std::thread> init_threads;
     auto do_init = [this](const auto &p) {
-      ROME_ASSERT_OK(locks_[p.id]->Init(host_, peers_));
+      ROME_ASSERT_OK(lock_handles_[p.id]->Init());
     };
     std::for_each(peers_.begin(), peers_.end(),
                   [&init_threads, do_init](const auto &p) {
@@ -53,7 +58,9 @@ protected:
   const peer_type host_{kHostId, kIpAddress, kHostPort};
 
   std::vector<peer_type> peers_;
-  std::unordered_map<uint16_t, std::unique_ptr<RdmaSpinLock>> locks_;
+  std::vector<MemoryPool*> pools_;
+  std::unordered_map<uint16_t, std::unique_ptr<RdmaSpinLockHandle>> lock_handles_;
+  remote_ptr<int64_t> lock_{-1};
 };
 
 TEST_F(RdmaSpinLockTest, HostIsLocked) {

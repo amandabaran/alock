@@ -42,7 +42,7 @@ sync
 
 clean
 
-lock="alock"
+lock="spin"
 log_level='trace'
 echo "Building ${lock}..."
 build ${lock}
@@ -53,6 +53,6 @@ for num_nodes in 2
 do
   for num_threads in 1
   do
-    bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=500 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --gdb=True --max_key=1000 --dry_run=False
+    bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=500 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --gdb=True --max_key=100 --dry_run=False
   done
 done

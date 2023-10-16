@@ -10,8 +10,8 @@ using ::rome::rdma::remote_nullptr;
 using ::rome::rdma::remote_ptr;
 using ::rome::rdma::RemoteObjectProto;
 
-RdmaMcsLock::RdmaMcsLock(MemoryPool::Peer self, MemoryPool &pool)
-    : self_(self), pool_(pool) {}
+RdmaMcsLock::RdmaMcsLock(MemoryPool::Peer self, MemoryPool &pool, std::set<int> local_clients)
+    : self_(self), pool_(pool), local_clients_(local_clients) {}
 
 absl::Status RdmaMcsLock::Init(MemoryPool::Peer host,
                                const std::vector<MemoryPool::Peer> &peers) {
@@ -21,17 +21,17 @@ absl::Status RdmaMcsLock::Init(MemoryPool::Peer host,
   ROME_ASSERT_OK(status);
   
   // Reserve remote memory for the local descriptor.
-  desc_pointer_ = pool_.Allocate<Descriptor>();
-  descriptor_ = reinterpret_cast<Descriptor *>(desc_pointer_.address());
-  ROME_DEBUG("Descriptor @ {:x}", static_cast<uint64_t>(desc_pointer_));
+  desc_pointer_ = pool_.Allocate<McsDescriptor>();
+  descriptor_ = reinterpret_cast<McsDescriptor *>(desc_pointer_.address());
+  ROME_DEBUG("McsDescriptor @ {:x}", static_cast<uint64_t>(desc_pointer_));
 
   if (is_host_) {
     // Send all peers the base address of the lock residing on the host
     RemoteObjectProto proto;
-    lock_pointer_ = pool_.Allocate<remote_ptr<Descriptor>>();
+    lock_pointer_ = pool_.Allocate<remote_ptr<McsDescriptor>>();
     proto.set_raddr(lock_pointer_.address());
 
-    *(std::to_address(lock_pointer_)) = remote_ptr<Descriptor>(0);
+    *(std::to_address(lock_pointer_)) = remote_ptr<McsDescriptor>(0);
     // tell all the peers where to find the addr of the first lock
     for (const auto &p : peers) {
       auto conn_or = pool_.connection_manager()->GetConnection(p.id);
@@ -52,7 +52,7 @@ absl::Status RdmaMcsLock::Init(MemoryPool::Peer host,
     lock_pointer_ = decltype(lock_pointer_)(host.id, got->raddr());
 
     //Used as preallocated memory for RDMA writes
-    prealloc_ = pool_.Allocate<remote_ptr<Descriptor>>();
+    prealloc_ = pool_.Allocate<remote_ptr<McsDescriptor>>();
   }
   ROME_DEBUG("Lock pointer {:x}", static_cast<uint64_t>(lock_pointer_));
   return absl::OkStatus();
@@ -64,12 +64,12 @@ bool RdmaMcsLock::IsLocked() {
     return std::to_address(*(std::to_address(lock_pointer_))) != 0;
   } else {
     // read in value of host's lock ptr
-    auto remote = pool_.Read<remote_ptr<Descriptor>>(lock_pointer_);
+    auto remote = pool_.Read<remote_ptr<McsDescriptor>>(lock_pointer_);
     // store result of if its locked
     auto locked = static_cast<uint64_t>(*(std::to_address(remote))) != 0;
     // deallocate the ptr used as a landing spot for reading in (which is created in Read)
     auto ptr =
-        remote_ptr<remote_ptr<Descriptor>>{self_.id, std::to_address(remote)};
+        remote_ptr<remote_ptr<McsDescriptor>>{self_.id, std::to_address(remote)};
     pool_.Deallocate(ptr);
     return locked;
   }
@@ -88,10 +88,10 @@ void RdmaMcsLock::Lock() {
     auto temp_ptr = remote_ptr<uint8_t>(prev);
     temp_ptr += 64; //temp_ptr = next field of the current tail's descriptor
     // make prev point to the current tail descriptor's next pointer
-    prev = remote_ptr<Descriptor>(temp_ptr);
+    prev = remote_ptr<McsDescriptor>(temp_ptr);
     // set the address of the current tail's next field = to the addr of our local descriptor
-    pool_.Write<remote_ptr<Descriptor>>(
-        static_cast<remote_ptr<remote_ptr<Descriptor>>>(prev), desc_pointer_,
+    pool_.Write<remote_ptr<McsDescriptor>>(
+        static_cast<remote_ptr<remote_ptr<McsDescriptor>>>(prev), desc_pointer_,
         prealloc_);
     ROME_DEBUG("[Lock] Enqueued: {} --> (id={})",
                static_cast<uint64_t>(prev.id()),
@@ -135,7 +135,7 @@ void RdmaMcsLock::Unlock() {
       ;
     std::atomic_thread_fence(std::memory_order_acquire);
     // gets a pointer to the next descriptor object
-    auto next = const_cast<remote_ptr<Descriptor> &>(descriptor_->next);
+    auto next = const_cast<remote_ptr<McsDescriptor> &>(descriptor_->next);
     //writes to the the next descriptors budget which lets it know it has the lock now
     pool_.Write<uint64_t>(static_cast<remote_ptr<uint64_t>>(next),
                           descriptor_->budget - 1,

@@ -60,7 +60,7 @@ def getData(proto, path=''):
     return data
 
 
-x1_ = 'experiment_params.cluster_size'
+x1_ = 'experiment_params.num_nodes'
 x2_ = 'lock_type'
 # x3_ = 'experiment_params.workload.worker_threads'
 # x_ = [x1_, x2_, x3_]

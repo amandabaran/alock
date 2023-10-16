@@ -6,7 +6,7 @@
 
 #include "alock/benchmark/one_lock/experiment.pb.h"
 #include "alock/locks/rdma_mcs_lock/rdma_mcs_lock.h"
-#include "alock/locks/spin_lock/rdma_spin_lock_handle.h"
+#include "alock/locks/rdma_spin_lock/rdma_spin_lock.h"
 #include "alock/locks/a_lock/a_lock_handle.h"
 
 #include "absl/status/status.h"
@@ -58,8 +58,8 @@ using root_map = std::map<uint32_t, root_type>;
 using key_map = std::map<uint32_t, std::pair<key_type, key_type>>;
 using Operation = key_type;
 
-uint64_t lock_byte_size_ = sizeof(LockType);
-
+// uint64_t lock_byte_size_ = sizeof(LockType);
+uint64_t lock_byte_size_ = CACHELINE_SIZE;
 
 // struct LockOp {
 //   key_type key; 
@@ -94,35 +94,50 @@ void PopulateDefaultValues(ExperimentParams* params) {
   }
 }
 
-auto CreateOpStream(const ExperimentParams& params, const X::NodeProto& node_proto) {
-  std::vector<Operation> operations = std::vector<Operation>();
+// auto CreateOpStream(const ExperimentParams& params, const X::NodeProto& node_proto) {
+//   std::vector<Operation> operations = std::vector<Operation>();
     
-  // initialize random number generator and key_range
-  int full_key_range = params.workload().max_key() - params.workload().min_key();
-  int local_range = node_proto.range().high() - node_proto.range().low();
+//   // initialize random number generator and key_range
+//   int full_key_range = params.workload().max_key() - params.workload().min_key();
+//   int local_range = node_proto.range().high() - node_proto.range().low();
 
-  double p_local = params.workload().p_local();
-  //TODO: figure out how to generate key based on result of bernoulli stream for each operation
-  auto bernoulli_stream = std::make_unique<
-      rome::RandomDistributionStream<std::bernoulli_distribution, double>>(p_local);
-  auto key_stream = std::make_unique<rome::RandomDistributionStream<
-      std::uniform_int_distribution<key_type>, key_type, key_type>>(
-      params.workload().min_key(), params.workload().max_key());
+//   double p_local = params.workload().p_local();
+//   //TODO: figure out how to generate key based on result of bernoulli stream for each operation
+//   auto bernoulli_stream = std::make_unique<
+//       rome::RandomDistributionStream<std::bernoulli_distribution, double>>(p_local);
+//   auto key_stream = std::make_unique<rome::RandomDistributionStream<
+//       std::uniform_int_distribution<key_type>, key_type, key_type>>(
+//       params.workload().min_key(), params.workload().max_key());
   
-  return key_stream;
-  // return rome::MappedStream<X::RequestProto, rome::YcsbOp<key_type>, value_type,
-  //                           bool>::
+//   return key_stream;
+//   // return rome::MappedStream<X::RequestProto, rome::YcsbOp<key_type>, value_type,
+//   //                           bool>::
 
+// }
+
+auto CreateLocalKeyRange(const ExperimentParams& params, const X::NodeProto& self, const X::ClusterProto& cluster, std::set<int> local_clients){
+  key_type high = self.range().high();
+  key_type low = self.range().low();
+  //Go through all nodes of the cluster, if node is a local client, check if it will expand the local range
+  for (auto c : cluster.nodes()){
+    if (local_clients.contains(c.nid())){
+      high = std::max(high, c.range().high());
+      low = std::min(low, c.range().low());
+    }
+  }
+  return std::make_pair(low, high);
 }
 
-auto CreateRDOpStream(const ExperimentParams& params) {
+//TODO: update op stream to use bernoulli distribution first, then use random distribution with either the local workload range or remote range
+
+auto CreateOpStream(const ExperimentParams& params, std::pair<key_type, key_type> local_range) {
   return std::make_unique<rome::RandomDistributionStream<
       std::uniform_int_distribution<key_type>, key_type, key_type>>(
       params.workload().min_key(), params.workload().max_key());
 }
 
 void RecordResults(const ExperimentParams &experiment_params,
-                          const std::vector<ResultProto> &experiment_results) {
+                          const std::vector<ResultProto> &experiment_results) {                      
   ResultsProto results;
   results.mutable_experiment_params()->CopyFrom(experiment_params);
   results.set_cluster_size(experiment_params.num_nodes());

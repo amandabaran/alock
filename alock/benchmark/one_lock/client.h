@@ -31,9 +31,9 @@ class Client : public rome::ClientAdaptor<key_type> {
 
   ~Client() = default;
 
-  static std::unique_ptr<Client> Create(const Peer &self, const X::NodeProto& node_proto, ExperimentParams params, std::barrier<> *barrier,
-          MemoryPool& pool, key_map* kr_map, root_map* root_ptr_map) {
-    return std::unique_ptr<Client>(new Client(self, node_proto, params, barrier, pool, kr_map, root_ptr_map));
+  static std::unique_ptr<Client> Create(const Peer &self, const X::NodeProto& node_proto, const X::ClusterProto& cluster, ExperimentParams params, std::barrier<> *barrier,
+          MemoryPool& pool, key_map* kr_map, root_map* root_ptr_map, std::set<int> locals) {
+    return std::unique_ptr<Client>(new Client(self, node_proto, cluster, params, barrier, pool, kr_map, root_ptr_map, locals));
   }
 
   static void signal_handler(int signal) { 
@@ -65,9 +65,12 @@ class Client : public rome::ClientAdaptor<key_type> {
 
     auto *client_ptr = client.get();
 
+    auto local_range = CreateLocalKeyRange(client_ptr->params_, client_ptr->node_proto_, 
+                                        client_ptr->cluster_, client_ptr->local_clients_);
+
     // Create and start the workload driver (also starts client).
     auto driver = rome::WorkloadDriver<key_type>::Create(
-        std::move(client), CreateRDOpStream(client_ptr->params_),
+        std::move(client), CreateOpStream(client_ptr->params_, local_range),
         qps_controller.get(),
         std::chrono::milliseconds(experiment_params.sampling_rate_ms()));
     ROME_ASSERT_OK(driver->Start());
@@ -76,7 +79,7 @@ class Client : public rome::ClientAdaptor<key_type> {
     ROME_INFO("Running workload for {}s", experiment_params.workload().runtime());
     auto runtime = std::chrono::seconds(experiment_params.workload().runtime());
     std::this_thread::sleep_for(runtime);
-
+    
     ROME_INFO("Stopping client...");
     ROME_ASSERT_OK(driver->Stop());
 
@@ -89,13 +92,17 @@ class Client : public rome::ClientAdaptor<key_type> {
     // Sleep for a hot sec to let the node receive the messages sent by the
     // clients before disconnecting.
     // (see https://github.com/jacnel/project-x/issues/15)
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     return result; 
   }
 
   X::remote_ptr<LockType> CalcLockAddr(const key_type &key){
     auto min_key = node_proto_.range().low();
     auto max_key = node_proto_.range().high();
+    ROME_DEBUG("key map size is {}", key_range_map_->size());
+    for (const auto &elem : *key_range_map_){
+      ROME_DEBUG("key map: {}: {}, {}", elem.first, elem.second.first, elem.second.second);
+    }
     if (key > max_key || key < min_key){
       // find which node key belongs to
       for(const auto &elem : *key_range_map_) {
@@ -126,7 +133,7 @@ class Client : public rome::ClientAdaptor<key_type> {
         auto lock_ptr = root_type(temp_ptr);
         return lock_ptr;
     }
-    ROME_DEBUG("ERROR - COULD NOT FIND KEY: {}", key);
+    ROME_ERROR("ERROR - COULD NOT FIND KEY: {}", key);
     return X::remote_nullptr;
   }
 
@@ -140,9 +147,10 @@ class Client : public rome::ClientAdaptor<key_type> {
   }
 
   absl::Status Apply(const key_type &op) override {
-    ROME_DEBUG("Attempting to lock key {}", op);
+    // key_type k = 6;
+    ROME_DEBUG("Client {} attempting to lock key {}", self_.id, op);    
     X::remote_ptr<LockType> lock_addr = CalcLockAddr(op);
-    ROME_DEBUG("Address for lock is {:x}", static_cast<uint64_t>(lock_addr));
+    ROME_TRACE("Address for lock is {:x}", static_cast<uint64_t>(lock_addr));
     lock_handle_.Lock(lock_addr);
     auto start = util::SystemClock::now();
     if (params_.workload().has_think_time_ns()) {
@@ -150,15 +158,16 @@ class Client : public rome::ClientAdaptor<key_type> {
              std::chrono::nanoseconds(params_.workload().think_time_ns()))
        ;
     }
-    ROME_DEBUG("Unlocking key {}...", op);
+    ROME_DEBUG("Client {} unlocking key {}...", self_.id, op);
     lock_handle_.Unlock(lock_addr);
+    ROME_DEBUG("Unlocked key {}", op);
     return absl::OkStatus();
   }
 
     
   absl::Status Stop() override {
     ROME_DEBUG("Stopping...");
-    // Waits for all other clients
+    // Waits for all other co located clients (threads)
     barrier_->arrive_and_wait();
     return absl::OkStatus();
   }
@@ -167,18 +176,19 @@ class Client : public rome::ClientAdaptor<key_type> {
     return node_proto_;
   }
 
- //TODO: ADD CLIENT HARNESS BC OF PASSING AROUND NODE SHIT OR DO THE Node->GetStuff() in main.cc
  private:
-  Client(const Peer &self, const X::NodeProto& node_proto, ExperimentParams params, std::barrier<> *barrier,
-          MemoryPool& pool, key_map* kr_map, root_map* root_ptr_map)
+  Client(const Peer &self, const X::NodeProto& node_proto, const X::ClusterProto& cluster, ExperimentParams params, std::barrier<> *barrier,
+          MemoryPool& pool, key_map* kr_map, root_map* root_ptr_map, std::set<int> locals)
       : self_(self),
         node_proto_(node_proto),
+        cluster_(cluster),
         params_(params),
         barrier_(barrier),
         pool_(pool),
-        lock_handle_(self, pool_), 
         key_range_map_(kr_map), 
         root_ptrs_(root_ptr_map),
+        local_clients_(locals),
+        lock_handle_(self, pool_, locals), 
         root_lock_ptr_(root_ptrs_->at(self.id)) {}
 
   const Peer self_;
@@ -190,14 +200,13 @@ class Client : public rome::ClientAdaptor<key_type> {
   key_map* key_range_map_;
   root_map* root_ptrs_;
   root_type root_lock_ptr_;
+  std::set<int> local_clients_;
   
   // For generating a random key to lock if stream doesnt work
   std::random_device rd_;
   std::default_random_engine rand_;
 
   const X::NodeProto& node_proto_;
-
-  std::vector<std::future<absl::StatusOr<ResultProto>>> results_;
-  std::vector<ResultProto> result_protos_;
+  const X::ClusterProto& cluster_; 
 };
 

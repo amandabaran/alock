@@ -47,7 +47,7 @@ flags.DEFINE_string(
 flags.DEFINE_multi_string('lock_type', 'spin', 'Lock type used in experiment (one of {spin, mcs, alock})')
 flags.DEFINE_multi_integer('think_ns', 500, 'Think times in nanoseconds')
 
-flags.DEFINE_integer('min_key', 0, 'Minimum key')
+flags.DEFINE_integer('min_key', 1, 'Minimum key')
 flags.DEFINE_integer('max_key', int(1e4), 'Maximum key')
 flags.DEFINE_integer('threads', 1, 'Number of Workers (threads) to launch per node')
 flags.DEFINE_float('theta', 0.99, 'Theta in Zipfian distribution')
@@ -131,19 +131,22 @@ def parse_nodes(csv, nid, num_nodes):
     node_protos = {}
     num_clients = num_nodes * FLAGS.threads
     
-    total_keys = (FLAGS.max_key - FLAGS.min_key)
+    total_keys = (FLAGS.max_key - FLAGS.min_key) + 1
     keys_per_node = total_keys / num_clients
    
     for r in range(0, num_clients):
         i = nid % num_nodes
         n = csv_nodes[i]
+        
+        # Make client ids start at 1 so that 0 can represent unlocked
+        cid = nid + 1
        
-        min_key = int(r * keys_per_node)
+        min_key = int(r * keys_per_node) + 1
         max_key = int((r + 1) * keys_per_node) if (r < num_clients - 1) else FLAGS.max_key
         print("node: ", n[0], " range: ", min_key, " - ", max_key)
         
         c = cluster_pb2.NodeProto(
-            nid=nid, name=n[0], public_name=n[1],
+            nid=cid, name=n[0], public_name=n[1],
             port=FLAGS.port + nid,
             range=cluster_pb2.KeyRangeProto(
                 low=min_key,

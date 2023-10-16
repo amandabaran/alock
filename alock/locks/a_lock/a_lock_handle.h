@@ -32,7 +32,7 @@ class ALockHandle{
 public:
   using conn_type = MemoryPool::conn_type;
 
-  ALockHandle(MemoryPool::Peer self, MemoryPool& lock_pool);
+  ALockHandle(MemoryPool::Peer self, MemoryPool& lock_pool, std::set<int> local_clients);
 
   absl::Status Init();
 
@@ -55,6 +55,7 @@ private:
   void Reacquire();
 
   bool is_local_; //resued for each call to lock for easy check on whether worker is local to key we are attempting to lock
+  std::set<int> local_clients_; 
   
   MemoryPool::Peer self_;
   MemoryPool& pool_; // pool of alocks that the handle is local to (initalized in cluster/node_impl.h)

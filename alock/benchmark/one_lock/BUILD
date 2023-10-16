@@ -51,7 +51,7 @@ cc_library(
         "//alock/cluster:node",
         "//alock/cluster:lock_table",
         "//alock/locks/rdma_mcs_lock:rdma_mcs_lock",
-        "//alock/locks/spin_lock:rdma_spin_lock",
+        "//alock/locks/rdma_spin_lock:rdma_spin_lock",
         "//alock/locks/a_lock:a_lock",
         "@absl//absl/status",
         "@absl//absl/status:statusor",

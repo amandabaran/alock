@@ -19,9 +19,7 @@ inline static void cpu_relax() { asm volatile("pause\n" : : : "memory"); }
 
 
 template <typename K, typename V>
-Node<K, V>::~Node(){
-  //Disconnect ? shutdown?
-}
+Node<K, V>::~Node() = default;
 
 template <typename K, typename V>
 Node<K, V>::Node(const NodeProto& self, std::vector<MemoryPool::Peer> others, const ClusterProto& cluster, bool prefill)
@@ -81,7 +79,7 @@ template <typename K, typename V>
 absl::Status Node<K, V>::Prefill(const key_type& min_key,
                                    const key_type& max_key) {
   if (prefill_){
-    ROME_INFO("Prefilling lock table... [{}, {})", min_key, max_key);
+    ROME_INFO("Prefilling lock table... [{}, {}]", min_key, max_key);
     root_lock_ptr_ = lock_table_.AllocateLocks(min_key, max_key);
   } else {
     ROME_INFO("Prefilling set to false, one lock per lock table");

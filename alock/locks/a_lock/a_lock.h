@@ -30,18 +30,18 @@ static constexpr uint32_t kPoolSize = 22;
 #define VICTIM_OFFSET 32
 
 struct alignas(64) RemoteDescriptor {
-    int8_t budget{-1};
+    int8_t budget = -1;
     uint8_t pad1[NEXT_PTR_OFFSET - sizeof(budget)];
-    remote_ptr<RemoteDescriptor> next{0};
+    remote_ptr<RemoteDescriptor> next = remote_nullptr;
     uint8_t pad2[CACHELINE_SIZE - NEXT_PTR_OFFSET - sizeof(next)];
 };
 static_assert(alignof(RemoteDescriptor) == CACHELINE_SIZE);
 static_assert(sizeof(RemoteDescriptor) == CACHELINE_SIZE);
 
 struct alignas(64) LocalDescriptor {
-    int8_t budget{-1}; //budget == -1 indicates its locked, unlocked and passed off when it can proceed to critical section
+    int8_t budget = -1;//budget == -1 indicates its locked, unlocked and passed off when it can proceed to critical section
     uint8_t pad1[NEXT_PTR_OFFSET - sizeof(budget)];
-    LocalDescriptor* next{nullptr};
+    LocalDescriptor* next = nullptr;
     uint8_t pad2[CACHELINE_SIZE - NEXT_PTR_OFFSET - sizeof(next)];
 };
 static_assert(alignof(LocalDescriptor) == CACHELINE_SIZE);
@@ -49,15 +49,15 @@ static_assert(sizeof(LocalDescriptor) == CACHELINE_SIZE);
 
 struct alignas(64) ALock {
     // pointer to the pointer of the remote tail
-    remote_ptr<RemoteDescriptor> r_tail;
+    remote_ptr<RemoteDescriptor> r_tail = remote_nullptr;
     // pad so local tail starts at addr+16
     uint8_t pad1[DESC_PTR_OFFSET - sizeof(r_tail)]; 
     // pointer to the local tail
-    remote_ptr<LocalDescriptor> l_tail; 
+    remote_ptr<LocalDescriptor> l_tail = remote_nullptr;; 
     // pad so victim starts at addr+32
     uint8_t pad2[VICTIM_OFFSET - DESC_PTR_OFFSET - sizeof(l_tail)]; 
     // node id of the victim
-    uint64_t victim; 
+    uint64_t victim = 1; 
     uint8_t pad3[CACHELINE_SIZE - VICTIM_OFFSET - sizeof(victim)]; 
 };
 

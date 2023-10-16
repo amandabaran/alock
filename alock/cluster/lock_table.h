@@ -32,7 +32,7 @@ class LockTable {
     ROME_TRACE("Allocated root lock for key {}", static_cast<key_type>(min_key));
     // Allocate one lock per key
     for (auto i = min_key + 1; i <= max_key; i++){
-        lock_pool_.Allocate<lock_type>();
+        auto __attribute__ ((unused)) lock = lock_pool_.Allocate<lock_type>();
         ROME_TRACE("Allocated lock for key {}", i);
     }
     ROME_DEBUG("Root Ptr on Node {} is {:x}", node_id_, static_cast<uint64_t>(root_lock_ptr_));

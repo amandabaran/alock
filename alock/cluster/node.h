@@ -50,7 +50,6 @@ class Node {
 
   MemoryPool* GetLockPool(){ return &lock_pool_; }
 
-
  private:
   const NodeProto self_;
   std::vector<MemoryPool::Peer> others_;
