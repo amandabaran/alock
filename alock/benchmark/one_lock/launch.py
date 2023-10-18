@@ -29,7 +29,7 @@ flags.DEFINE_bool(
     'Whether or not to print commands to retrieve data from client nodes')
 flags.DEFINE_string(
     'save_root',
-    '~/alock/alock/bazel-bin/alock/benchmark/one_lock/main.runfiles/alock/',
+    '~/alock/alock/',
     'Directory results are saved under when running')
 flags.DEFINE_string('nodefile', None, 'Path to nodefile',
                     short_name='n', required=True)
@@ -72,7 +72,7 @@ flags.DEFINE_multi_integer(
     'nodes', 1, 'Number of nodes in cluster', short_name='N')
 
 flags.DEFINE_integer(
-    'port', 18018, 'Port to listen for incoming connections on')
+    'port', 12200, 'Port to listen for incoming connections on')
 flags.DEFINE_string('log_dest', '/Users/amandabaran/Desktop/sss/async_locks/alock/logs/alock',
                     'Name of local log directory for ssh commands')
 flags.DEFINE_boolean(

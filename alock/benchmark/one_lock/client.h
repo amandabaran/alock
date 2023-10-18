@@ -80,7 +80,7 @@ class Client : public rome::ClientAdaptor<key_type> {
     auto runtime = std::chrono::seconds(experiment_params.workload().runtime());
     std::this_thread::sleep_for(runtime);
     
-    ROME_INFO("Stopping client...");
+    ROME_INFO("Stopping client {}...", client_ptr->self_.id);
     ROME_ASSERT_OK(driver->Stop());
 
     // Output results.
@@ -99,10 +99,7 @@ class Client : public rome::ClientAdaptor<key_type> {
   X::remote_ptr<LockType> CalcLockAddr(const key_type &key){
     auto min_key = node_proto_.range().low();
     auto max_key = node_proto_.range().high();
-    ROME_DEBUG("key map size is {}", key_range_map_->size());
-    for (const auto &elem : *key_range_map_){
-      ROME_DEBUG("key map: {}: {}, {}", elem.first, elem.second.first, elem.second.second);
-    }
+    ROME_DEBUG("size of root ptr map: {}", root_ptrs_->size());
     if (key > max_key || key < min_key){
       // find which node key belongs to
       for(const auto &elem : *key_range_map_) {
@@ -166,7 +163,7 @@ class Client : public rome::ClientAdaptor<key_type> {
 
     
   absl::Status Stop() override {
-    ROME_DEBUG("Stopping...");
+    ROME_INFO("Stopping...");
     // Waits for all other co located clients (threads)
     barrier_->arrive_and_wait();
     return absl::OkStatus();

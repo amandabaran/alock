@@ -76,7 +76,6 @@ bool RdmaMcsLock::IsLocked() {
 }
 
 void RdmaMcsLock::Lock() {
-  // TODO: CURRENTLY ONLY IMPLEMENTED FOR REMOTE CLIENTS
   ROME_ASSERT_DEBUG(!is_host_, "Unimplemented!");  
   // Set local descriptor to initial values
   descriptor_->budget = -1;
@@ -103,8 +102,6 @@ void RdmaMcsLock::Lock() {
     if (descriptor_->budget == 0) {
       ROME_DEBUG("Budget exhausted (id={})",
                  static_cast<uint64_t>(desc_pointer_.id()));
-      // TODO: INJECT THE CALL TO REACQUIRE
-
       descriptor_->budget = kInitBudget;
     }
   } else { //no one had the lock, we were swapped in
@@ -121,7 +118,6 @@ void RdmaMcsLock::Lock() {
 
 void RdmaMcsLock::Unlock() {
   std::atomic_thread_fence(std::memory_order_release);
-  // TODO: CURRENTLY ONLY IMPLEMENTED FOR REMOTE CLIENTS
   ROME_ASSERT_DEBUG(!is_host_, "Unimplemented!");
   // if lock_pointer_ == my desc (we are the tail), set it to 0 to unlock
   // otherwise, someone else is contending for lock and we want to give it to them

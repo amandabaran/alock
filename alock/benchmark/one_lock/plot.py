@@ -12,7 +12,7 @@ import seaborn
 from rome.rome.util.debugpy_util import debugpy_hook
 
 
-flags.DEFINE_string("figdir", 'figures',
+flags.DEFINE_string("figdir", '/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/one_lock/plots/',
                     "Directory name to save figures under")
 flags.DEFINE_string(
     'datafile', None,
@@ -60,7 +60,7 @@ def getData(proto, path=''):
     return data
 
 
-x1_ = 'experiment_params.num_nodes'
+x1_ = 'cluster_size'
 x2_ = 'lock_type'
 # x3_ = 'experiment_params.workload.worker_threads'
 # x_ = [x1_, x2_, x3_]
@@ -81,6 +81,7 @@ def get_originals(data):
 
 def get_summary(data):
     # Calculate totals grouped by the cluster size
+    print("DATA IS: ", data)
     grouped = data.groupby(x_, as_index=True)[y_]
     _avg = grouped.mean()
     _stddev = grouped.std()
@@ -118,7 +119,7 @@ def plot_throughput(
         style=hue,
         markers=True,
         markersize=markersize,
-        errorbar='sd',
+        # errorbar='sd',
         palette=palette
     )
     totals = seaborn.lineplot(
@@ -212,7 +213,6 @@ def generate_csv(results_dir, datafile):
         for proto in results_protos:
             results.append(getData(proto))
             bar()
-    print("RESULTS ", results, "\n\n\n\n")
     data = pandas.DataFrame()
     dfs = []
     with alive_bar(len(results), title="Generating datafile: {}".format(datafile)) as bar:
@@ -226,35 +226,35 @@ def generate_csv(results_dir, datafile):
     data.to_csv(datafile, index_label='row')
 
 
-def plot(datafile, ycsb_list):
+def plot(datafile, lock_type):
     data = pandas.read_csv(datafile)
     # TODO: THIS LINE CHANGES WHICH LOCK HOLD TIME WE ARE PLOTTING
-    data = data[data['experiment_params.workload.think_time_ns'] == 5000] #modify what this takes to plot differernt set of
+    data = data[data['experiment_params.workload.think_time_ns'] == 500] #modify what this takes to plot differernt set of
     # data = data[data['experiment_params.num_clients'] % 4 == 0]
                 # [data['experiment_params.num_clients'] >= 30]
-    print("DATA1", data)    
+    # print("DATA1", data)    
     
-    alock = data[data['experiment_params.name'].str.count("alock.*") == 1]
-    print("ALOCK", alock)
-    alock['lock_type'] = 'ALock'
-    data = alock
+    # alock = data[data['experiment_params.name'].str.count("alock.*") == 1]
+    # # print("ALOCK", alock)
+    # alock['lock_type'] = 'ALock'
+    # data = alock
     # mcs = data[data['experiment_params.name'].str.count("mcs.*") == 1]
     # mcs['lock_type'] = 'MCS'
+    spin = data[data['experiment_params.name'].str.count("spin.*") == 1]
+    spin['lock_type'] = 'Spin'
+    spin = spin[spin['lock_type'] == 'Spin']
 
-    # spin = data[data['experiment_params.name'].str.count("spin.*") == 1]
-    # spin['lock_type'] = 'Spin'
-    
+    data = spin
     # data = pandas.concat([mcs, spin])
-    
-    data = data[['lock_type', 'results.driver.qps.summary.mean']]
+    data = data[['cluster_size', 'lock_type', 'results.driver.qps.summary.mean']]
     print("DATA", data)
     data['results.driver.qps.summary.mean'] = data['results.driver.qps.summary.mean'].apply(
         lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
     data = data.explode('results.driver.qps.summary.mean')
     data = data.reset_index(drop=True)
-    print(data)
+    # print(data)
     summary = get_summary(data)
 
     plot_throughput(x1_, data, summary, 'lock_type', 'Num. nodes',
                     'Lock type', os.path.join(FLAGS.figdir, 'test'))
-    print(data)
+    # print(data)

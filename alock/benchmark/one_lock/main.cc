@@ -57,6 +57,7 @@ int main(int argc, char *argv[]) {
 
   auto cluster = absl::GetFlag(FLAGS_cluster);
   auto experiment_params = absl::GetFlag(FLAGS_experiment_params);
+  PopulateDefaultValues(&experiment_params);
   ROME_ASSERT_OK(ValidateExperimentParams(experiment_params));
 
   auto client_ids = experiment_params.client_ids(); 
@@ -83,6 +84,10 @@ int main(int argc, char *argv[]) {
     locals.insert(c);
   }
 
+  for(int i = 0; i < num_threads; i++){
+    ROME_INFO("Peer list {}:{}@{}", i, clients.at(i).id, clients.at(i).address, clients.at(i).port);
+  }
+
   ROME_DEBUG("size of locals: {}", locals.size());
 
   if (!experiment_params.workload().has_runtime() || experiment_params.workload().runtime() < 0) {
@@ -98,9 +103,11 @@ int main(int argc, char *argv[]) {
   std::vector<std::thread> client_threads;
   std::barrier client_barrier(num_threads);
   ResultProto results[num_threads];
+  ROME_DEBUG("NUM THREADS IS {}", num_threads);
   for (int i = 0; i < num_threads; i++){
-    client_threads.emplace_back(std::thread([&](int tidx){
-      auto c = clients[i];
+    client_threads.emplace_back(std::thread([&clients, &cluster, &nodes, &experiment_params, &locals, &results, &client_barrier](int tidx){
+      auto c = clients[tidx];
+      ROME_INFO("CLIENT {}:{}:{} STARTING IN MAIN\n", c.id, c.address, c.port);
       auto node_proto = cluster.nodes().begin();
       while (node_proto != cluster.nodes().end() && node_proto->nid() != c.id) ++node_proto;
       ROME_ASSERT(node_proto != cluster.nodes().end(), "Failed to find client: {}", c.id);
@@ -108,7 +115,7 @@ int main(int argc, char *argv[]) {
       std::vector<Peer> others;
       if (std::is_same<LockType, X::ALock>::value){
         std::copy_if(nodes.begin(), nodes.end(), std::back_inserter(others),
-                      [c](auto &p) { return p.address != c.address; });
+                      [c](auto &p) { return p.id != c.id; });
       } else {
         ROME_DEBUG("Including self in others for loopback connection");
         std::copy(nodes.begin(), nodes.end(), std::back_inserter(others));
@@ -127,8 +134,8 @@ int main(int argc, char *argv[]) {
       try {
         auto result = Client::Run(std::move(client), experiment_params, &done);
         if (result.ok()){
-          results[i] = result.value();
-          ROME_INFO("{}", results[i].DebugString());
+          results[tidx] = result.value();
+          ROME_INFO("{}", results[tidx].DebugString());
         } else {
           ROME_ERROR("Client run failed. (id={})", c.id);
         }
@@ -148,7 +155,10 @@ int main(int argc, char *argv[]) {
   }
 
   std::vector<ResultProto> results_vec;
-  results_vec.insert(results_vec.end(), &results[0], &results[num_threads]);
+  for (ResultProto r : results){
+    results_vec.emplace_back(r);
+  }
+  ROME_INFO("Size of results vec: {}", results_vec.size());
   RecordResults(experiment_params, results_vec);
   
   ROME_INFO("Done");

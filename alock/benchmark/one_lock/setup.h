@@ -69,18 +69,6 @@ uint64_t lock_byte_size_ = CACHELINE_SIZE;
 static constexpr uint16_t kServerPort = 18000;
 static constexpr uint16_t kBaseClientPort = 18001;
 
-absl::Status ValidateExperimentParams(const ExperimentParams& params) {
-  if (!params.has_workload()) {
-    return util::InvalidArgumentErrorBuilder()
-           << "No workload: " << params.DebugString();
-  }
-  if (params.client_ids_size() != params.num_nodes()) {
-    return util::InvalidArgumentErrorBuilder()
-            << "Number of nodes does not match node node_ids: " << params.DebugString();
-  } 
-  return absl::OkStatus();
-}
-
 void PopulateDefaultValues(ExperimentParams* params) {
   if (!params->workload().has_min_key())
     params->mutable_workload()->set_min_key(0);
@@ -92,6 +80,18 @@ void PopulateDefaultValues(ExperimentParams* params) {
   if (!params->has_sampling_rate_ms()) {
     params->set_sampling_rate_ms(50);
   }
+}
+
+absl::Status ValidateExperimentParams(const ExperimentParams& params) {
+  if (!params.has_workload()) {
+    return util::InvalidArgumentErrorBuilder()
+           << "No workload: " << params.DebugString();
+  }
+  if (params.client_ids_size() != params.num_nodes()) {
+    return util::InvalidArgumentErrorBuilder()
+            << "Number of nodes does not match node node_ids: " << params.DebugString();
+  } 
+  return absl::OkStatus();
 }
 
 // auto CreateOpStream(const ExperimentParams& params, const X::NodeProto& node_proto) {

@@ -1,0 +1,171 @@
+experiment_params {
+  name: "spin_n1_c2_t500"
+  prefill: true
+  num_nodes: 2
+  client_ids: 1
+  client_ids: 2
+  sampling_rate_ms: 50
+  save_dir: "spin_n1/spin"
+  workload {
+    think_time_ns: 500
+    runtime: 10
+    min_key: 1
+    max_key: 100
+    theta: 0.99
+    p_local: 0.5
+  }
+  num_threads: 2
+}
+results {
+  experiment_params {
+    name: "spin_n1_c2_t500"
+    prefill: true
+    num_nodes: 2
+    client_ids: 1
+    client_ids: 2
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/spin"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 2
+  }
+  client {
+    nid: 1
+    name: "node0"
+    public_name: "apt128"
+    port: 12200
+    range {
+      low: 1
+      high: 50
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 2421993
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9130527886
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 265263.97060839942
+        stddev: 12521.701017543171
+        min: 208475.30330274755
+        p50: 268202.7837331561
+        p90: 268585.78223839612
+        p95: 268659.287420991
+        p99: 268781.48095008067
+        p999: 268802.02524974471
+        max: 269049.13666949165
+        count: 179
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 3376.0765557843047
+        stddev: 686.71606654846767
+        min: 2533
+        p50: 3180.396852455176
+        p90: 3368.7115441579795
+        p95: 3774.2017806221934
+        p99: 4143.1624580844227
+        p999: 9694.2787325229219
+        max: 114909
+        count: 1893691
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "spin_n1_c2_t500"
+    prefill: true
+    num_nodes: 2
+    client_ids: 1
+    client_ids: 2
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/spin"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 2
+  }
+  client {
+    nid: 2
+    name: "node0"
+    public_name: "apt128"
+    port: 12201
+    range {
+      low: 51
+      high: 100
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 2425034
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9130516220
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 265596.5762172289
+        stddev: 12210.389321216857
+        min: 210441.48954148535
+        p50: 268463.36553384061
+        p90: 268850.09620120283
+        p95: 268919.59435490792
+        p99: 269012.38829398307
+        p999: 269253.05931019649
+        max: 269282.72629635123
+        count: 179
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 3373.8443358169447
+        stddev: 678.07872344648308
+        min: 2519
+        p50: 3176.4088756007036
+        p90: 3356.7562359300368
+        p95: 3605.3642219187736
+        p99: 4038.904726047952
+        p999: 6723.979683348266
+        max: 114094
+        count: 1895163
+      }
+    }
+  }
+}
+cluster_size: 2

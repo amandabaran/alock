@@ -1,0 +1,1473 @@
+experiment_params {
+  name: "alock_n1_c16_t500"
+  prefill: true
+  num_nodes: 16
+  client_ids: 1
+  client_ids: 2
+  client_ids: 3
+  client_ids: 4
+  client_ids: 5
+  client_ids: 6
+  client_ids: 7
+  client_ids: 8
+  client_ids: 9
+  client_ids: 10
+  client_ids: 11
+  client_ids: 12
+  client_ids: 13
+  client_ids: 14
+  client_ids: 15
+  client_ids: 16
+  sampling_rate_ms: 50
+  save_dir: "spin_n1/alock"
+  workload {
+    think_time_ns: 500
+    runtime: 10
+    min_key: 1
+    max_key: 100
+    theta: 0.99
+    p_local: 0.5
+  }
+  num_threads: 16
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 1
+    name: "node0"
+    public_name: "apt128"
+    port: 12200
+    range {
+      low: 1
+      high: 6
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 7008372
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9139585374
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 767562.431605376
+        stddev: 23508.6709801756
+        min: 603823.58077931392
+        p50: 772364.74548648368
+        p90: 778881.3433369901
+        p95: 779908.60689869127
+        p99: 782728.55582660146
+        p999: 783210.59994814277
+        max: 783763.36726530234
+        count: 179
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 802.16554971153971
+        stddev: 438.99327023869739
+        min: 202
+        p50: 1074.0655183565914
+        p90: 1209.0093073526741
+        p95: 1230.0908963527577
+        p99: 1281.1998333149229
+        p999: 1338.0479103426508
+        max: 224880
+        count: 4858148
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 2
+    name: "node0"
+    public_name: "apt128"
+    port: 12201
+    range {
+      low: 7
+      high: 12
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 7003594
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9139519500
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 766918.18078740523
+        stddev: 28554.201042000328
+        min: 572385.917553566
+        p50: 772687.610563562
+        p90: 776797.07261735015
+        p95: 777868.13976287073
+        p99: 779915.056962406
+        p999: 780250.55152228067
+        max: 790311.14263615175
+        count: 178
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 803.31721121935175
+        stddev: 443.11625178302461
+        min: 198
+        p50: 983.98212593802566
+        p90: 1204.0540202732263
+        p95: 1236.0474142955795
+        p99: 1299.0453422961357
+        p999: 1372.4578731587455
+        max: 196880
+        count: 4857779
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 3
+    name: "node0"
+    public_name: "apt128"
+    port: 12202
+    range {
+      low: 13
+      high: 18
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 6995161
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9144642967
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 766129.19571566617
+        stddev: 27627.791692314921
+        min: 555751.26895317773
+        p50: 771768.31014580932
+        p90: 776449.33352919226
+        p95: 777552.05625432369
+        p99: 778329.89348917047
+        p999: 778669.14749080664
+        max: 779806.96596447367
+        count: 178
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 805.6676057430584
+        stddev: 425.1824117917522
+        min: 193
+        p50: 421.98204773509968
+        p90: 1206.0722227014019
+        p95: 1243.031142678059
+        p99: 1311.0042399810859
+        p999: 1338.6688503731104
+        max: 71874
+        count: 4848381
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 4
+    name: "node0"
+    public_name: "apt128"
+    port: 12203
+    range {
+      low: 19
+      high: 25
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 6925324
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9143698020
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 758181.8671176834
+        stddev: 39565.268042555923
+        min: 411733.95790626417
+        p50: 765346.40718742507
+        p90: 770531.00740767748
+        p95: 771468.11091290321
+        p99: 773796.88652288751
+        p999: 776457.73557930032
+        max: 845985.73611738742
+        count: 178
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 820.87878062966854
+        stddev: 429.78064056944567
+        min: 197
+        p50: 543.01268138959608
+        p90: 612.65110647707866
+        p95: 625.82722212990427
+        p99: 658.30170227752808
+        p999: 1044.9460703754341
+        max: 79249
+        count: 4782206
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 5
+    name: "node0"
+    public_name: "apt128"
+    port: 12204
+    range {
+      low: 26
+      high: 31
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 6934575
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9144111448
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 759490.35005588457
+        stddev: 34553.530684681435
+        min: 507246.85987704981
+        p50: 766585.73969749687
+        p90: 772384.36777801346
+        p95: 773951.695242045
+        p99: 775653.46534886421
+        p999: 776373.88983847213
+        max: 814764.58920747775
+        count: 178
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 817.87665549044516
+        stddev: 451.33918361654395
+        min: 202
+        p50: 981.29467810289464
+        p90: 1219.9598353609276
+        p95: 1245.0158007610371
+        p99: 1291.1660079641722
+        p999: 1323.5042930869042
+        max: 261712
+        count: 4795633
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 6
+    name: "node0"
+    public_name: "apt128"
+    port: 12205
+    range {
+      low: 32
+      high: 37
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 6928653
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9142108974
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 758726.7037588323
+        stddev: 40173.0364005877
+        min: 464414.38160982437
+        p50: 766266.23156616092
+        p90: 772058.3766088878
+        p95: 772802.96665363526
+        p99: 775668.39171400829
+        p999: 776417.00023841485
+        max: 777543.12098742323
+        count: 178
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 821.92614175118376
+        stddev: 447.79293240458986
+        min: 203
+        p50: 472.11156765661008
+        p90: 1221.9686817420304
+        p95: 1254.9559053253747
+        p99: 1299.1275573468008
+        p999: 1328.7555864115532
+        max: 144708
+        count: 4779588
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 7
+    name: "node0"
+    public_name: "apt128"
+    port: 12206
+    range {
+      low: 38
+      high: 43
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 6926680
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9139735292
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 758643.18300416134
+        stddev: 28545.828017438413
+        min: 557268.30425780057
+        p50: 763974.03986252774
+        p90: 768367.41844507668
+        p95: 769327.23659585963
+        p99: 771234.713757983
+        p999: 772000.28265241208
+        max: 772703.127258513
+        count: 178
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 825.86299647442672
+        stddev: 425.23148878178546
+        min: 200
+        p50: 1065.7866046131969
+        p90: 1214.0305390753522
+        p95: 1243.0483346208455
+        p99: 1297.1235876307171
+        p999: 1331.6064520637208
+        max: 77500
+        count: 4778242
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 8
+    name: "node0"
+    public_name: "apt128"
+    port: 12207
+    range {
+      low: 44
+      high: 50
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 6952926
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9145091792
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 761504.03654600389
+        stddev: 30029.58275888917
+        min: 553726.804810451
+        p50: 767203.81521261833
+        p90: 773951.831816716
+        p95: 774861.55322614964
+        p99: 777175.497320559
+        p999: 777860.95413884986
+        max: 778568.88416093367
+        count: 178
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 815.5605047894295
+        stddev: 426.37056955347123
+        min: 189
+        p50: 1086.5341892497954
+        p90: 1223.9399295195892
+        p95: 1251.9702178689172
+        p99: 1303.0586766231472
+        p999: 1357.7065532723338
+        max: 71641
+        count: 4804380
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 9
+    name: "node0"
+    public_name: "apt128"
+    port: 12208
+    range {
+      low: 51
+      high: 56
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 6905012
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9139566943
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 756234.03852159192
+        stddev: 29136.282214706873
+        min: 546224.5918510796
+        p50: 761927.43073055008
+        p90: 767327.00251466
+        p95: 768516.82037591259
+        p99: 770523.07866419479
+        p999: 771712.29542898794
+        max: 772268.284515816
+        count: 178
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 826.48710085979246
+        stddev: 1810.9598985807247
+        min: 193
+        p50: 1058.7599597731028
+        p90: 1212.0088374892937
+        p95: 1243.0170629064226
+        p99: 1293.1219837802337
+        p999: 1326.514230616857
+        max: 3355561
+        count: 4758573
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 10
+    name: "node0"
+    public_name: "apt128"
+    port: 12209
+    range {
+      low: 57
+      high: 62
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 6809688
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9144649557
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 745790.1863029598
+        stddev: 25647.072104683735
+        min: 542373.620446658
+        p50: 750709.31422857079
+        p90: 754793.27649904857
+        p95: 755570.87942462415
+        p99: 757355.35830239463
+        p999: 758783.00147262716
+        max: 763346.81974150718
+        count: 179
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 863.39412438387524
+        stddev: 647.55299877496236
+        min: 201
+        p50: 1030.3430778148365
+        p90: 1220.0553254682766
+        p95: 1249.0818524059498
+        p99: 1301.1678234603789
+        p999: 1360.4735167448723
+        max: 1086210
+        count: 4659222
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 11
+    name: "node0"
+    public_name: "apt128"
+    port: 12210
+    range {
+      low: 63
+      high: 68
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 6969173
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9139618201
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 763304.41158186481
+        stddev: 29867.01609345229
+        min: 504661.02412995737
+        p50: 769542.5535385781
+        p90: 776469.57975235872
+        p95: 778391.94928617624
+        p99: 780664.44651959336
+        p999: 782063.93000104313
+        max: 790547.5926846416
+        count: 178
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 812.05677418391588
+        stddev: 444.92948347367371
+        min: 202
+        p50: 457.61313641831646
+        p90: 1222.9742081155546
+        p95: 1252.0031425729733
+        p99: 1303.1074720437696
+        p999: 1357.4123937071013
+        max: 271417
+        count: 4820219
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 12
+    name: "node0"
+    public_name: "apt128"
+    port: 12211
+    range {
+      low: 69
+      high: 75
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 6956628
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9136604377
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 761946.18098985392
+        stddev: 31125.750834852566
+        min: 519176.64154465206
+        p50: 766373.14780329459
+        p90: 775192.67372044874
+        p95: 776255.53318085067
+        p99: 779236.89252491377
+        p999: 780000.18508877745
+        max: 780526.47902111313
+        count: 178
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 820.786795764946
+        stddev: 9171.0007229050261
+        min: 185
+        p50: 1059.680300697587
+        p90: 1207.0897310391917
+        p95: 1243.05464487565
+        p99: 1298.1196619480993
+        p999: 1335.5200768548609
+        max: 20086022
+        count: 4806776
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 13
+    name: "node0"
+    public_name: "apt128"
+    port: 12212
+    range {
+      low: 76
+      high: 81
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 7009318
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9145956569
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 767630.2966660352
+        stddev: 37181.988613688118
+        min: 407747.87628863548
+        p50: 775541.83324097691
+        p90: 779880.58666721045
+        p95: 781371.76153589471
+        p99: 784424.12540151074
+        p999: 784534.50237221981
+        max: 785273.75351638952
+        count: 178
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 801.71150748911725
+        stddev: 2593.6782363471902
+        min: 196
+        p50: 490.48178267209852
+        p90: 1216.9964923676209
+        p95: 1242.0475525127481
+        p99: 1300.0758307268645
+        p999: 1353.1425905797576
+        max: 5626110
+        count: 4867856
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 14
+    name: "node0"
+    public_name: "apt128"
+    port: 12213
+    range {
+      low: 82
+      high: 87
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 7014844
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9130495368
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 767909.75193261856
+        stddev: 39239.196964165538
+        min: 404107.31458944653
+        p50: 776012.37478766416
+        p90: 781260.2780958768
+        p95: 782303.01183718559
+        p99: 783805.59143019875
+        p999: 784273.173953731
+        max: 784492.555996781
+        count: 178
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 792.0344434550226
+        stddev: 541.61060787523968
+        min: 204
+        p50: 1046.3836260144114
+        p90: 1196.1351903801244
+        p95: 1234.0790387113061
+        p99: 1293.1086389603579
+        p999: 1346.1422615159133
+        max: 101745
+        count: 4880666
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 15
+    name: "node0"
+    public_name: "apt128"
+    port: 12214
+    range {
+      low: 88
+      high: 93
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 7070526
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9130384066
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 774339.7036769765
+        stddev: 37154.489255762448
+        min: 495904.615992887
+        p50: 781195.75948519143
+        p90: 786855.33757458639
+        p95: 787990.86935260787
+        p99: 790766.02682020492
+        p999: 791273.26194770273
+        max: 793880.33354894957
+        count: 178
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 783.91517353299935
+        stddev: 449.58308560264834
+        min: 203
+        p50: 578.50581470224643
+        p90: 1204.0634392323452
+        p95: 1234.0891987607952
+        p99: 1291.1552217579406
+        p999: 1348.7378272718188
+        max: 246758
+        count: 4921082
+      }
+    }
+  }
+}
+results {
+  experiment_params {
+    name: "alock_n1_c16_t500"
+    prefill: true
+    num_nodes: 16
+    client_ids: 1
+    client_ids: 2
+    client_ids: 3
+    client_ids: 4
+    client_ids: 5
+    client_ids: 6
+    client_ids: 7
+    client_ids: 8
+    client_ids: 9
+    client_ids: 10
+    client_ids: 11
+    client_ids: 12
+    client_ids: 13
+    client_ids: 14
+    client_ids: 15
+    client_ids: 16
+    sampling_rate_ms: 50
+    save_dir: "spin_n1/alock"
+    workload {
+      think_time_ns: 500
+      runtime: 10
+      min_key: 1
+      max_key: 100
+      theta: 0.99
+      p_local: 0.5
+    }
+    num_threads: 16
+  }
+  client {
+    nid: 16
+    name: "node0"
+    public_name: "apt128"
+    port: 12215
+    range {
+      low: 94
+      high: 100
+    }
+  }
+  driver {
+    ops {
+      name: "total_ops"
+      counter {
+        count: 7092019
+      }
+    }
+    runtime {
+      name: "driver_stopwatch"
+      stopwatch {
+        runtime_ns: 9134478643
+      }
+    }
+    qps {
+      name: "sampled_qps"
+      summary {
+        units: "ops/s"
+        mean: 776736.87884970161
+        stddev: 30933.554899818941
+        min: 587626.40574893577
+        p50: 783120.7931226854
+        p90: 788051.80758304964
+        p95: 789741.58658453391
+        p99: 793522.72444305278
+        p999: 794373.15194032039
+        max: 795462.16773499176
+        count: 179
+      }
+    }
+    latency {
+      name: "sampled_lat"
+      summary {
+        units: "ns"
+        mean: 776.16454859047712
+        stddev: 619.23799916001133
+        min: 178
+        p50: 1058.6414546988292
+        p90: 1206.008186843535
+        p95: 1228.0960102479573
+        p99: 1285.1683244558826
+        p999: 1385.3634675238534
+        max: 830755
+        count: 4951978
+      }
+    }
+  }
+}
+cluster_size: 16
