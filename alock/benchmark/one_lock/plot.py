@@ -81,7 +81,6 @@ def get_originals(data):
 
 def get_summary(data):
     # Calculate totals grouped by the cluster size
-    print("DATA IS: ", data)
     grouped = data.groupby(x_, as_index=True)[y_]
     _avg = grouped.mean()
     _stddev = grouped.std()
@@ -103,13 +102,13 @@ def plot_throughput(
     global x1_, x2_, x3_, y_, r_, n_, c_
     fig, axes = plt.subplots(1, 2, figsize=(15, 3))
     seaborn.set_theme(style='ticks')
-    markersize = 32
+    markersize = 24
 
     if hue != None:
         num_hues = len(summary.reset_index()[hue].dropna().unique())
     else:
         num_hues = 1
-    palette = seaborn.color_palette("flare_r", num_hues)
+    palette = seaborn.color_palette("viridis", num_hues)
     per = seaborn.lineplot(
         data=originals,
         x=xcol,
@@ -146,7 +145,7 @@ def plot_throughput(
     axes[0].set_ylabel('Throughput (ops/s)', font, labelpad=20)
     axes[0].set_xlabel(xlabel, font)
     axes[0].set_yscale('log')
-    axes[0].set_ylim(500, 1.5e5)
+    axes[0].set_ylim(500, 1.5e7)
     axes[1].set_title('Total', font)
     axes[1].set_ylabel('', font)
     axes[1].set_xlabel(xlabel, font)
@@ -234,9 +233,9 @@ def plot(datafile, lock_type):
                 # [data['experiment_params.num_clients'] >= 30]
     # print("DATA1", data)    
     
-    # alock = data[data['experiment_params.name'].str.count("alock.*") == 1]
-    # # print("ALOCK", alock)
-    # alock['lock_type'] = 'ALock'
+    alock = data[data['experiment_params.name'].str.count("alock.*") == 1]
+    # print("ALOCK", alock)
+    alock['lock_type'] = 'ALock'
     # data = alock
     # mcs = data[data['experiment_params.name'].str.count("mcs.*") == 1]
     # mcs['lock_type'] = 'MCS'
@@ -244,10 +243,9 @@ def plot(datafile, lock_type):
     spin['lock_type'] = 'Spin'
     spin = spin[spin['lock_type'] == 'Spin']
 
-    data = spin
+    data = pandas.concat([alock, spin])
     # data = pandas.concat([mcs, spin])
     data = data[['cluster_size', 'lock_type', 'results.driver.qps.summary.mean']]
-    print("DATA", data)
     data['results.driver.qps.summary.mean'] = data['results.driver.qps.summary.mean'].apply(
         lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
     data = data.explode('results.driver.qps.summary.mean')
@@ -255,6 +253,6 @@ def plot(datafile, lock_type):
     # print(data)
     summary = get_summary(data)
 
-    plot_throughput(x1_, data, summary, 'lock_type', 'Num. nodes',
-                    'Lock type', os.path.join(FLAGS.figdir, 'test'))
+    plot_throughput(x1_, data, summary, 'lock_type', 'Clients',
+                    'Lock type', os.path.join(FLAGS.figdir, '1Node'))
     # print(data)
