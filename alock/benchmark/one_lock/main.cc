@@ -101,6 +101,7 @@ int main(int argc, char *argv[]) {
 
   // Create and Launch each of the clients.
   std::vector<std::thread> client_threads;
+  client_threads.reserve(num_threads);
   std::barrier client_barrier(num_threads);
   ResultProto results[num_threads];
   ROME_DEBUG("NUM THREADS IS {}", num_threads);
@@ -129,8 +130,10 @@ int main(int argc, char *argv[]) {
       ROME_ASSERT_OK(node->Connect());
       // Make sure Connect() is done before launching clients
       std::atomic_thread_fence(std::memory_order_release);
+      client_barrier.arrive_and_wait();
       auto client = Client::Create(c, *node_proto, cluster, experiment_params, &client_barrier, 
                                       *(node->GetLockPool()), node->GetKeyRangeMap(), node->GetRootPtrMap(), locals);
+      client_barrier.arrive_and_wait();                              
       try {
         auto result = Client::Run(std::move(client), experiment_params, &done);
         if (result.ok()){

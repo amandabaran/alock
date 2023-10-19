@@ -228,7 +228,7 @@ def generate_csv(results_dir, datafile):
 def plot(datafile, lock_type):
     data = pandas.read_csv(datafile)
     # TODO: THIS LINE CHANGES WHICH LOCK HOLD TIME WE ARE PLOTTING
-    data = data[data['experiment_params.workload.think_time_ns'] == 500] #modify what this takes to plot differernt set of
+    data = data[data['experiment_params.workload.think_time_ns'] == 0] #modify what this takes to plot differernt set of
     # data = data[data['experiment_params.num_clients'] % 4 == 0]
                 # [data['experiment_params.num_clients'] >= 30]
     # print("DATA1", data)    

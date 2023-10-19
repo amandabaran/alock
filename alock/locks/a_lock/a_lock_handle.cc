@@ -175,6 +175,7 @@ void ALockHandle::LocalLock(){
     if (is_leader){
         l_victim_->exchange(LOCAL_VICTIM, std::memory_order_acquire);
         while (l_victim_->load() == LOCAL_VICTIM && l_r_tail_->load() != 0){
+            ROME_INFO("Stuck here?");
             cpu_relax();
         } 
     }
@@ -260,10 +261,8 @@ void ALockHandle::LocalUnlock(){
     }
     // in either case, once the successor has appeared, the unlock() method sets
     // its successor’s budget, indicating that the lock is now free
-    ROME_DEBUG("client {} ldesc budget {}", self_.id, l_desc_.budget);
     //TODO: SEG FAULT HERE WHEN GOING REALLY FAST
     l_desc_.next->budget = l_desc_.budget - 1;
-    ROME_DEBUG("client {} ldesc next budget {}",  self_.id, l_desc_.next->budget);
     // at this point no other thread can access this node and it can be reused
     // std::atomic_thread_fence(std::memory_order_release); //didnt do shit
     l_desc_.next = nullptr;
@@ -281,7 +280,7 @@ void ALockHandle::Unlock(remote_ptr<ALock> alock){
 }
 
 void ALockHandle::Reacquire(){
-  ROME_INFO("REACQUIRE ON {}", self_.id);
+  ROME_DEBUG("REACQUIRE ON {}", self_.id);
   if (is_local_) {
     while (l_victim_->load() == LOCAL_VICTIM &&  l_r_tail_->load() != 0){
         cpu_relax();

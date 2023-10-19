@@ -32,40 +32,41 @@ using ::rome::rdma::RemoteObjectProto;
 using RdmaSpinLock = uint64_t;
 
 class RdmaSpinLockHandle{
-  public:
-    RdmaSpinLockHandle(MemoryPool::Peer self, MemoryPool& pool, std::set<int> local_clients)
-     : self_(self), pool_(pool), local_clients_(local_clients) {}
+public:
+  RdmaSpinLockHandle(MemoryPool::Peer self, MemoryPool& pool, std::set<int> local_clients)
+    : self_(self), pool_(pool), local_clients_(local_clients) {}
 
-    absl::Status Init() {
-      // Preallocate memory for RDMA writes
-      local_ = pool_.Allocate<RdmaSpinLock>();
-      std::atomic_thread_fence(std::memory_order_release);
-      return absl::OkStatus();
+  absl::Status Init() {
+    // Preallocate memory for RDMA writes
+    local_ = pool_.Allocate<RdmaSpinLock>();
+    std::atomic_thread_fence(std::memory_order_release);
+    return absl::OkStatus();
+  }
+
+  bool IsLocked() { return lock_ != remote_nullptr; }
+
+  void Lock(remote_ptr<RdmaSpinLock> lock) {  
+    lock_ = lock;
+    ROME_DEBUG("LOCK VALUE IS {}", *lock_);
+    ROME_DEBUG("Attempting to lock addr {:x}", lock_.address());
+    ROME_DEBUG("Ptr id is : {}", lock_.id());
+    // return;
+    while (pool_.CompareAndSwap(lock_, kUnlocked, self_.id) != kUnlocked) {
+      ROME_DEBUG("am i stuck?");
+      cpu_relax();
     }
+    std::atomic_thread_fence(std::memory_order_release);
+    return;
+  }
 
-    bool IsLocked() { return lock_ != remote_nullptr; }
-
-    void Lock(remote_ptr<RdmaSpinLock> lock) {  
-      lock_ = lock;
-      ROME_DEBUG("LOCK VALUE IS {}", *lock_);
-      ROME_DEBUG("Attempting to lock addr {:x}", lock_.address());
-      ROME_DEBUG("Ptr id is : {}", lock_.id());
-      // return;
-      while (pool_.CompareAndSwap(lock_, kUnlocked, self_.id) != kUnlocked) {
-        ROME_DEBUG("am i stuck?");
-        cpu_relax();
-      }
-      std::atomic_thread_fence(std::memory_order_release);
-      return;
-    }
-
-    void  Unlock(remote_ptr<RdmaSpinLock> lock) {
-      ROME_ASSERT(lock.address() == lock_.address(), "Attempting to unlock spinlock that is not locked.");
-      pool_.Write<RdmaSpinLock>(lock_, 0, /*prealloc=*/local_);
-      std::atomic_thread_fence(std::memory_order_release);
-      lock_ = remote_nullptr;
-      return;
-    }
+  void  Unlock(remote_ptr<RdmaSpinLock> lock) {
+    ROME_ASSERT(lock.address() == lock_.address(), "Attempting to unlock spinlock that is not locked.");
+    pool_.Write<RdmaSpinLock>(lock_, 0, /*prealloc=*/local_);
+    // pool_.Write<RdmaSpinLock>(lock_, 0);
+    std::atomic_thread_fence(std::memory_order_release);
+    lock_ = remote_nullptr;
+    return;
+  }
 
     
 private:

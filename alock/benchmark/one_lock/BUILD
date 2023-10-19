@@ -97,7 +97,7 @@ cc_binary(
     data = ["//alock/benchmark:nodefiles"],
     defines = select(
         {
-            # ":mcs": ["LOCK_TYPE=::X::RdmaMcsLock"],
+            # ":mcs": ["LOCK_TYPE=::X::RdmaMcsLock", "LOCK_HANDLE=::X::RdmaMcsLockHandle"],
             ":spin": ["LOCK_TYPE=::X::RdmaSpinLock", "LOCK_HANDLE=::X::RdmaSpinLockHandle"],
             ":alock": ["LOCK_TYPE=::X::ALock", "LOCK_HANDLE=::X::ALockHandle"],
         },

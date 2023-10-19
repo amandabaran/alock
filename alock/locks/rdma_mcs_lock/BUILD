@@ -1,6 +1,5 @@
 cc_library(
     name = "rdma_mcs_lock",
-    srcs = ["rdma_mcs_lock.cc"],
     hdrs = ["rdma_mcs_lock.h"],
     visibility = ["//visibility:public"],
     deps = [

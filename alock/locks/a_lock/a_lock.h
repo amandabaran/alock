@@ -15,9 +15,6 @@ namespace X {
 using ::rome::rdma::remote_nullptr;
 using ::rome::rdma::remote_ptr;
 
-static constexpr uint32_t kInitBudget = 5;
-static constexpr uint32_t kPoolSize = 22;
-
 #define LOCAL_VICTIM  0
 #define REMOTE_VICTIM 1
 

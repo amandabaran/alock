@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Source cluster-dependent variables
-source "config.conf"
+source "config2.conf"
 
 #** FUNCTION DEFINITIONS **#
 
@@ -39,20 +39,20 @@ build() {
 echo "Pushing local repo to remote nodes..."
 sync
 
-# clean
+clean
 
 lock="spin"
 log_level='info'
 echo "Building ${lock}..."
 build ${lock}
 
-save_dir="spin_n1"
+save_dir="spintest"
 
 for num_nodes in 1
 do
-  for num_threads in 2 4 8 16
+  for num_threads in 1 2 4 8 16 24 32 48
   do
-    bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=500 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --gdb=True --max_key=100 --dry_run=False
+    bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --gdb=False --max_key=16 --dry_run=False
   done
 done
 bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile}  --ssh_user=adb321  --get_data  --local_save_dir=${workspace}/benchmark/one_lock/results/${save_dir}/ --remote_save_dir=${save_dir} --lock_type=${lock}

@@ -3,7 +3,7 @@
 # Source cluster-dependent variables
 source "config.conf"
 
-save_dir="spin_n1"
+save_dir="spin_n2"
 lock="alock"
 datafile="output.csv"
 echo "Plotting results in ${save_dir}"

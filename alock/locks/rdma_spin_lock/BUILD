@@ -5,7 +5,6 @@ cc_library(
     deps = [
         "//alock:util",
         "@rome//rome/rdma:rdma_memory",
-        
         "@rome//rome/rdma/channel:sync_accessor",
         "@rome//rome/rdma/connection_manager",
         "@rome//rome/rdma/memory_pool",
