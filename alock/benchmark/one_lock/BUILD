@@ -53,6 +53,7 @@ cc_library(
         "//alock/locks/rdma_mcs_lock:rdma_mcs_lock",
         "//alock/locks/rdma_spin_lock:rdma_spin_lock",
         "//alock/locks/a_lock:a_lock",
+        "//alock/locks/spin_lock:spin_lock",
         "@absl//absl/status",
         "@absl//absl/status:statusor",
         "@rome//rome/rdma/connection_manager",
@@ -66,6 +67,7 @@ string_flag(
         "mcs",
         "spin",
         "alock",
+        "l_spin",
     ],
 )
 
@@ -90,6 +92,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "lspin",
+    flag_values = {
+        ":lock_type": "lspin",
+    },
+)
+
 cc_binary(
     name = "main",
     srcs = ["main.cc"],
@@ -100,6 +109,7 @@ cc_binary(
             # ":mcs": ["LOCK_TYPE=::X::RdmaMcsLock", "LOCK_HANDLE=::X::RdmaMcsLockHandle"],
             ":spin": ["LOCK_TYPE=::X::RdmaSpinLock", "LOCK_HANDLE=::X::RdmaSpinLockHandle"],
             ":alock": ["LOCK_TYPE=::X::ALock", "LOCK_HANDLE=::X::ALockHandle"],
+            # ":lspin": ["LOCK_TYPE=::X::SpinLock", "LOCK_HANDLE=::X::SpinLockHandle"],
         },
     ),
     deps = [

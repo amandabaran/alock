@@ -34,7 +34,7 @@ class Node {
   
  public:
   ~Node();
-  Node(const NodeProto& self, std::vector<MemoryPool::Peer> others, const ClusterProto& cluster, bool prefill);
+  Node(const NodeProto& self, std::vector<MemoryPool::Peer> others, const ClusterProto& cluster, const ExperimentParams& params);
 
   absl::Status Connect();
 
@@ -54,6 +54,7 @@ class Node {
   const NodeProto self_;
   std::vector<MemoryPool::Peer> others_;
   const ClusterProto cluster_;
+  const ExperimentParams params_;
   bool prefill_;
 
   MemoryPool lock_pool_;

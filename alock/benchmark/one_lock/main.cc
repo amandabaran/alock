@@ -73,9 +73,8 @@ int main(int argc, char *argv[]) {
         nodes.push_back(p);
   });
 
-  ROME_DEBUG("size of client_ids: {}", client_ids.size());
+  //set of client ids local to this node
   std::set<int> locals;
-
   //vector of clients on this node in Peer form
   std::vector<Peer> clients;
   for (const auto &c : client_ids){
@@ -85,10 +84,8 @@ int main(int argc, char *argv[]) {
   }
 
   for(int i = 0; i < num_threads; i++){
-    ROME_INFO("Peer list {}:{}@{}", i, clients.at(i).id, clients.at(i).address, clients.at(i).port);
+    ROME_DEBUG("Peer list {}:{}@{}", i, clients.at(i).id, clients.at(i).address, clients.at(i).port);
   }
-
-  ROME_DEBUG("size of locals: {}", locals.size());
 
   if (!experiment_params.workload().has_runtime() || experiment_params.workload().runtime() < 0) {
     signal_handler_internal = std::function([](int signum) {
@@ -104,11 +101,9 @@ int main(int argc, char *argv[]) {
   client_threads.reserve(num_threads);
   std::barrier client_barrier(num_threads);
   ResultProto results[num_threads];
-  ROME_DEBUG("NUM THREADS IS {}", num_threads);
   for (int i = 0; i < num_threads; i++){
     client_threads.emplace_back(std::thread([&clients, &cluster, &nodes, &experiment_params, &locals, &results, &client_barrier](int tidx){
       auto c = clients[tidx];
-      ROME_INFO("CLIENT {}:{}:{} STARTING IN MAIN\n", c.id, c.address, c.port);
       auto node_proto = cluster.nodes().begin();
       while (node_proto != cluster.nodes().end() && node_proto->nid() != c.id) ++node_proto;
       ROME_ASSERT(node_proto != cluster.nodes().end(), "Failed to find client: {}", c.id);
@@ -121,11 +116,10 @@ int main(int argc, char *argv[]) {
         ROME_DEBUG("Including self in others for loopback connection");
         std::copy(nodes.begin(), nodes.end(), std::back_inserter(others));
       }   
-      ROME_DEBUG("SIZE OF OTHERS: {}", others.size());
 
       // Create "node" (prob want to rename)
       ROME_DEBUG("Creating node for client {}:{}", c.id, c.port);
-      auto node = std::make_unique<X::Node<key_type, LockType>>(*node_proto, others, cluster, experiment_params.prefill());
+      auto node = std::make_unique<X::Node<key_type, LockType>>(*node_proto, others, cluster, experiment_params);
       // Create mem pools of lock tables on each node and connect with all clients
       ROME_ASSERT_OK(node->Connect());
       // Make sure Connect() is done before launching clients
@@ -152,7 +146,6 @@ int main(int argc, char *argv[]) {
    // Join all client threads
   int i = 0;
   for (auto it = client_threads.begin(); it != client_threads.end(); it++){
-      ROME_INFO("Syncing client {}", i++);
       auto t = it;
       t->join();
   }
@@ -161,7 +154,6 @@ int main(int argc, char *argv[]) {
   for (ResultProto r : results){
     results_vec.emplace_back(r);
   }
-  ROME_INFO("Size of results vec: {}", results_vec.size());
   RecordResults(experiment_params, results_vec);
   
   ROME_INFO("Done");

@@ -48,7 +48,7 @@ flags.DEFINE_multi_string('lock_type', 'spin', 'Lock type used in experiment (on
 flags.DEFINE_multi_integer('think_ns', 500, 'Think times in nanoseconds')
 
 flags.DEFINE_integer('min_key', 1, 'Minimum key')
-flags.DEFINE_integer('max_key', int(1e4), 'Maximum key')
+flags.DEFINE_multi_integer('max_key', int(1e4), 'Maximum key')
 flags.DEFINE_integer('threads', 1, 'Number of Workers (threads) to launch per node')
 flags.DEFINE_float('theta', 0.99, 'Theta in Zipfian distribution')
 flags.DEFINE_float('p_local', 0.5, 'Percentage of operations that are local to each node')
@@ -72,8 +72,8 @@ flags.DEFINE_multi_integer(
     'nodes', 1, 'Number of nodes in cluster', short_name='N')
 
 flags.DEFINE_integer(
-    'port', 12200, 'Port to listen for incoming connections on')
-flags.DEFINE_string('log_dest', '/Users/amandabaran/Desktop/sss/async_locks/alock/logs/alock',
+    'port', 42000, 'Port to listen for incoming connections on')
+flags.DEFINE_string('log_dest', '/Users/amandabaran/Desktop/sss/async_locks/alock/logs/locks',
                     'Name of local log directory for ssh commands')
 flags.DEFINE_boolean(
     'dry_run', False,
@@ -131,7 +131,7 @@ def parse_nodes(csv, nid, num_nodes):
     node_protos = {}
     num_clients = num_nodes * FLAGS.threads
     
-    total_keys = (FLAGS.max_key - FLAGS.min_key) + 1
+    total_keys = (FLAGS.max_key[0] - FLAGS.min_key) + 1
     keys_per_node = total_keys / num_clients
    
     for r in range(0, num_clients):
@@ -142,8 +142,8 @@ def parse_nodes(csv, nid, num_nodes):
         cid = nid + 1
        
         min_key = int(r * keys_per_node) + 1
-        max_key = int((r + 1) * keys_per_node) if (r < num_clients - 1) else FLAGS.max_key
-        print("node: ", n[0], " range: ", min_key, " - ", max_key)
+        max_key = int((r + 1) * keys_per_node) if (r < num_clients - 1) else FLAGS.max_key[0]
+        print("client: ", cid, " range: ", min_key, " - ", max_key)
         
         c = cluster_pb2.NodeProto(
             nid=cid, name=n[0], public_name=n[1],
@@ -223,17 +223,17 @@ def build_local_save_dir(lock, public_name):
     return os.path.join(FLAGS.local_save_dir, lock, public_name) + '/'
 
 def fill_experiment_params(
-        nodes, experiment_name, lock, think, num_nodes):
+        nodes, experiment_name, lock, num_nodes):
     proto = experiment_pb2.ExperimentParams()
     if nodes:
         proto.client_ids.extend(n.nid for n in nodes)
     proto.name = experiment_name
     proto.num_nodes = num_nodes
     proto.workload.runtime = FLAGS.runtime
-    proto.workload.think_time_ns = think
+    proto.workload.think_time_ns = FLAGS.think_ns[0]
     proto.save_dir = build_save_dir(lock)
     proto.workload.min_key = FLAGS.min_key
-    proto.workload.max_key = FLAGS.max_key
+    proto.workload.max_key = FLAGS.max_key[0]
     proto.workload.p_local = FLAGS.p_local
     # proto.workload.theta = FLAGS.theta
     proto.prefill = FLAGS.prefill
@@ -313,8 +313,8 @@ def main(args):
         if FLAGS.datafile is None:
             os.remove(datafile)
     else:
-        # lock type, number of nodes, think time
-        columns = ['lock', 'n', 't',  'done']
+        # lock type, number of nodes, think time, max key
+        columns = ['lock', 'n', 'm', 'done']
         experiments = {}
         if not FLAGS.dry_run and os.path.exists(FLAGS.expfile):
             print("EXP FILE EXISTS: ", os.path.abspath(FLAGS.expfile))
@@ -323,7 +323,7 @@ def main(args):
             configurations = list(itertools.product(
                 set(FLAGS.lock_type),
                 set(FLAGS.nodes),
-                set(FLAGS.think_ns),
+                set(FLAGS.max_key),
                 [False]))
             experiments = pandas.DataFrame(configurations, columns=columns)
             if not FLAGS.dry_run:
@@ -337,7 +337,7 @@ def main(args):
 
                 lock = row['lock']
                 n_count = row['n']
-                think = row['t']
+                max_key = row['m']
 
                 nodes_csv = partition_nodefile(FLAGS.nodefile)
                 if nodes_csv is None:
@@ -349,7 +349,7 @@ def main(args):
                 num_clients = n_count * FLAGS.threads
 
                 commands = []
-                experiment_name = lock + '_n' + str(len(nodes)) + '_c' + str(num_clients) + '_t' + str(think)
+                experiment_name = lock + '_n' + str(len(nodes)) + '_c' + str(num_clients) + '_m' + str(max_key)
                 bar.text = f'Lock type: {lock} | Current experiment: {experiment_name}'
                 if not FLAGS.get_data:
                     for n in set(nodes.keys()):
@@ -358,7 +358,7 @@ def main(args):
                         ssh_command = build_ssh_command(
                             node.public_name,
                             cluster_proto.domain)
-                        params  = fill_experiment_params(node_list, experiment_name, lock, think, num_nodes=len(node_list))
+                        params  = fill_experiment_params(node_list, experiment_name, lock, num_nodes=len(node_list))
                         run_command = build_run_command(lock, params, cluster_proto.cluster)
                         retries = 0
                         commands.append((

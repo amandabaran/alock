@@ -82,7 +82,6 @@ class Client : public rome::ClientAdaptor<key_type> {
     
     ROME_INFO("Stopping client {}...", client_ptr->self_.id);
     ROME_ASSERT_OK(driver->Stop());
-    ROME_DEBUG("outputting results");
     // Output results.
     ResultProto result;
     result.mutable_experiment_params()->CopyFrom(experiment_params);
@@ -166,7 +165,6 @@ class Client : public rome::ClientAdaptor<key_type> {
     ROME_INFO("Stopping...");
     // Waits for all other co located clients (threads)
     barrier_->arrive_and_wait();
-    ROME_INFO("all clients stopped");
     return absl::OkStatus();
   }
 

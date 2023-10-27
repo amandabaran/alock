@@ -15,6 +15,9 @@ namespace X {
 using ::rome::rdma::remote_nullptr;
 using ::rome::rdma::remote_ptr;
 
+template <typename T>
+using local_ptr = std::atomic<T>*;
+
 #define LOCAL_VICTIM  0
 #define REMOTE_VICTIM 1
 

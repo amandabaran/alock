@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <memory>
 #include <unordered_map>
+#include <cmath>
 
 #include "rome/colosseum/qps_controller.h"
 #include "rome/colosseum/streams/streams.h"
@@ -22,18 +23,22 @@ template <typename K, typename V>
 Node<K, V>::~Node() = default;
 
 template <typename K, typename V>
-Node<K, V>::Node(const NodeProto& self, std::vector<MemoryPool::Peer> others, const ClusterProto& cluster, bool prefill)
+Node<K, V>::Node(const NodeProto& self, std::vector<MemoryPool::Peer> others, const ClusterProto& cluster, const ExperimentParams& params)
     : self_(self),
       others_(others),
       cluster_(cluster),
-      prefill_(prefill),
+      params_(params),
+      prefill_(params.prefill()),
       lock_pool_(MemoryPool::Peer(self.nid(), self.name(), self.port()), std::make_unique<MemoryPool::cm_type>(self.nid())),
       lock_table_(self, lock_pool_) {}
 
 template <typename K, typename V>
 absl::Status Node<K,V>::Connect(){
-  ROME_DEBUG("Init MemoryPool for locks");
-  ROME_ASSERT_OK(lock_pool_.Init(kLockPoolSize, others_));
+  //calculation to determine lock pool size
+  uint32_t bytesNeeded = ((64 * params_.workload().max_key()) + (64 * 5 * params_.num_threads()));
+  uint32_t lockPoolSize = 1 << uint32_t(ceil(log2(bytesNeeded)));
+  ROME_DEBUG("Init MemoryPool for locks size {}, bytes {}", lockPoolSize, bytesNeeded);
+  ROME_ASSERT_OK(lock_pool_.Init(lockPoolSize, others_));
 
   ROME_ASSERT_OK(Prefill(self_.range().low(), self_.range().high()));
 
