@@ -10,5 +10,9 @@
 # Directory where clangd puts its indexing work
 /.cache/
 
-/qplock/benchmark/figures
-/qplock/benchmark/results*
+**/plots*
+**/results*
+*/*.csv*
+alock/**/*.pbtxt
+.DS_Store
+
