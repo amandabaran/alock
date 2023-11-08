@@ -32,7 +32,7 @@ class Client : public rome::ClientAdaptor<key_type> {
   ~Client() = default;
 
   static std::unique_ptr<Client> Create(const Peer &self, const X::NodeProto& node_proto, const X::ClusterProto& cluster, ExperimentParams params, std::barrier<> *barrier,
-          MemoryPool& pool, key_map* kr_map, root_map* root_ptr_map, std::set<int> locals) {
+          MemoryPool& pool, key_map* kr_map, root_map* root_ptr_map, std::unordered_set<int> locals) {
     return std::unique_ptr<Client>(new Client(self, node_proto, cluster, params, barrier, pool, kr_map, root_ptr_map, locals));
   }
 
@@ -134,7 +134,7 @@ class Client : public rome::ClientAdaptor<key_type> {
   }
 
   absl::Status Start() override {
-    ROME_INFO("Starting Client...");
+    ROME_DEBUG("Starting Client...");
     root_lock_ptr_ = root_ptrs_->at(self_.id);
     auto status = lock_handle_.Init();
     ROME_ASSERT_OK(status);
@@ -162,7 +162,7 @@ class Client : public rome::ClientAdaptor<key_type> {
 
     
   absl::Status Stop() override {
-    ROME_INFO("Stopping...");
+    ROME_DEBUG("Stopping...");
     // Waits for all other co located clients (threads)
     barrier_->arrive_and_wait();
     return absl::OkStatus();
@@ -174,7 +174,7 @@ class Client : public rome::ClientAdaptor<key_type> {
 
  private:
   Client(const Peer &self, const X::NodeProto& node_proto, const X::ClusterProto& cluster, ExperimentParams params, std::barrier<> *barrier,
-          MemoryPool& pool, key_map* kr_map, root_map* root_ptr_map, std::set<int> locals)
+          MemoryPool& pool, key_map* kr_map, root_map* root_ptr_map, std::unordered_set<int> locals)
       : self_(self),
         node_proto_(node_proto),
         cluster_(cluster),
@@ -196,7 +196,7 @@ class Client : public rome::ClientAdaptor<key_type> {
   key_map* key_range_map_;
   root_map* root_ptrs_;
   root_type root_lock_ptr_;
-  std::set<int> local_clients_;
+  std::unordered_set<int> local_clients_;
   
   // For generating a random key to lock if stream doesnt work
   std::random_device rd_;

@@ -54,10 +54,10 @@ public:
   bool IsLocked() {
     if (is_host_) {
       //since we are the host, get the local addr and just interpret the value
-      return std::to_address(*(std::to_address(lock_pointer_))) != 0;
+      return std::to_address(*(std::to_address(tail_pointer_))) != 0;
     } else {
       // read in value of host's lock ptr
-      auto remote = pool_.Read<remote_ptr<RdmaMcsLock>>(lock_pointer_);
+      auto remote = pool_.Read<remote_ptr<RdmaMcsLock>>(tail_pointer_);
       // store result of if its locked
       auto locked = static_cast<uint64_t>(*(std::to_address(remote))) != 0;
       // deallocate the ptr used as a landing spot for reading in (which is created in Read)
@@ -70,16 +70,18 @@ public:
 
   void Lock(remote_ptr<RdmaMcsLock> lock) {
     lock_ = lock;
-    lock_pointer_ = decltype(lock_pointer_)(lock.id(), lock.address() + NEXT_PTR_OFFSET);
+    ROME_DEBUG("lock_: {:x}", static_cast<uint64_t>(lock_));
+    tail_pointer_ = decltype(tail_pointer_)(lock.id(), lock.address() + NEXT_PTR_OFFSET);
+    ROME_DEBUG("tail_pointer_: {:x}", static_cast<uint64_t>(tail_pointer_));
     // Set local descriptor to initial values
     descriptor_->budget = -1;
     descriptor_->next = remote_nullptr;
     // swap local descriptor in at the address of the hosts lock pointer
     auto prev =
-        pool_.AtomicSwap(lock_pointer_, static_cast<uint64_t>(desc_pointer_));
+        pool_.AtomicSwap(tail_pointer_, static_cast<uint64_t>(desc_pointer_));
     if (prev != remote_nullptr) { //someone else has the lock
       auto temp_ptr = remote_ptr<uint8_t>(prev);
-      temp_ptr += 64; //temp_ptr = next field of the current tail's descriptor
+      temp_ptr += NEXT_PTR_OFFSET; //temp_ptr = next field of the current tail's descriptor
       // make prev point to the current tail descriptor's next pointer
       prev = remote_ptr<RdmaMcsLock>(temp_ptr);
       // set the address of the current tail's next field = to the addr of our local descriptor
@@ -113,12 +115,12 @@ public:
   void Unlock(remote_ptr<RdmaMcsLock> lock) {
     ROME_ASSERT(lock.address() == lock_.address(), "Attempting to unlock lock that is not locked.");
     std::atomic_thread_fence(std::memory_order_release);
-    // if lock_pointer_ == my desc (we are the tail), set it to 0 to unlock
+    // if tail_pointer_ == my desc (we are the tail), set it to 0 to unlock
     // otherwise, someone else is contending for lock and we want to give it to them
     // try to swap in a 0 to unlock the descriptor at the addr of lock_pointer, which we expect to currently be equal to our descriptor
-    auto prev = pool_.CompareAndSwap(lock_pointer_,
+    auto prev = pool_.CompareAndSwap(tail_pointer_,
                                     static_cast<uint64_t>(desc_pointer_), 0);
-    if (prev != desc_pointer_) {  // if the lock at lock_pointer_ was not equal to our descriptor
+    if (prev != desc_pointer_) {  // if the lock at tail_pointer_ was not equal to our descriptor
       // attempt to hand the lock to prev
       // spin while 
       while (descriptor_->next == remote_nullptr)
@@ -135,6 +137,7 @@ public:
                 static_cast<uint64_t>(desc_pointer_.id()),
                 descriptor_->budget);
   }
+
 private:
   bool is_host_;
   MemoryPool::Peer self_;
@@ -146,7 +149,7 @@ private:
 
   // this is pointing to the next field of the lock on the host
   remote_ptr<RdmaMcsLock> lock_;
-  remote_ptr<remote_ptr<RdmaMcsLock>> lock_pointer_; //this is supposed to be the tail on the host
+  remote_ptr<remote_ptr<RdmaMcsLock>> tail_pointer_; //this is supposed to be the tail on the host
   
   // Used for rdma writes to the next feld
   remote_ptr<remote_ptr<RdmaMcsLock>> prealloc_;

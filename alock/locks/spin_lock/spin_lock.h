@@ -43,12 +43,10 @@ class SpinLockHandle{
     void Lock(SpinLock* lock) {
       return;
       lock_ = lock;
-      ROME_DEBUG("LOCK VALUE IS {}", *lock_);
-      ROME_DEBUG("Attempting to lock addr lock_: {:x}, lock: {:x}", lock_.address());
+      ROME_DEBUG("Attempting to lock addr lock_: {}, lock: {:x}", *lock_, lock_.address());
       
       while (lock_.compare_exchange_strong(p, nullptr, std::memory_order_release,
                                         std::memory_order_relaxed)) {
-        ROME_DEBUG("am i stuck?");
         cpu_relax();
       }
       std::atomic_thread_fence(std::memory_order_release);

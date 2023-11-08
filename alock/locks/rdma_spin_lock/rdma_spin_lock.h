@@ -43,16 +43,18 @@ public:
     return absl::OkStatus();
   }
 
-  bool IsLocked() { return lock_ != remote_nullptr; }
+  bool IsLocked(remote_ptr<RdmaSpinLock> lock) { 
+    val = pool_.Read(lock);
+    if (val == kUnlocked){
+      return false;
+    }
+    return true;
+  }
 
   void Lock(remote_ptr<RdmaSpinLock> lock) {  
     lock_ = lock;
-    ROME_DEBUG("LOCK VALUE IS {}", *lock_);
-    ROME_DEBUG("Attempting to lock addr {:x}", lock_.address());
-    ROME_DEBUG("Ptr id is : {}", lock_.id());
-    // return;
+    //TODO: switch to read and write to see if CAS introduces an issue with the rdma card because its atomic
     while (pool_.CompareAndSwap(lock_, kUnlocked, self_.id) != kUnlocked) {
-      ROME_DEBUG("am i stuck?");
       cpu_relax();
     }
     std::atomic_thread_fence(std::memory_order_release);
@@ -62,7 +64,6 @@ public:
   void  Unlock(remote_ptr<RdmaSpinLock> lock) {
     ROME_ASSERT(lock.address() == lock_.address(), "Attempting to unlock spinlock that is not locked.");
     pool_.Write<RdmaSpinLock>(lock_, 0, /*prealloc=*/local_);
-    // pool_.Write<RdmaSpinLock>(lock_, 0);
     std::atomic_thread_fence(std::memory_order_release);
     lock_ = remote_nullptr;
     return;

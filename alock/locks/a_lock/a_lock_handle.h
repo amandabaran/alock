@@ -33,9 +33,9 @@ public:
       : self_(self), pool_(pool), local_clients_(local_clients) {}
 
   absl::Status Init() {
-    for(auto c : local_clients_){
-      ROME_DEBUG("Client {} is local to client {}", self_.id, c);
-    }
+    // for(auto c : local_clients_){
+    //   ROME_DEBUG("Client {} is local to client {}", self_.id, c);
+    // }
     // allocate local and remote descriptors for this worker to use
     r_desc_pointer_ = pool_.Allocate<RemoteDescriptor>();
     r_desc_ = reinterpret_cast<RemoteDescriptor *>(r_desc_pointer_.address());
@@ -43,12 +43,6 @@ public:
     l_desc_pointer_ = pool_.Allocate<LocalDescriptor>();
     l_desc_ = *l_desc_pointer_;
     ROME_DEBUG("Node {}: LocalDescriptor @ {:x}", self_.id, static_cast<uint64_t>(l_desc_pointer_));
-  
-    // Set local descriptors to initial values
-    r_desc_->budget = -1;
-    r_desc_->next = remote_nullptr;
-    l_desc_.budget = -1;
-    l_desc_.next = nullptr;
 
     // Make sure remote and local descriptors are done allocating
     std::atomic_thread_fence(std::memory_order_release);
@@ -60,15 +54,17 @@ public:
     
     return absl::OkStatus();
   }
-
-
-
+ 
   void Lock(remote_ptr<ALock> alock){
     ROME_ASSERT(a_lock_pointer_ == remote_nullptr, "Attempting to lock handle that is already locked.");
     a_lock_pointer_ = alock;
     r_tail_ = decltype(r_tail_)(alock.id(), alock.address());
     r_l_tail_ = decltype(r_l_tail_)(alock.id(), alock.address() + DESC_PTR_OFFSET);
-    r_victim_ = decltype(r_victim_)(alock.id(), alock.address() + VICTIM_OFFSET);   
+    r_victim_ = decltype(r_victim_)(alock.id(), alock.address() + VICTIM_OFFSET);  
+    ROME_TRACE("r_tail_ addr: {:x}", static_cast<uint64_t>(r_tail_));
+    ROME_TRACE("r_l_tail_ addr: {:x}", static_cast<uint64_t>(r_l_tail_));
+    ROME_TRACE("r_victim_ addr: {:x}", static_cast<uint64_t>(r_victim_));
+    //TODO: NEED TO MAKE THIS WAY FASTER
     if (local_clients_.contains(a_lock_pointer_.id())){
       is_local_ = true;
     } else {
@@ -76,7 +72,6 @@ public:
     }
     ROME_DEBUG("Client {} is_local_ : {}", self_.id, is_local_);
     if (is_local_){ 
-      a_lock_ = decltype(a_lock_)(alock.raw());
       l_r_tail_ = reinterpret_cast<local_ptr<RemoteDescriptor*>>(alock.address());
       l_l_tail_ = reinterpret_cast<local_ptr<LocalDescriptor*>>(alock.address() + DESC_PTR_OFFSET);
       l_victim_ = reinterpret_cast<local_ptr<uint64_t*>>(alock.address() + VICTIM_OFFSET);
@@ -155,7 +150,8 @@ private:
 
   bool LockRemoteMcsQueue(){
       ROME_DEBUG("Locking remote MCS queue...");
-      
+      r_desc_->budget = -1;
+      r_desc_->next = remote_nullptr;
       // swap RemoteDescriptor onto the remote tail of the alock 
       auto prev =
         pool_.AtomicSwap(r_tail_, static_cast<uint64_t>(r_desc_pointer_));
@@ -198,7 +194,8 @@ private:
   }
 
   void RemoteLock(){
-    ROME_DEBUG("RemoteLock()");
+    ROME_DEBUG("Client {} RemoteLock()", self_.id);
+     // Set local descriptors to initial values
     bool is_leader = LockRemoteMcsQueue();
     if (is_leader){
         auto prev = pool_.AtomicSwap(r_victim_, static_cast<uint8_t>(REMOTE_VICTIM));
@@ -242,12 +239,15 @@ private:
   }
 
   void LocalLock(){
-      ROME_DEBUG("LocalLock()");
+      ROME_DEBUG("Client {} LocalLock()", self_.id);
+      // Set local descriptor to inital values
+      l_desc_.budget = -1;
+      l_desc_.next = nullptr;
       bool is_leader = LockLocalMcsQueue();
       if (is_leader){
           l_victim_->exchange(LOCAL_VICTIM, std::memory_order_acquire);
           while (l_victim_->load() == LOCAL_VICTIM && l_r_tail_->load() != 0){
-              ROME_INFO("Stuck here?");
+              ROME_TRACE("Stuck here?");
               cpu_relax();
           } 
       }
@@ -318,14 +318,13 @@ private:
   }
 
   bool is_local_; //resued for each call to lock for easy check on whether worker is local to key we are attempting to lock
-  std::set<int> local_clients_; 
+  std::unordered_set<int> local_clients_; 
   
   MemoryPool::Peer self_;
   MemoryPool& pool_; // pool of alocks that the handle is local to (initalized in cluster/node_impl.h)
 
   //Pointer to alock to allow it to be read/write via rdma
   remote_ptr<ALock> a_lock_pointer_;
-  volatile ALock *a_lock_;
   
   // Access to fields remotely
   remote_ptr<remote_ptr<RemoteDescriptor>> r_tail_;

@@ -70,6 +70,8 @@ flags.DEFINE_bool('gdb', False, 'Run in gdb')
 # Experiment configuration
 flags.DEFINE_multi_integer(
     'nodes', 1, 'Number of nodes in cluster', short_name='N')
+flags.DEFINE_multi_integer(
+    'num_clients', 1, 'Total number of clients in cluster', short_name='C')
 
 flags.DEFINE_integer(
     'port', 42000, 'Port to listen for incoming connections on')
@@ -238,6 +240,7 @@ def fill_experiment_params(
     # proto.workload.theta = FLAGS.theta
     proto.prefill = FLAGS.prefill
     proto.num_threads = FLAGS.threads
+    proto.num_clients = FLAGS.num_clients[0]
     return proto
 
 def build_get_data_command(lock, node, cluster):
@@ -314,20 +317,22 @@ def main(args):
             os.remove(datafile)
     else:
         # lock type, number of nodes, think time, max key
-        columns = ['lock', 'n', 'm', 'done']
+        columns = ['lock', 'n', 'm', 'c', 'done']
         experiments = {}
-        if not FLAGS.dry_run and os.path.exists(FLAGS.expfile):
-            print("EXP FILE EXISTS: ", os.path.abspath(FLAGS.expfile))
-            experiments = pandas.read_csv(FLAGS.expfile, index_col='row')
-        else:
-            configurations = list(itertools.product(
-                set(FLAGS.lock_type),
-                set(FLAGS.nodes),
-                set(FLAGS.max_key),
-                [False]))
-            experiments = pandas.DataFrame(configurations, columns=columns)
-            if not FLAGS.dry_run:
-                experiments.to_csv(FLAGS.expfile, mode='w+', index_label='row')
+        # commented out so we always remake experiments
+        # if not FLAGS.dry_run and os.path.exists(FLAGS.expfile):
+        #     print("EXP FILE EXISTS: ", os.path.abspath(FLAGS.expfile))
+        #     experiments = pandas.read_csv(FLAGS.expfile, index_col='row')
+        # else:
+        configurations = list(itertools.product(
+            set(FLAGS.lock_type),
+            set(FLAGS.nodes),
+            set(FLAGS.max_key),
+            set(FLAGS.num_clients),
+            [False]))
+        experiments = pandas.DataFrame(configurations, columns=columns)
+        if not FLAGS.dry_run:
+            experiments.to_csv(FLAGS.expfile, mode='w+', index_label='row')
 
         with alive_bar(int(experiments.shape[0]), title='Running experiments...') as bar:
             for index, row in experiments.iterrows():
@@ -338,6 +343,7 @@ def main(args):
                 lock = row['lock']
                 n_count = row['n']
                 max_key = row['m']
+                num_clients = row['c']
 
                 nodes_csv = partition_nodefile(FLAGS.nodefile)
                 if nodes_csv is None:
@@ -346,7 +352,6 @@ def main(args):
                 print("NCOUNT: ", n_count)
                 temp, nodes = parse_nodes(nodes_csv, 0, n_count)
                 cluster_proto.MergeFrom(temp) 
-                num_clients = n_count * FLAGS.threads
 
                 commands = []
                 experiment_name = lock + '_n' + str(len(nodes)) + '_c' + str(num_clients) + '_m' + str(max_key)
@@ -358,7 +363,7 @@ def main(args):
                         ssh_command = build_ssh_command(
                             node.public_name,
                             cluster_proto.domain)
-                        params  = fill_experiment_params(node_list, experiment_name, lock, num_nodes=len(node_list))
+                        params  = fill_experiment_params(node_list, experiment_name, lock, num_nodes=n_count)
                         run_command = build_run_command(lock, params, cluster_proto.cluster)
                         retries = 0
                         commands.append((

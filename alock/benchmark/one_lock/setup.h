@@ -77,9 +77,8 @@ void PopulateDefaultValues(ExperimentParams* params) {
   if (!params->workload().has_theta())
     params->mutable_workload()->set_theta(0.99);
   if (!params->has_num_threads()) params->set_num_threads(1);
-  if (!params->has_sampling_rate_ms()) {
+  if (!params->has_sampling_rate_ms())
     params->set_sampling_rate_ms(50);
-  }
 }
 
 absl::Status ValidateExperimentParams(const ExperimentParams& params) {
@@ -87,9 +86,9 @@ absl::Status ValidateExperimentParams(const ExperimentParams& params) {
     return util::InvalidArgumentErrorBuilder()
            << "No workload: " << params.DebugString();
   }
-  if (params.client_ids_size() != params.num_nodes()) {
+  if (params.client_ids_size() != params.num_threads()) {
     return util::InvalidArgumentErrorBuilder()
-            << "Number of nodes does not match node node_ids: " << params.DebugString();
+            << "Number of threads does not match node node_ids: " << params.DebugString();
   } 
   return absl::OkStatus();
 }

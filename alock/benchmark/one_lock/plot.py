@@ -60,24 +60,13 @@ def getData(proto, path=''):
     return data
 
 
-x1_ = 'cluster_size'
+x1_ = 'experiment_params.num_clients'
 x2_ = 'lock_type'
-# x3_ = 'experiment_params.workload.worker_threads'
-# x_ = [x1_, x2_, x3_]
-x_ = [x1_, x2_]
+x3_ = 'experiment_params.workload.max_key'
+# x4_ = 'num_nodes'
+x_ = [x1_, x2_, x3_]
 y_ = 'results.driver.qps.summary.mean'
-cols_ = [x1_, x2_,  y_]
-
-r_ = 'results.read_only'
-n_ = 'results.client.name'
-c_ = 'results.client.nid'
-
-
-def get_originals(data):
-    global cols_
-    return data[cols_].rename(
-        columns={x1_: 'c', x2_: 'r', x3_: 'w', x4_: 's'})
-
+cols_ = [x1_, x2_, x3_, y_]
 
 def get_summary(data):
     # Calculate totals grouped by the cluster size
@@ -94,15 +83,129 @@ def get_summary(data):
     summary['min'] = _min
     summary['max'] = _max
     summary['total'] = _total
+    print("\n\n----------------SUMMARY------------------\n")
     print(summary)
     return summary
 
-def plot_throughput(
-        xcol, originals, summary, hue, xlabel, hue_label, name):
-    global x1_, x2_, x3_, y_, r_, n_, c_
-    fig, axes = plt.subplots(1, 2, figsize=(15, 3))
+def plot_2(xcol, originals, summary,  hue, xlabel, hue_label, name):
+    global x1_, x2_, x3_, y_
+    markersize = 8
+    spin = originals[originals['lock_type'] == 'Spin']
+    alock = originals[originals['lock_type'] == 'ALock']
+    
+    fig, (axTop, axBottom) = plt.subplots(ncols=1, nrows=2, figsize=(10, 3), sharex=True, gridspec_kw={'hspace':0.05})
+    markersize = 12
+    palette = seaborn.color_palette("viridis")
+    line1 = seaborn.lineplot(
+        data=alock,
+        x=xcol,
+        y=y_,
+        ax=axTop,
+        markers=True,
+        markersize=markersize,
+        # errorbar='sd',
+        color='b'
+    )
+    axTop.set_ylim(bottom=80000)
+    
+    line2 = seaborn.lineplot(
+        data=spin,
+        x=xcol,
+        y=y_,
+        ax=axBottom,
+        markers=True,
+        markersize=markersize,
+        color='r'
+    )
+    axBottom.set_ylim(0, 2500)
+
+    font = {'fontsize': 14}
+    
+    # hide the spines between ax and ax2
+    axTop.spines['bottom'].set_visible(False)
+    axBottom.spines['top'].set_visible(False)
+    axTop.xaxis.tick_top()
+    axTop.tick_params(labeltop=False)  # don't put tick labels at the top
+    axBottom.xaxis.tick_bottom()
+
+    d = .005  # how big to make the diagonal lines in axes coordinates
+    # arguments to pass to plot, just so we don't keep repeating them
+    kwargs = dict(transform=axTop.transAxes, color='k', clip_on=False)
+    axTop.plot((-d, +d), (-d, +d), **kwargs)        # top-left diagonal
+    axTop.plot((1 - d, 1 + d), (-d, +d), **kwargs)  # top-right diagonal
+
+    kwargs.update(transform=axBottom.transAxes)  # switch to the bottom axes
+    axBottom.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
+    axBottom.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)  # bottom-right diagonal
+
+    axTop.set_title('Per-Client Throughput', font)
+    axBottom.set_xlabel('Keys', font)
+    axBottom.set_ylabel('Throughput (ops/s)', font)
+    axBottom.set_xlabel('')
+    axTop.set_ylabel('')
+    axTop.invert_xaxis()
+    
+    legend = plt.legend(['Alock', 'Spin'])
+    # axTop.legend([line1, line2], ['ALock', 'Spin'], bbox_to_anchor=(.5, 1.27), loc='center', title="Lock Type", columnspacing=1, edgecolor='white', borderpad=0)
+    # plt.show()
+    filename = name + ".png"
+    dirname = os.path.dirname(filename)
+    os.makedirs(dirname, exist_ok=True)
+    fig.savefig(filename, dpi=300, bbox_extra_artists=(legend,)
+                if legend is not None else None, bbox_inches='tight')
+
+def plot_total_throughput():
+    pass
+
+def plot_multi(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, name):
+    global x1_, x2_, x3_, y_
+    # make a grid of subplots with a row for each node number and a column for each key setup
+    fig, axes = plt.subplots(len(nodes), len(keys), figsize=(15, 3))
     seaborn.set_theme(style='ticks')
-    markersize = 24
+    markersize = 8
+
+    if hue != None:
+        num_hues = len(summary.reset_index()[hue].dropna().unique())
+    else:
+        num_hues = 1
+    palette = seaborn.color_palette("viridis", num_hues)
+    
+    
+    for i, node in enumerate(nodes):
+        for j, key in enumerate(keys):
+            data = originals[originals['experiment_params.workload.max_key'] == key]
+            data = data[data['cluster_size'] == node]
+            seaborn.lineplot(
+                    data=data,
+                    x=xcol,
+                    y=y_,
+                    ax=axes[i][j],
+                    hue=hue,
+                    style=hue,
+                    markers=True,
+                    markersize=markersize,
+                    palette=palette
+            )
+            axes[i][j].set_title(str('Key Max: ', key, ' Nodes: ', node))
+            axes[i][j].set_ylabel('Throughput (ops/s)', labelpad=20)
+            axes[i][j].set_xlabel(xlabel)
+    
+    plt.tight_layout()
+    plt.show()
+
+    # filename = name + ".png"
+    # dirname = os.path.dirname(filename)
+    # os.makedirs(dirname, exist_ok=True)
+    # fig.savefig(filename, dpi=300, bbox_extra_artists=(legend,)
+    #             if legend is not None else None, bbox_inches='tight')
+    
+    
+def plot_throughput(xcol, originals, summary, hue, xlabel, hue_label, name):
+    global x1_, x2_, x3_, y_
+    # make a grid of subplots with r X c plots of size figsize
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 3))
+    seaborn.set_theme(style='ticks')
+    markersize = 8
 
     if hue != None:
         num_hues = len(summary.reset_index()[hue].dropna().unique())
@@ -113,7 +216,7 @@ def plot_throughput(
         data=originals,
         x=xcol,
         y=y_,
-        ax=axes[0],
+        ax=ax1,
         hue=hue,
         style=hue,
         markers=True,
@@ -125,7 +228,7 @@ def plot_throughput(
         data=summary,
         x=xcol,
         y='total',
-        ax=axes[1],
+        ax=ax2,
         hue=hue,
         style=hue,
         markers=True,
@@ -134,25 +237,27 @@ def plot_throughput(
     )
 
     font = {'fontsize': 24}
-    for ax in axes:
+    for ax in ax1, ax2:
         ax.ticklabel_format(axis='y', scilimits=[-5, 3])
         ax.yaxis.get_offset_text().set_fontsize(24)
         ax.yaxis.set_major_locator(plt.MaxNLocator(5))
         ax.tick_params(labelsize=24)
         ax.set_ylim(ymin=0)
 
-    axes[0].set_title('Per-client', font)
-    axes[0].set_ylabel('Throughput (ops/s)', font, labelpad=20)
-    axes[0].set_xlabel(xlabel, font)
-    axes[0].set_yscale('log')
-    axes[0].set_ylim(500, 1.5e7)
-    axes[1].set_title('Total', font)
-    axes[1].set_ylabel('', font)
-    axes[1].set_xlabel(xlabel, font)
-    # axes[1].set_ylim(0, 1.25e7)
-
+    ax1.set_title('Per-client', font)
+    ax1.set_ylabel('Throughput (ops/s)', font, labelpad=20)
+    ax1.set_xlabel(xlabel, font)
+    # ax1.invert_xaxis()
+    ax1.set_ylim(1.5e3)
+    
+    ax2.set_title('Total', font)
+    ax2.set_ylabel('', font)
+    ax2.set_xlabel(xlabel, font)
+    # ax2.invert_xaxis()
+    ax2.set_ylim(2e5)
+    
     # h1, l1 = totals.get_legend_handles_labels()
-    h2, l2 = axes[0].get_legend_handles_labels()
+    h2, l2 = ax1.get_legend_handles_labels()
     for h in h2:
         h.set_markersize(24)
         h.set_linewidth(3)
@@ -179,10 +284,12 @@ def plot_throughput(
 
 def plot_latency(data):
     print("Plotting latency...")
-    # columns = ['experiment_params.name', 'experiment_params.cluster_size',
-    #            'driver.qps.summary.mean', 'driver.latency.summary.mean',
-    #            'driver.latency.summary.p99', 'driver.latency.summary.p999']
-    # data = data[columns]
+    columns = ['experiment_params.name', 'lock_type',
+               'experiment_params.cluster_size', 'experiment_params.workload.max_key',
+               'driver.qps.summary.mean', 'driver.latency.summary.mean',
+               'driver.latency.summary.p99', 'driver.latency.summary.p999']
+    data = data[columns]
+    print(data)
     # data = data[data['experiment_params.name'].str.count('.*_c.*') == 0]
 
 
@@ -227,32 +334,40 @@ def generate_csv(results_dir, datafile):
 
 def plot(datafile, lock_type):
     data = pandas.read_csv(datafile)
-    # TODO: THIS LINE CHANGES WHICH LOCK HOLD TIME WE ARE PLOTTING
-    data = data[data['experiment_params.workload.think_time_ns'] == 0] #modify what this takes to plot differernt set of
-    # data = data[data['experiment_params.num_clients'] % 4 == 0]
-                # [data['experiment_params.num_clients'] >= 30]
-    # print("DATA1", data)    
-    
+    print(data)
+    # Choose what you want to plot by filtering data
+    # data = data[data['cluster_size'] == 180] #modify what this takes to plot differernt set of
+    data = data[data['experiment_params.workload.max_key'] == 10]
+    data = data[data['cluster_size'] == 2]
+               
     alock = data[data['experiment_params.name'].str.count("alock.*") == 1]
-    # print("ALOCK", alock)
     alock['lock_type'] = 'ALock'
-    # data = alock
     # mcs = data[data['experiment_params.name'].str.count("mcs.*") == 1]
     # mcs['lock_type'] = 'MCS'
     spin = data[data['experiment_params.name'].str.count("spin.*") == 1]
     spin['lock_type'] = 'Spin'
-    spin = spin[spin['lock_type'] == 'Spin']
-
+ 
     data = pandas.concat([alock, spin])
-    # data = pandas.concat([mcs, spin])
-    data = data[['cluster_size', 'lock_type', 'results.driver.qps.summary.mean']]
+
+    data = data[['experiment_params.num_clients', 'cluster_size', 'lock_type', 'experiment_params.workload.max_key', 'results.driver.qps.summary.mean']]
     data['results.driver.qps.summary.mean'] = data['results.driver.qps.summary.mean'].apply(
         lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
     data = data.explode('results.driver.qps.summary.mean')
     data = data.reset_index(drop=True)
     # print(data)
+    spin = data[data['lock_type']== 'Spin']
+    alock = data[data['lock_type'] == 'ALock']
+    print(data)
     summary = get_summary(data)
+    # alock_summary = get_summary(alock)
+    # spin_summary = get_summary(spin)
+    # summary = [spin_summary, alock_summary]
 
-    plot_throughput(x1_, data, summary, 'lock_type', 'Clients',
-                    'Lock type', os.path.join(FLAGS.figdir, '1Node'))
-    # print(data)
+    # data = alock
+    # plot_throughput(x1_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'n2_m10'))
+    nodes = [1, 2, 3, 4, 5]
+    keys = [10, 50, 100, 1000]
+    plot_multi(nodes, keys, x1_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, '5nodescale') )
+    
+    # plot_2(x1_, data, summary, 'lock_type', 'Keys', 'Lock type', os.path.join(FLAGS.figdir, 'alock_n2'))
+    # plot_latency(data)

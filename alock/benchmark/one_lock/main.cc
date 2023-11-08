@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
   });
 
   //set of client ids local to this node
-  std::set<int> locals;
+  std::unordered_set<int> locals;
   //vector of clients on this node in Peer form
   std::vector<Peer> clients;
   for (const auto &c : client_ids){

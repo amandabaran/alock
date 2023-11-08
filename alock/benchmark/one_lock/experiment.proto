@@ -53,6 +53,9 @@ message ExperimentParams {
 
   // Number of threads per node
   optional uint32 num_threads = 9;
+
+  //Total number of clients in the system (num_threads*num_nodes)
+  optional uint32 num_clients = 10;
 };
 
 message CloudlabClusterProto {
