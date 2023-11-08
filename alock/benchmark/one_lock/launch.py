@@ -135,9 +135,10 @@ def parse_nodes(csv, nid, num_nodes):
     
     total_keys = (FLAGS.max_key[0] - FLAGS.min_key) + 1
     keys_per_node = total_keys / num_clients
-   
+    i = 0
+    
     for r in range(0, num_clients):
-        i = nid % num_nodes
+        # i = nid % num_nodes
         n = csv_nodes[i]
         
         # Make client ids start at 1 so that 0 can represent unlocked
@@ -159,7 +160,9 @@ def parse_nodes(csv, nid, num_nodes):
             node_protos[n[0]] = []
         node_protos[n[0]].append(c)
         nid += 1
-        
+        if (nid == (i+1)*FLAGS.threads):
+            i += 1
+    exit(0)   
     return proto, node_protos
 
 
