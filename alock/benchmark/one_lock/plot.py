@@ -1,4 +1,5 @@
 from enum import Enum
+from math import ceil
 from absl import flags
 from absl import app
 import os
@@ -63,7 +64,7 @@ def getData(proto, path=''):
 x1_ = 'experiment_params.num_clients'
 x2_ = 'lock_type'
 x3_ = 'experiment_params.workload.max_key'
-# x4_ = 'num_nodes'
+# x4_ = 'experiment_params.num_nodes'
 x_ = [x1_, x2_, x3_]
 y_ = 'results.driver.qps.summary.mean'
 cols_ = [x1_, x2_, x3_, y_]
@@ -87,77 +88,68 @@ def get_summary(data):
     print(summary)
     return summary
 
-def plot_2(xcol, originals, summary,  hue, xlabel, hue_label, name):
-    global x1_, x2_, x3_, y_
-    markersize = 8
-    spin = originals[originals['lock_type'] == 'Spin']
-    alock = originals[originals['lock_type'] == 'ALock']
-    
-    fig, (axTop, axBottom) = plt.subplots(ncols=1, nrows=2, figsize=(10, 3), sharex=True, gridspec_kw={'hspace':0.05})
-    markersize = 12
-    palette = seaborn.color_palette("viridis")
-    line1 = seaborn.lineplot(
-        data=alock,
-        x=xcol,
-        y=y_,
-        ax=axTop,
-        markers=True,
-        markersize=markersize,
-        # errorbar='sd',
-        color='b'
-    )
-    axTop.set_ylim(bottom=80000)
-    
-    line2 = seaborn.lineplot(
-        data=spin,
-        x=xcol,
-        y=y_,
-        ax=axBottom,
-        markers=True,
-        markersize=markersize,
-        color='r'
-    )
-    axBottom.set_ylim(0, 2500)
-
-    font = {'fontsize': 14}
-    
-    # hide the spines between ax and ax2
-    axTop.spines['bottom'].set_visible(False)
-    axBottom.spines['top'].set_visible(False)
-    axTop.xaxis.tick_top()
-    axTop.tick_params(labeltop=False)  # don't put tick labels at the top
-    axBottom.xaxis.tick_bottom()
-
-    d = .005  # how big to make the diagonal lines in axes coordinates
-    # arguments to pass to plot, just so we don't keep repeating them
-    kwargs = dict(transform=axTop.transAxes, color='k', clip_on=False)
-    axTop.plot((-d, +d), (-d, +d), **kwargs)        # top-left diagonal
-    axTop.plot((1 - d, 1 + d), (-d, +d), **kwargs)  # top-right diagonal
-
-    kwargs.update(transform=axBottom.transAxes)  # switch to the bottom axes
-    axBottom.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
-    axBottom.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)  # bottom-right diagonal
-
-    axTop.set_title('Per-Client Throughput', font)
-    axBottom.set_xlabel('Keys', font)
-    axBottom.set_ylabel('Throughput (ops/s)', font)
-    axBottom.set_xlabel('')
-    axTop.set_ylabel('')
-    axTop.invert_xaxis()
-    
-    legend = plt.legend(['Alock', 'Spin'])
-    # axTop.legend([line1, line2], ['ALock', 'Spin'], bbox_to_anchor=(.5, 1.27), loc='center', title="Lock Type", columnspacing=1, edgecolor='white', borderpad=0)
-    # plt.show()
-    filename = name + ".png"
-    dirname = os.path.dirname(filename)
-    os.makedirs(dirname, exist_ok=True)
-    fig.savefig(filename, dpi=300, bbox_extra_artists=(legend,)
-                if legend is not None else None, bbox_inches='tight')
-
 def plot_total_throughput():
     pass
 
-def plot_multi(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, name):
+def plot_budgets(nodes, budgets, xcol, originals, summary, hue, xlabel, hue_label, name):
+    global x1_, x2_, x3_, y_
+    # make a grid of subplots with a row for each node number and a column for each key setup
+    fig, axes = plt.subplots(len(nodes), len(budgets), figsize=(15, 3))
+    seaborn.set_theme(style='ticks')
+    markersize = 8
+
+    if hue != None:
+        num_hues = len(summary.reset_index()[hue].dropna().unique())
+    else:
+        num_hues = 1
+    palette = seaborn.color_palette("viridis", num_hues)
+    
+    plt.subplots_adjust(hspace = 0.8)
+    
+    for i, node in enumerate(nodes):
+        for j, budget in enumerate(budgets):
+            data = originals[originals['experiment_params.budget'] == budget]
+            data = data[data['experiment_params.num_nodes'] == node]
+            seaborn.lineplot(
+                    data=data,
+                    x=xcol,
+                    y=y_,
+                    ax=axes[i][j],
+                    hue=hue,
+                    style=hue,
+                    markers=True,
+                    markersize=markersize,
+                    palette=palette
+            )
+            h2, l2 = axes[i][j].get_legend_handles_labels()
+            axes[i][j].set_ylabel('') 
+            axes[i][j].set_xlabel('')
+        axes[i][ceil(j/2)].set_title(str(node) + " Nodes")
+        axes[i][0].set_ylabel('Throughput (ops/s)', labelpad=20)
+    
+    for j in range(len(budgets)):    
+        axes[len(nodes)-1][j].set_xlabel(xlabel)
+
+    h2, l2 = axes[i][j].get_legend_handles_labels()
+    for h in h2:
+        h.set_markersize(24)
+        h.set_linewidth(3)
+    labels_handles = {}
+    labels_handles.update(dict(zip(l2, h2)))
+    
+    for ax in axes.flatten():
+        ax.legend().remove()
+    
+    fig.legend(h2, l2,
+        # h2, l2, bbox_to_anchor=(.5, 1.27),
+        loc='upper center', fontsize=12, title_fontsize=16, title=hue_label,
+        ncol=num_hues if num_hues < 6 else int(num_hues / 2),
+        columnspacing=1, edgecolor='white', borderpad=0)
+    
+    plt.show()
+
+
+def plot_grid(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, name):
     global x1_, x2_, x3_, y_
     # make a grid of subplots with a row for each node number and a column for each key setup
     fig, axes = plt.subplots(len(nodes), len(keys), figsize=(15, 3))
@@ -170,11 +162,12 @@ def plot_multi(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, na
         num_hues = 1
     palette = seaborn.color_palette("viridis", num_hues)
     
+    plt.subplots_adjust(hspace = 0.8)
     
     for i, node in enumerate(nodes):
         for j, key in enumerate(keys):
             data = originals[originals['experiment_params.workload.max_key'] == key]
-            data = data[data['cluster_size'] == node]
+            data = data[data['experiment_params.num_nodes'] == node]
             seaborn.lineplot(
                     data=data,
                     x=xcol,
@@ -186,11 +179,74 @@ def plot_multi(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, na
                     markersize=markersize,
                     palette=palette
             )
-            axes[i][j].set_title(str('Key Max: ', key, ' Nodes: ', node))
-            axes[i][j].set_ylabel('Throughput (ops/s)', labelpad=20)
-            axes[i][j].set_xlabel(xlabel)
+            h2, l2 = axes[i][j].get_legend_handles_labels()
+            axes[i][j].set_ylabel('') 
+            axes[i][j].set_xlabel('')
+        axes[i][ceil(j/2)].set_title(str(node) + " Nodes")
+        axes[i][0].set_ylabel('Throughput (ops/s)', labelpad=20)
     
-    plt.tight_layout()
+    for j in range(len(keys)):    
+     axes[len(nodes)-1][j].set_xlabel(xlabel)
+
+    h2, l2 = axes[i][j].get_legend_handles_labels()
+    for h in h2:
+        h.set_markersize(24)
+        h.set_linewidth(3)
+    labels_handles = {}
+    labels_handles.update(dict(zip(l2, h2)))
+    
+    for ax in axes.flatten():
+        ax.legend().remove()
+    
+    fig.legend(h2, l2,
+        # h2, l2, bbox_to_anchor=(.5, 1.27),
+        loc='upper center', fontsize=12, title_fontsize=16, title=hue_label,
+        ncol=num_hues if num_hues < 6 else int(num_hues / 2),
+        columnspacing=1, edgecolor='white', borderpad=0)
+    
+    plt.show()
+
+    # filename = name + ".png"
+    # dirname = os.path.dirname(filename)
+    # os.makedirs(dirname, exist_ok=True)
+    # fig.savefig(filename, dpi=300, bbox_extra_artists=(legend,)
+    #             if legend is not None else None, bbox_inches='tight')
+    
+
+def plot_multi(node, keys, xcol, originals, summary, hue, xlabel, hue_label, name):
+    global x1_, x2_, x3_, y_
+    # make a grid of subplots with a column for each key setup
+    fig, axes = plt.subplots(1, len(keys), figsize=(15, 3))
+    seaborn.set_theme(style='ticks')
+    markersize = 8
+
+    if hue != None:
+        num_hues = len(summary.reset_index()[hue].dropna().unique())
+    else:
+        num_hues = 1
+    palette = seaborn.color_palette("viridis", num_hues)
+    
+    
+    
+    for j, key in enumerate(keys):
+        data = originals[originals['experiment_params.workload.max_key'] == key]
+        data = data[data['experiment_params.num_nodes'] == node]
+        seaborn.lineplot(
+                data=data,
+                x=xcol,
+                y=y_,
+                ax=axes[j],
+                hue=hue,
+                style=hue,
+                markers=True,
+                markersize=markersize,
+                palette=palette
+        )
+        axes[j].set_title('Key Max: ' + str(key) + ' Nodes: ' + str(node))
+        axes[j].set_ylabel('Throughput (ops/s)', labelpad=20)
+        axes[j].set_xlabel(xlabel)
+    
+    # plt.tight_layout()
     plt.show()
 
     # filename = name + ".png"
@@ -337,27 +393,24 @@ def plot(datafile, lock_type):
     print(data)
     # Choose what you want to plot by filtering data
     # data = data[data['cluster_size'] == 180] #modify what this takes to plot differernt set of
-    data = data[data['experiment_params.workload.max_key'] == 10]
-    data = data[data['cluster_size'] == 2]
+    # data = data[data['experiment_params.workload.max_key'] == 10]
+    # data = data[data['cluster_size'] == 2]
                
     alock = data[data['experiment_params.name'].str.count("alock.*") == 1]
     alock['lock_type'] = 'ALock'
-    # mcs = data[data['experiment_params.name'].str.count("mcs.*") == 1]
-    # mcs['lock_type'] = 'MCS'
+    mcs = data[data['experiment_params.name'].str.count("mcs.*") == 1]
+    mcs['lock_type'] = 'MCS'
     spin = data[data['experiment_params.name'].str.count("spin.*") == 1]
     spin['lock_type'] = 'Spin'
  
-    data = pandas.concat([alock, spin])
+    data = pandas.concat([alock, mcs, spin])
 
-    data = data[['experiment_params.num_clients', 'cluster_size', 'lock_type', 'experiment_params.workload.max_key', 'results.driver.qps.summary.mean']]
+    data = data[['experiment_params.num_clients', 'experiment_params.num_nodes', 'lock_type', 'experiment_params.workload.max_key', 'results.driver.qps.summary.mean']]
     data['results.driver.qps.summary.mean'] = data['results.driver.qps.summary.mean'].apply(
         lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
     data = data.explode('results.driver.qps.summary.mean')
     data = data.reset_index(drop=True)
-    # print(data)
-    spin = data[data['lock_type']== 'Spin']
-    alock = data[data['lock_type'] == 'ALock']
-    print(data)
+
     summary = get_summary(data)
     # alock_summary = get_summary(alock)
     # spin_summary = get_summary(spin)
@@ -365,9 +418,12 @@ def plot(datafile, lock_type):
 
     # data = alock
     # plot_throughput(x1_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'n2_m10'))
-    nodes = [1, 2, 3, 4, 5]
-    keys = [10, 50, 100, 1000]
-    plot_multi(nodes, keys, x1_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, '5nodescale') )
+    nodes = [1, 2, 5, 10, 15, 20]
+    keys = [10, 100, 1000]
+    # plot_grid(nodes, keys, x1_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, '20nodescale') )
+    nodes = [2]
+    budgets = [5, 10, 100, 1000]
+    plot_budgets(nodes, budgets, x1_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'budget_test') )
     
     # plot_2(x1_, data, summary, 'lock_type', 'Keys', 'Lock type', os.path.join(FLAGS.figdir, 'alock_n2'))
     # plot_latency(data)

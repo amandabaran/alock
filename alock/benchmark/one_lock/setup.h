@@ -78,7 +78,7 @@ void PopulateDefaultValues(ExperimentParams* params) {
     params->mutable_workload()->set_theta(0.99);
   if (!params->has_num_threads()) params->set_num_threads(1);
   if (!params->has_sampling_rate_ms())
-    params->set_sampling_rate_ms(50);
+    params->set_sampling_rate_ms(10);
 }
 
 absl::Status ValidateExperimentParams(const ExperimentParams& params) {
@@ -93,43 +93,40 @@ absl::Status ValidateExperimentParams(const ExperimentParams& params) {
   return absl::OkStatus();
 }
 
-// auto CreateOpStream(const ExperimentParams& params, const X::NodeProto& node_proto) {
-//   std::vector<Operation> operations = std::vector<Operation>();
-    
-//   // initialize random number generator and key_range
-//   int full_key_range = params.workload().max_key() - params.workload().min_key();
-//   int local_range = node_proto.range().high() - node_proto.range().low();
+auto CreateOpStream(const ExperimentParams& params, const X::NodeProto& node){
+  std::uniform_real_distribution<double> dist = std::uniform_real_distribution<double>(0.0, 1.0);
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::bernoulli_distribution bernoulliDist(params.workload().p_local());
 
-//   double p_local = params.workload().p_local();
-//   //TODO: figure out how to generate key based on result of bernoulli stream for each operation
-//   auto bernoulli_stream = std::make_unique<
-//       rome::RandomDistributionStream<std::bernoulli_distribution, double>>(p_local);
-//   auto key_stream = std::make_unique<rome::RandomDistributionStream<
-//       std::uniform_int_distribution<key_type>, key_type, key_type>>(
-//       params.workload().min_key(), params.workload().max_key());
-  
-//   return key_stream;
-//   // return rome::MappedStream<X::RequestProto, rome::YcsbOp<key_type>, value_type,
-//   //                           bool>::
+  int local_start = node.local_range().low();
+  int local_end = node.local_range().high();
+  int local_range = local_end - local_start + 1;
 
-// }
+  int min_key = params.workload().min_key();
+  int max_key = params.workload().max_key();
+  int key_range = max_key - min_key + 1;
 
-auto CreateLocalKeyRange(const ExperimentParams& params, const X::NodeProto& self, const X::ClusterProto& cluster, std::set<int> local_clients){
-  key_type high = self.range().high();
-  key_type low = self.range().low();
-  //Go through all nodes of the cluster, if node is a local client, check if it will expand the local range
-  for (auto c : cluster.nodes()){
-    if (local_clients.contains(c.nid())){
-      high = std::max(high, c.range().high());
-      low = std::min(low, c.range().low());
+  //apply this to determine a key for each op
+  std::function<key_type(void)> generator = [&](){
+    // Determine whether to use the local range 
+    bool useLocalRange = bernoulliDist(gen);
+    key_type key;
+    if (useLocalRange){
+      key = dist(gen) * local_range + local_start;
+    } else {
+      key = dist(gen) * key_range + min_key;
+      while (key <= local_end && key >= local_start){
+        key = dist(gen) * key_range + min_key;
+      }
     }
-  }
-  return std::make_pair(low, high);
+    return key;
+  };
+
+  return std::make_unique<rome::EndlessStream<key_type>>(generator);            
 }
 
-//TODO: update op stream to use bernoulli distribution first, then use random distribution with either the local workload range or remote range
-
-auto CreateOpStream(const ExperimentParams& params, std::pair<key_type, key_type> local_range) {
+auto CreateOpStream(const ExperimentParams& params) {
   return std::make_unique<rome::RandomDistributionStream<
       std::uniform_int_distribution<key_type>, key_type, key_type>>(
       params.workload().min_key(), params.workload().max_key());

@@ -26,7 +26,7 @@ using ::rome::rdma::RemoteObjectProto;
 #define NEXT_PTR_OFFSET 32
 
 struct alignas(64) RdmaMcsLock          {
-  long int budget{-1};
+  int64_t budget{-1};
   uint8_t pad1[NEXT_PTR_OFFSET - sizeof(budget)];
   remote_ptr<RdmaMcsLock> next{0};
   uint8_t pad2[CACHELINE_SIZE - NEXT_PTR_OFFSET - sizeof(uintptr_t)];
@@ -36,8 +36,8 @@ static_assert(sizeof(RdmaMcsLock) == 64);
 
 class RdmaMcsLockHandle {
 public: 
-  RdmaMcsLockHandle(MemoryPool::Peer self, MemoryPool &pool, std::set<int> local_clients)
-      : self_(self), pool_(pool), local_clients_(local_clients) {}
+  RdmaMcsLockHandle(MemoryPool::Peer self, MemoryPool &pool, std::unordered_set<int> local_clients, uint64_t budget)
+      : self_(self), pool_(pool), local_clients_(local_clients), init_budget_(budget) {}
 
   absl::Status Init() {    
     // Reserve remote memory for the local descriptor.
@@ -49,6 +49,10 @@ public:
 
     std::atomic_thread_fence(std::memory_order_release);
     return absl::OkStatus();
+  }
+
+  uint64_t GetReaqCount(){
+    return 0;
   }
 
   bool IsLocked() {
@@ -98,11 +102,11 @@ public:
       if (descriptor_->budget == 0) {
         ROME_DEBUG("Budget exhausted (id={})",
                   static_cast<uint64_t>(desc_pointer_.id()));
-        descriptor_->budget = kInitBudget;
+        descriptor_->budget = init_budget_;
       }
     } else { //no one had the lock, we were swapped in
       // set lock holders descriptor budget to initBudget since we are the first lockholder
-      descriptor_->budget = kInitBudget;
+      descriptor_->budget = init_budget_;
     }
     // budget was set to greater than 0, CS can be entered
     ROME_DEBUG("[Lock] Acquired: prev={:x}, budget={:x} (id={})",
@@ -139,10 +143,11 @@ public:
   }
 
 private:
+  int64_t init_budget_;  
   bool is_host_;
   MemoryPool::Peer self_;
   MemoryPool &pool_; //reference to pool object, so all descriptors in same pool
-  std::set<int> local_clients_;
+  std::unordered_set<int> local_clients_;
 
   // Pointer to the A_Lock object, store address in constructor
   // remote_ptr<A_Lock> glock_; 

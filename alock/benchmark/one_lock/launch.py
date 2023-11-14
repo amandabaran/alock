@@ -52,6 +52,7 @@ flags.DEFINE_multi_integer('max_key', int(1e4), 'Maximum key')
 flags.DEFINE_integer('threads', 1, 'Number of Workers (threads) to launch per node')
 flags.DEFINE_float('theta', 0.99, 'Theta in Zipfian distribution')
 flags.DEFINE_float('p_local', 0.5, 'Percentage of operations that are local to each node')
+flags.DEFINE_multi_integer('budget', 5, 'Budget to be used for alock before reacquiring global lock')
 
 flags.DEFINE_integer('runtime', 10, 'Number of seconds to run experiment')
 
@@ -134,18 +135,20 @@ def parse_nodes(csv, nid, num_nodes):
     num_clients = num_nodes * FLAGS.threads
     
     total_keys = (FLAGS.max_key[0] - FLAGS.min_key) + 1
-    keys_per_node = total_keys / num_clients
+    keys_per_client = total_keys / num_clients
+    keys_per_node = total_keys / num_nodes
     i = 0
+    local_low = FLAGS.min_key
+    local_high = keys_per_node
     
     for r in range(0, num_clients):
-        # i = nid % num_nodes
         n = csv_nodes[i]
         
         # Make client ids start at 1 so that 0 can represent unlocked
         cid = nid + 1
        
-        min_key = int(r * keys_per_node) + 1
-        max_key = int((r + 1) * keys_per_node) if (r < num_clients - 1) else FLAGS.max_key[0]
+        min_key = int(r * keys_per_client) + 1
+        max_key = int((r + 1) * keys_per_client) if (r < num_clients - 1) else FLAGS.max_key[0]
         print("client: ", cid, " range: ", min_key, " - ", max_key)
         
         c = cluster_pb2.NodeProto(
@@ -153,7 +156,10 @@ def parse_nodes(csv, nid, num_nodes):
             port=FLAGS.port + nid,
             range=cluster_pb2.KeyRangeProto(
                 low=min_key,
-                high=max_key
+                high=max_key),
+            local_range=cluster_pb2.KeyRangeProto(
+                low=int(local_low),
+                high=int(local_high)
             ))
         proto.cluster.nodes.append(c)
         if node_protos.get(n[0]) is None:
@@ -162,7 +168,9 @@ def parse_nodes(csv, nid, num_nodes):
         nid += 1
         if (nid == (i+1)*FLAGS.threads):
             i += 1
-    exit(0)   
+            local_low = local_high + 1
+            local_high = (i + 1)*keys_per_node
+            
     return proto, node_protos
 
 
@@ -234,6 +242,7 @@ def fill_experiment_params(
         proto.client_ids.extend(n.nid for n in nodes)
     proto.name = experiment_name
     proto.num_nodes = num_nodes
+    proto.budget = FLAGS.budget[0]
     proto.workload.runtime = FLAGS.runtime
     proto.workload.think_time_ns = FLAGS.think_ns[0]
     proto.save_dir = build_save_dir(lock)
@@ -320,17 +329,14 @@ def main(args):
             os.remove(datafile)
     else:
         # lock type, number of nodes, think time, max key
-        columns = ['lock', 'n', 'm', 'c', 'done']
+        # columns = ['lock', 'n', 'm', 'c', 'done']
+        columns = ['lock', 'n', 'b', 'c', 'done']
         experiments = {}
-        # commented out so we always remake experiments
-        # if not FLAGS.dry_run and os.path.exists(FLAGS.expfile):
-        #     print("EXP FILE EXISTS: ", os.path.abspath(FLAGS.expfile))
-        #     experiments = pandas.read_csv(FLAGS.expfile, index_col='row')
-        # else:
         configurations = list(itertools.product(
             set(FLAGS.lock_type),
             set(FLAGS.nodes),
-            set(FLAGS.max_key),
+            set(FLAGS.budget),
+            # set(FLAGS.max_key),
             set(FLAGS.num_clients),
             [False]))
         experiments = pandas.DataFrame(configurations, columns=columns)
@@ -345,7 +351,8 @@ def main(args):
 
                 lock = row['lock']
                 n_count = row['n']
-                max_key = row['m']
+                # max_key = row['m']
+                budget = row['b']
                 num_clients = row['c']
 
                 nodes_csv = partition_nodefile(FLAGS.nodefile)
@@ -357,7 +364,7 @@ def main(args):
                 cluster_proto.MergeFrom(temp) 
 
                 commands = []
-                experiment_name = lock + '_n' + str(len(nodes)) + '_c' + str(num_clients) + '_m' + str(max_key)
+                experiment_name = lock + '_n' + str(len(nodes)) + '_c' + str(num_clients) + '_b' + str(budget)
                 bar.text = f'Lock type: {lock} | Current experiment: {experiment_name}'
                 if not FLAGS.get_data:
                     for n in set(nodes.keys()):

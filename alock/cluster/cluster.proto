@@ -13,6 +13,7 @@ message NodeProto {
   optional string public_name = 3;
   optional uint32 port = 4;
   optional KeyRangeProto range = 5;
+  optional KeyRangeProto local_range = 6; 
 };
 
 message ClusterProto {

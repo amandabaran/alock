@@ -19,8 +19,7 @@ message Workload {
   optional double theta = 5;
   
   //between 0 and 1
-  optional double p_local = 6;
-  
+  optional double p_local = 6;  
 };
 
 message RemotePtrProto {
@@ -56,6 +55,8 @@ message ExperimentParams {
 
   //Total number of clients in the system (num_threads*num_nodes)
   optional uint32 num_clients = 10;
+
+  optional int64 budget = 11;
 };
 
 message CloudlabClusterProto {

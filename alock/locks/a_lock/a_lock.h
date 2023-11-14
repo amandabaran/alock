@@ -30,7 +30,7 @@ using local_ptr = std::atomic<T>*;
 #define VICTIM_OFFSET 32
 
 struct alignas(64) RemoteDescriptor {
-    int8_t budget = -1;
+    int64_t budget = -1;
     uint8_t pad1[NEXT_PTR_OFFSET - sizeof(budget)];
     remote_ptr<RemoteDescriptor> next = remote_nullptr;
     uint8_t pad2[CACHELINE_SIZE - NEXT_PTR_OFFSET - sizeof(next)];
@@ -39,7 +39,7 @@ static_assert(alignof(RemoteDescriptor) == CACHELINE_SIZE);
 static_assert(sizeof(RemoteDescriptor) == CACHELINE_SIZE);
 
 struct alignas(64) LocalDescriptor {
-    int8_t budget = -1;//budget == -1 indicates its locked, unlocked and passed off when it can proceed to critical section
+    int64_t budget = -1;//budget == -1 indicates its locked, unlocked and passed off when it can proceed to critical section
     uint8_t pad1[NEXT_PTR_OFFSET - sizeof(budget)];
     LocalDescriptor* next = nullptr;
     uint8_t pad2[CACHELINE_SIZE - NEXT_PTR_OFFSET - sizeof(next)];

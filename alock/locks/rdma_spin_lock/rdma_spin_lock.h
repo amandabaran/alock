@@ -22,29 +22,33 @@ using ::rome::rdma::remote_nullptr;
 using ::rome::rdma::remote_ptr;
 using ::rome::rdma::RemoteObjectProto;
 
-// struct alignas(64) RdmaSpinLock {
-//     uint64_t lock = 0;
-//     uint8_t pad1[CACHELINE_SIZE - sizeof(budget)];
-// };
-// static_assert(alignof(RemoteDescriptor) == CACHELINE_SIZE);
-// static_assert(sizeof(RemoteDescriptor) == CACHELINE_SIZE);
+struct alignas(64) RdmaSpinLock {
+    uint64_t lock{0};
+    uint8_t pad1[CACHELINE_SIZE - sizeof(lock)];
+};
+static_assert(alignof(RdmaSpinLock) == CACHELINE_SIZE);
+static_assert(sizeof(RdmaSpinLock) == CACHELINE_SIZE);
 
-using RdmaSpinLock = uint64_t;
+// using RdmaSpinLock = uint64_t;
 
 class RdmaSpinLockHandle{
 public:
-  RdmaSpinLockHandle(MemoryPool::Peer self, MemoryPool& pool, std::set<int> local_clients)
+  RdmaSpinLockHandle(MemoryPool::Peer self, MemoryPool& pool, std::unordered_set<int> local_clients, uint64_t budget)
     : self_(self), pool_(pool), local_clients_(local_clients) {}
 
   absl::Status Init() {
     // Preallocate memory for RDMA writes
-    local_ = pool_.Allocate<RdmaSpinLock>();
+    local_ = pool_.Allocate<uint64_t>();
     std::atomic_thread_fence(std::memory_order_release);
     return absl::OkStatus();
   }
 
+  uint64_t GetReaqCount(){
+    return 0;
+  }
+
   bool IsLocked(remote_ptr<RdmaSpinLock> lock) { 
-    val = pool_.Read(lock);
+    uint64_t val = static_cast<uint64_t>(pool_.Read(lock));
     if (val == kUnlocked){
       return false;
     }
@@ -52,7 +56,7 @@ public:
   }
 
   void Lock(remote_ptr<RdmaSpinLock> lock) {  
-    lock_ = lock;
+    lock_ = decltype(lock_)(lock.id(), lock.address());
     //TODO: switch to read and write to see if CAS introduces an issue with the rdma card because its atomic
     while (pool_.CompareAndSwap(lock_, kUnlocked, self_.id) != kUnlocked) {
       cpu_relax();
@@ -63,7 +67,7 @@ public:
 
   void  Unlock(remote_ptr<RdmaSpinLock> lock) {
     ROME_ASSERT(lock.address() == lock_.address(), "Attempting to unlock spinlock that is not locked.");
-    pool_.Write<RdmaSpinLock>(lock_, 0, /*prealloc=*/local_);
+    pool_.Write<uint64_t>(lock_, 0, /*prealloc=*/local_);
     std::atomic_thread_fence(std::memory_order_release);
     lock_ = remote_nullptr;
     return;
@@ -72,15 +76,16 @@ public:
     
 private:
 
+
   static constexpr uint64_t kUnlocked = 0;
   bool is_host_;
 
   MemoryPool::Peer self_;
   MemoryPool &pool_;
-  std::set<int> local_clients_;
+  std::unordered_set<int> local_clients_;
 
-  remote_ptr<RdmaSpinLock> lock_;
-  remote_ptr<RdmaSpinLock> local_;
+  remote_ptr<uint64_t> lock_;
+  remote_ptr<uint64_t> local_;
 
 };
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Source cluster-dependent variables
-source "config.conf"
+source "config2.conf"
 
 #** FUNCTION DEFINITIONS **#
 
@@ -35,23 +35,15 @@ build() {
 echo "Pushing local repo to remote nodes..."
 sync
 
-# clean
+clean
 
-lock="spin"
+lock="mcs"
 log_level='info'
-
 echo "Building ${lock}..."
-# build ${lock}
+build ${lock}
 
 save_dir="mcstest"
 
-# for num_nodes in 1c
-# do
-#   for num_threads in 80
-#   do
-#     bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --gdb=False --max_key=100 --dry_run=False
-#   done
-# done
 
 for num_nodes in 1 2 5 10 15 20
 do
@@ -61,24 +53,8 @@ do
       for max in 10 100 1000 10000 
       # for max in 100 1000 10000
       do
-        bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --gdb=False --max_key=${max} --dry_run=False
+        num_clients=$((num_threads * num_nodes))
+        bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --gdb=False --max_key=${max} --dry_run=False
       done
     done
 done
-
-
-# for num_nodes in 1
-# do
-#   for num_threads in 180
-#   # for num_threads in 50 100 150 200 250 300 350 400 450 500 550 600 650 700 750 800 850 900 950 1000
-#     do 
-#       for max in 10000 5000 1000 750 500 250 180 100 95 90 85 80 75 70 65 60 55 50 45 40 35 30 25 20 15 10 5 1
-#       # for max in 100 1000 10000
-#       do
-#         bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --gdb=False --max_key=${max} --dry_run=False
-#         # sleep 5
-#         # echo "slept"
-#         # command "pkill -9 -f bazel"
-#       done
-#     done
-# done
