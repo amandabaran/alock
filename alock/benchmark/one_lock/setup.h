@@ -5,9 +5,9 @@
 #include <memory>
 
 #include "alock/benchmark/one_lock/experiment.pb.h"
-#include "alock/locks/rdma_mcs_lock/rdma_mcs_lock.h"
-#include "alock/locks/rdma_spin_lock/rdma_spin_lock.h"
-#include "alock/locks/a_lock/a_lock_handle.h"
+#include "alock/src/locks/rdma_mcs_lock/rdma_mcs_lock.h"
+#include "alock/src/locks/rdma_spin_lock/rdma_spin_lock.h"
+#include "alock/src/locks/a_lock/a_lock_handle.h"
 
 #include "absl/status/status.h"
 #include "rome/colosseum/client_adaptor.h"

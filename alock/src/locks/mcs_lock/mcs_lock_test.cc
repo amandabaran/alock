@@ -4,7 +4,7 @@
 #include "gtest/gtest.h"
 #include "rome/logging/logging.h"
 
-#include "util.h"
+#include "../../../util.h"
 
 namespace X {
 namespace {

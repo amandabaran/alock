@@ -4,7 +4,7 @@
 #include <string_view>
 
 #include "absl/strings/str_cat.h"
-#include "alock/cluster/cluster.pb.h"
+#include "alock/src/cluster/cluster.pb.h"
 #include "rome/rdma/channel/sync_accessor.h"
 #include "rome/rdma/connection_manager/connection.h"
 #include "rome/rdma/connection_manager/connection_manager.h"

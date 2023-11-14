@@ -17,9 +17,9 @@
 #include "rome/rdma/memory_pool/remote_ptr.h"
 #include "rome/util/clocks.h"
 #include "rome/util/distribution_util.h"
-#include "alock/cluster/node.h"
-#include "alock/cluster/lock_table.h"
-#include "alock/cluster/common.h"
+#include "alock/src/cluster/node.h"
+#include "alock/src/cluster/lock_table.h"
+#include "alock/src/cluster/common.h"
 
 #include "setup.h"
 
@@ -77,7 +77,7 @@ class Client : public rome::ClientAdaptor<key_type> {
     // Sleep while driver is running
     ROME_INFO("Running workload for {}s", experiment_params.workload().runtime());
     auto runtime = std::chrono::seconds(experiment_params.workload().runtime());
-    std::this_thread::sleep_for(runtime);
+    std::this_thread::sleep_for(runtime + std::chrono::seconds(2));
     
     ROME_INFO("Stopping client {}...", client_ptr->self_.id);
     ROME_ASSERT_OK(driver->Stop());

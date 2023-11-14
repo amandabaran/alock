@@ -2,7 +2,7 @@ syntax = "proto2";
 
 import "protos/metrics.proto";
 import "protos/colosseum.proto";
-import "alock/cluster/cluster.proto";
+import "alock/src/cluster/cluster.proto";
 
 message AckProto {};
 

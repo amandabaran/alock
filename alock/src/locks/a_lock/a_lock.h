@@ -8,7 +8,7 @@
 #include <thread>
 
 #include "rome/rdma/memory_pool/memory_pool.h"
-#include "../../util.h"
+#include "../../../util.h"
 
 namespace X {
 
@@ -26,7 +26,7 @@ using local_ptr = std::atomic<T>*;
 #define IN_USE_DESC 1
 
 #define NEXT_PTR_OFFSET 32
-#define DESC_PTR_OFFSET 16
+#define TAIL_PTR_OFFSET 16
 #define VICTIM_OFFSET 32
 
 struct alignas(64) RemoteDescriptor {
@@ -51,12 +51,12 @@ struct alignas(64) ALock {
     // pointer to the pointer of the remote tail
     remote_ptr<RemoteDescriptor> r_tail = remote_nullptr;
     // pad so local tail starts at addr+16
-    uint8_t pad1[DESC_PTR_OFFSET - sizeof(r_tail)]; 
+    uint8_t pad1[TAIL_PTR_OFFSET - sizeof(r_tail)]; 
     // pointer to the local tail
     remote_ptr<LocalDescriptor> l_tail = remote_nullptr;; 
     // pad so victim starts at addr+32
-    uint8_t pad2[VICTIM_OFFSET - DESC_PTR_OFFSET - sizeof(l_tail)]; 
-    // node id of the victim
+    uint8_t pad2[VICTIM_OFFSET - TAIL_PTR_OFFSET - sizeof(l_tail)]; 
+    // cohort id of the victim
     uint64_t victim = 1; 
     uint8_t pad3[CACHELINE_SIZE - VICTIM_OFFSET - sizeof(victim)]; 
 };

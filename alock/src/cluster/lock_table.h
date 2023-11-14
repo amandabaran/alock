@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include "alock/cluster/cluster.pb.h"
-#include "alock/cluster/common.h"
+#include "alock/src/cluster/cluster.pb.h"
+#include "alock/src/cluster/common.h"
 #include "rome/rdma/memory_pool/remote_ptr.h"
 
 namespace X {

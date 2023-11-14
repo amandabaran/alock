@@ -42,20 +42,21 @@ sync
 clean
 
 lock="alock"
-log_level='trace'
+log_level='info'
 # echo "Building ${lock}..."
 # build ${lock}
 
 save_dir="budget_test"
 
 num_nodes=2
+keys=1
 
-for num_threads in 2
+for num_threads in 2 4 8 16 32 48
 do 
-  for budget in 10
+  for budget in 5
   do
     num_clients=$((num_threads * num_nodes))  
-    bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --max_key=1 --budget=${budget}
+    bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --max_key=${keys} --budget=${budget}
   done
 done
 

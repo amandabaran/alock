@@ -11,7 +11,7 @@ from os import abort
 from time import sleep
 
 import alock.benchmark.one_lock.experiment_pb2 as experiment_pb2
-import alock.cluster.cluster_pb2 as cluster_pb2
+import alock.src.cluster.cluster_pb2 as cluster_pb2
 import pandas
 from absl import app, flags
 from alive_progress import alive_bar
