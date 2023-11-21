@@ -15,15 +15,15 @@ namespace X {
 using ::rome::rdma::remote_nullptr;
 using ::rome::rdma::remote_ptr;
 
-template <typename T>
-using local_ptr = std::atomic<T>*;
+// ! DOING THIS WAY CUS ITS WAY EASIER
+// #define REMOTE_ONLY
 
 #define LOCAL_VICTIM  0
 #define REMOTE_VICTIM 1
 
-// Used for tracking status of descriptors by workers
-#define FREE_DESC 0
-#define IN_USE_DESC 1
+// Used for tracking status of descriptors
+#define UNLOCKED 0
+#define LOCKED 1
 
 #define NEXT_PTR_OFFSET 32
 #define TAIL_PTR_OFFSET 16
@@ -53,11 +53,11 @@ struct alignas(64) ALock {
     // pad so local tail starts at addr+16
     uint8_t pad1[TAIL_PTR_OFFSET - sizeof(r_tail)]; 
     // pointer to the local tail
-    remote_ptr<LocalDescriptor> l_tail = remote_nullptr;; 
+    remote_ptr<LocalDescriptor> l_tail = remote_nullptr;
     // pad so victim starts at addr+32
     uint8_t pad2[VICTIM_OFFSET - TAIL_PTR_OFFSET - sizeof(l_tail)]; 
     // cohort id of the victim
-    uint64_t victim = 1; 
+    uint64_t victim = 0; 
     uint8_t pad3[CACHELINE_SIZE - VICTIM_OFFSET - sizeof(victim)]; 
 };
 

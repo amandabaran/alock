@@ -109,13 +109,18 @@ int main(int argc, char *argv[]) {
       ROME_ASSERT(node_proto != cluster.nodes().end(), "Failed to find client: {}", c.id);
 
       std::vector<Peer> others;
-      if (std::is_same<LockType, X::ALock>::value){
-        std::copy_if(nodes.begin(), nodes.end(), std::back_inserter(others),
-                      [c](auto &p) { return p.id != c.id; });
-      } else {
+      #ifdef REMOTE_ONLY
         ROME_DEBUG("Including self in others for loopback connection");
         std::copy(nodes.begin(), nodes.end(), std::back_inserter(others));
-      }   
+      #elif
+        if (std::is_same<LockType, X::ALock>::value){
+          std::copy_if(nodes.begin(), nodes.end(), std::back_inserter(others),
+                        [c](auto &p) { return p.id != c.id; });
+        } else {
+          ROME_DEBUG("Including self in others for loopback connection");
+          std::copy(nodes.begin(), nodes.end(), std::back_inserter(others));
+        }   
+      #endif
 
       // Create "node" (prob want to rename)
       ROME_DEBUG("Creating node for client {}:{}", c.id, c.port);
@@ -147,6 +152,8 @@ int main(int argc, char *argv[]) {
   int i = 0;
   for (auto it = client_threads.begin(); it != client_threads.end(); it++){
       auto t = it;
+      ROME_INFO("Joining thread {}", i);
+      i++;
       t->join();
   }
 

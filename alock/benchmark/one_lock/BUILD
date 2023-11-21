@@ -67,7 +67,7 @@ string_flag(
         "mcs",
         "spin",
         "alock",
-        "l_spin",
+        "lspin",
     ],
 )
 
@@ -111,6 +111,7 @@ cc_binary(
             ":alock": ["LOCK_TYPE=::X::ALock", "LOCK_HANDLE=::X::ALockHandle"],
             # ":lspin": ["LOCK_TYPE=::X::SpinLock", "LOCK_HANDLE=::X::SpinLockHandle"],
         },
+
     ),
     deps = [
         ":client",

@@ -45,7 +45,7 @@ flags.DEFINE_string(
 
 # Workload definition
 flags.DEFINE_multi_string('lock_type', 'spin', 'Lock type used in experiment (one of {spin, mcs, alock})')
-flags.DEFINE_multi_integer('think_ns', 500, 'Think times in nanoseconds')
+flags.DEFINE_multi_integer('think_ns', 0, 'Think times in nanoseconds')
 
 flags.DEFINE_integer('min_key', 1, 'Minimum key')
 flags.DEFINE_multi_integer('max_key', int(1e4), 'Maximum key')
@@ -204,6 +204,8 @@ def build_run_command(lock, params, cluster):
                         'bazel-bin/alock/benchmark/one_lock/main'])
     cmd = ' '.join([cmd, '--experiment_params', quote(make_one_line(params))])
     cmd = ' '.join([cmd, '--cluster', quote(make_one_line(cluster))])
+    
+    # print("\n\n\n\n CMD: \n", cmd, '\n\n\n\n\n')
     return cmd
 
 
@@ -329,14 +331,14 @@ def main(args):
             os.remove(datafile)
     else:
         # lock type, number of nodes, think time, max key
-        # columns = ['lock', 'n', 'm', 'c', 'done']
-        columns = ['lock', 'n', 'b', 'c', 'done']
+        columns = ['lock', 'n', 'm', 'c', 'done']
+        # columns = ['lock', 'n', 'b', 'c', 'done']
         experiments = {}
         configurations = list(itertools.product(
             set(FLAGS.lock_type),
             set(FLAGS.nodes),
-            set(FLAGS.budget),
-            # set(FLAGS.max_key),
+            # set(FLAGS.budget),
+            set(FLAGS.max_key),
             set(FLAGS.num_clients),
             [False]))
         experiments = pandas.DataFrame(configurations, columns=columns)
@@ -351,8 +353,8 @@ def main(args):
 
                 lock = row['lock']
                 n_count = row['n']
-                # max_key = row['m']
-                budget = row['b']
+                max_key = row['m']
+                # budget = row['b']
                 num_clients = row['c']
 
                 nodes_csv = partition_nodefile(FLAGS.nodefile)
@@ -364,7 +366,7 @@ def main(args):
                 cluster_proto.MergeFrom(temp) 
 
                 commands = []
-                experiment_name = lock + '_n' + str(len(nodes)) + '_c' + str(num_clients) + '_b' + str(budget)
+                experiment_name = lock + '_n' + str(len(nodes)) + '_c' + str(num_clients) + '_m' + str(max_key)
                 bar.text = f'Lock type: {lock} | Current experiment: {experiment_name}'
                 if not FLAGS.get_data:
                     for n in set(nodes.keys()):

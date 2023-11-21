@@ -8,6 +8,7 @@
 #include "alock/src/locks/rdma_mcs_lock/rdma_mcs_lock.h"
 #include "alock/src/locks/rdma_spin_lock/rdma_spin_lock.h"
 #include "alock/src/locks/a_lock/a_lock_handle.h"
+#include "alock/src/locks/spin_lock/spin_lock.h"
 
 #include "absl/status/status.h"
 #include "rome/colosseum/client_adaptor.h"

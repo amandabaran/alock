@@ -127,8 +127,7 @@ public:
     if (prev != desc_pointer_) {  // if the lock at tail_pointer_ was not equal to our descriptor
       // attempt to hand the lock to prev
       // spin while 
-      while (descriptor_->next == remote_nullptr)
-        ;
+      while (descriptor_->next == remote_nullptr);
       std::atomic_thread_fence(std::memory_order_acquire);
       // gets a pointer to the next descriptor object
       auto next = const_cast<remote_ptr<RdmaMcsLock> &>(descriptor_->next);

@@ -7,15 +7,21 @@
 
 namespace X {
 
+template <typename V>
+struct alignas(128) Entry {
+  V lock;
+  uint8_t pad[CACHELINE_SIZE - sizeof(lock)];
+  uint64_t value;
+  uint8_t pad1[CACHELINE_SIZE - sizeof(value)];
+};
+
 // Class that determines which node a given key is on based on the range it falls into
 template <typename K, typename V>
 class LockTable {
  using key_type = K; // some int (uint16)
- using lock_type = V; // ALock or MCSDescriptor or 
+ using lock_type = V; // ALock or MCS or Spin
  using MemoryPool = rome::rdma::MemoryPool;
  using root_type = rome::rdma::remote_ptr<lock_type>;
-//  using root_map = std::map<uint32_t, root_type>;
-//  using key_map = std::map<uint32_t, std::pair<key_type, key_type>>;
 
  public:
   LockTable(const NodeProto& node, MemoryPool &lock_pool)

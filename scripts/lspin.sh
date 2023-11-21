@@ -24,7 +24,7 @@ clean() {
 build() {
   tmp=$(pwd)
   cd ../../rome/scripts
-  python rexec.py -n ${nodefile} --remote_user=adb321 --remote_root=/users/adb321/alock --local_root=/Users/amandabaran/Desktop/sss/async_locks/alock --cmd="cd alock/alock && ~/go/bin/bazelisk build -c opt --action_env=BAZEL_CXXOPTS='-std=c++20' --lock_type=$1 //alock/benchmark/one_lock:main"
+  python rexec.py -n ${nodefile} --remote_user=adb321 --remote_root=/users/adb321/alock --local_root=/Users/amandabaran/Desktop/sss/async_locks/alock --cmd="cd alock/alock && ~/go/bin/bazelisk build -c opt --lock_type=$1 //alock/benchmark/one_lock:main --action_env=BAZEL_CXXOPTS='-std=c++20'"
   # if [ $? -ne 0 ]; then 
   #   echo "Build Error: ${result}" 
   #   exit 1
@@ -41,21 +41,21 @@ sync
 
 clean
 
-lock="alock"
-log_level='info'
+lock="lspin"
+log_level='trace'
 # echo "Building ${lock}..."
 # build ${lock}
 
-save_dir="remote_test"
+save_dir="lspin_test"
 
-for num_nodes in 2
+for num_nodes in 1
 do 
   for num_threads in 1
   do 
-    for keys in 10
+    for keys in 1
     do
       num_clients=$((num_threads * num_nodes))  
-      bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --max_key=${keys} --budget=5 --gdb=True 
+      bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --max_key=${keys} --budget=5 --gdb=True
     done
   done
 done

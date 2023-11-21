@@ -51,7 +51,7 @@ class Client : public rome::ClientAdaptor<key_type> {
     //Signal Handler
     signal(SIGINT, signal_handler);
 
-    //Sleep for a second in case all clients aren't done connecting
+    //Sleep for a bit in case all clients aren't done with startup/connecting
     std::this_thread::sleep_for(std::chrono::seconds(2));
     
     // Setup qps_controller.
@@ -66,7 +66,9 @@ class Client : public rome::ClientAdaptor<key_type> {
     auto *client_ptr = client.get();
 
     auto stream = CreateOpStream(experiment_params);
-
+    std::barrier<>* barr = client_ptr->barrier_;
+    barr->arrive_and_wait();
+    ROME_INFO("Starting client {}...", client_ptr->self_.id);
     // Create and start the workload driver (also starts client).
     auto driver = rome::WorkloadDriver<key_type>::Create(
         std::move(client), std::move(stream),
@@ -77,9 +79,10 @@ class Client : public rome::ClientAdaptor<key_type> {
     // Sleep while driver is running
     ROME_INFO("Running workload for {}s", experiment_params.workload().runtime());
     auto runtime = std::chrono::seconds(experiment_params.workload().runtime());
-    std::this_thread::sleep_for(runtime + std::chrono::seconds(2));
-    
+    std::this_thread::sleep_for(runtime);
+
     ROME_INFO("Stopping client {}...", client_ptr->self_.id);
+    barr->arrive_and_wait();
     ROME_ASSERT_OK(driver->Stop());
     // Output results.
     ResultProto result;
@@ -137,6 +140,7 @@ class Client : public rome::ClientAdaptor<key_type> {
     auto status = lock_handle_.Init();
     ROME_ASSERT_OK(status);
     barrier_->arrive_and_wait(); //waits for all clients to init lock handle
+    std::this_thread::sleep_for(std::chrono::seconds(2)); //sleep to wait for remote clients before returning
     return status;
   }
 
@@ -160,9 +164,10 @@ class Client : public rome::ClientAdaptor<key_type> {
 
     
   absl::Status Stop() override {
-    std::vector<uint64_t> counts = lock_handle_.GetCounts();
-    ROME_INFO("COUNTs: reaq: {}, local: {}, remote: {}", counts[0], counts[1], counts[2]);
-    ROME_DEBUG("Stopping...");
+    // std::this_thread::sleep_for(std::chrono::seconds(2)); //sleep for a sec to let remote ops finish?
+    // std::vector<uint64_t> counts = lock_handle_.GetCounts();
+    // ROME_INFO("COUNTs: reaq: {}, local: {}, remote: {}", counts[0], counts[1], counts[2]);
+    ROME_INFO("Stopping...");
     // Waits for all other co located clients (threads)
     barrier_->arrive_and_wait();
     return absl::OkStatus();
