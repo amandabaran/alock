@@ -64,9 +64,9 @@ public:
     r_tail_ = decltype(r_tail_)(alock.id(), alock.address());
     r_l_tail_ = decltype(r_l_tail_)(alock.id(), alock.address() + TAIL_PTR_OFFSET);
     r_victim_ = decltype(r_victim_)(alock.id(), alock.address() + VICTIM_OFFSET);  
-    ROME_TRACE("r_tail_ addr: {:x}", static_cast<uint64_t>(r_tail_));
-    ROME_TRACE("r_l_tail_ addr: {:x} calc: {:X}", static_cast<uint64_t>(r_l_tail_), static_cast<uint64_t>(a_lock_pointer_) + TAIL_PTR_OFFSET);
-    ROME_TRACE("r_victim_ addr: {:x} calc: {:X}", static_cast<uint64_t>(r_victim_), static_cast<uint64_t>(a_lock_pointer_) + VICTIM_OFFSET);
+    ROME_TRACE("r_tail_ addr: {:x}, val: {:x}", static_cast<uint64_t>(r_tail_), static_cast<uint64_t>(*r_tail_));
+    ROME_TRACE("r_l_tail_ addr: {:x} val: {:x}", static_cast<uint64_t>(r_l_tail_),  static_cast<uint64_t>(*r_l_tail_));
+    ROME_TRACE("r_victim_ addr: {:x} val: {}", static_cast<uint64_t>(r_victim_),  static_cast<uint64_t>(*r_victim_));
     
     #ifdef REMOTE_ONLY 
       is_local_ = false;
@@ -74,28 +74,17 @@ public:
     #else
       if (local_clients_.contains(a_lock_pointer_.id())){
         is_local_ = true;
-      } else {
-        is_local_ = false;
-      }
-      ROME_DEBUG("Client {} is_local_ : {}", self_.id, is_local_);
-      if (is_local_){ 
-        ALock* temp = reinterpret_cast<ALock*>(alock.address());
-        l_lock_ptr_.store(&temp);
-        // l_lock_ptr_.store(reinterpret_cast<ALock*>(alock.address()));
-        RemoteDescriptor* temp1 = reinterpret_cast<RemoteDescriptor*>(alock.address());
-        l_r_tail_ptr_.store(&temp1);
-        // l_r_tail_ptr_.store(reinterpret_cast<RemoteDescriptor*>(alock.address()));
-        LocalDescriptor* temp2 = reinterpret_cast<LocalDescriptor*>(alock.address() + TAIL_PTR_OFFSET);
-        l_l_tail_ptr_.store(&temp2);
-        // l_l_tail_ptr_.store(reinterpret_cast<LocalDescriptor*>(alock.address() + TAIL_PTR_OFFSET));
-        uint64_t* temp3 = reinterpret_cast<uint64_t*>(alock.address() + VICTIM_OFFSET);
-        l_victim_ptr_.store(&temp3);
-        // l_victim_ptr_.store(reinterpret_cast<uint64_t*>(alock.address() + VICTIM_OFFSET));
-        // l_r_tail_ = reinterpret_cast<std::atomic<RemoteDescriptor*>>(alock.address());
-        // l_l_tail_ = reinterpret_cast<std::atomic<LocalDescriptor*>>(alock.address() + TAIL_PTR_OFFSET);
-        // l_victim_ = reinterpret_cast<std::atomic<uint64_t*>>(alock.address() + VICTIM_OFFSET);
+        ROME_DEBUG("Client {} is_local_ : {}", self_.id, is_local_);
+        auto lock = (ALock*)alock.address();
+        l_r_tail_ = reinterpret_cast<uint64_t*>(&lock->r_tail);
+        l_l_tail_ = reinterpret_cast<uint64_t*>(&lock->l_tail);
+        l_victim_ = reinterpret_cast<uint64_t*>(&lock->victim);
+        ROME_DEBUG("l_r_tail_ is {:x}", *l_r_tail_);
+        ROME_DEBUG("l_l_tail_ is {:x}", *l_l_tail_);
+        ROME_DEBUG("l_victim_ is {}", *l_victim_);
         LocalLock();
       } else {
+        is_local_ = false;
         RemoteLock();
       }
     #endif
@@ -126,24 +115,26 @@ public:
 
 private: 
 
-  volatile bool inline IsLocked() {
+  bool inline IsLocked() {
     return a_lock_pointer_ != remote_nullptr;
   }
 
   inline void LocalPetersons(){
     ROME_DEBUG("Client {} setting local to victim", self_.id);
     //set local to victim
-    l_victim_ptr_.exchange(LOCAL_VICTIM, std::memory_order_acquire);
+    // ((*l_lock_ptr_).victim).atomic_exchange(LOCAL_VICTIM, std::memory_order_acquire);
+    ROME_DEBUG("l_victim {:x}", *l_victim_);
+    auto prev = __atomic_exchange_n(l_victim_, LOCAL_VICTIM, __ATOMIC_ACQUIRE);
+
     while (true){
       //break if remote tail isn't locked
-      // ROME_DEBUG("l_r_tail_ is {}", static_cast<uint64_t>(std::to_address(l_r_tail_->load(std::memory_order_acquire))));
-      if (*l_r_tail_ptr_.load() == 0){
+      ROME_DEBUG("l_r_tail_ {:x}", *l_r_tail_);
+      if (__atomic_load_n(l_r_tail_, __ATOMIC_ACQUIRE) == UNLOCKED){
         ROME_DEBUG("remote tail is no longer locked, break");
         break;
       }
-      // ROME_DEBUG("l_victim_ is {}", static_cast<uint64_t>(l_victim_.load()));
       //break if local is no longer victim
-      if (*l_victim_ptr_.load() != LOCAL_VICTIM){
+      if (__atomic_load_n(l_victim_, __ATOMIC_ACQUIRE) != LOCAL_VICTIM){
         ROME_DEBUG("local is no longer victim, break");
         break;
       } 
@@ -185,7 +176,6 @@ private:
       ROME_DEBUG("Locking remote MCS queue...");
       r_desc_->budget = -1;
       r_desc_->next = remote_nullptr;
-      bool passed;
       // swap RemoteDescriptor onto the remote tail of the alock 
       auto prev =
         pool_.AtomicSwap(r_tail_, static_cast<uint64_t>(r_desc_pointer_));
@@ -203,7 +193,7 @@ private:
                   static_cast<uint64_t>(r_desc_pointer_.id()));
           // spins locally, waits for current tail/lockholder to write to budget when it unlocks
           while (r_desc_->budget < 0) {
-            // cpu_relax();
+            cpu_relax();
             ROME_TRACE("Client {} waiting for remote lock", self_.id);
           }
           if (r_desc_->budget == 0) {
@@ -213,21 +203,20 @@ private:
               Reacquire();
               r_desc_->budget = init_budget_;
           }
-          passed = true;
+           // budget was set to greater than 0, CS can be entered
+          ROME_DEBUG("[Lock] Acquired: prev={:x}, budget={:x} (id={})",
+                  static_cast<uint64_t>(prev), r_desc_->budget,
+                  static_cast<uint64_t>(r_desc_pointer_.id()));
+          return true; //lock was passed to us
       } else { //no one had the lock, we were swapped in
           // set lock holders RemoteDescriptor budget to initBudget since we are the first lockholder
           r_desc_->budget = init_budget_;
-          passed = false;
+          // budget was set to greater than 0, CS can be entered
+          ROME_DEBUG("[Lock] Acquired: (NULL) prev={:x}, budget={:x} (id={})",
+                    static_cast<uint64_t>(prev), r_desc_->budget,
+                    static_cast<uint64_t>(r_desc_pointer_.id()));
+          return false; //lock was not passed to us
       }
-      // budget was set to greater than 0, CS can be entered
-      ROME_DEBUG("[Lock] Acquired: prev={:x}, budget={:x} (id={})",
-                  static_cast<uint64_t>(prev), r_desc_->budget,
-                  static_cast<uint64_t>(r_desc_pointer_.id()));
-
-      //  make sure Lock operation finished
-      std::atomic_thread_fence(std::memory_order_acquire);
-      ROME_DEBUG("Client {} is first in q on r_tail {:x}", self_.id, static_cast<uint64_t>(a_lock_pointer_));
-      return passed;
   }
 
   inline void RemoteLock(){
@@ -246,16 +235,20 @@ private:
   inline bool LockLocalMcsQueue(){
     // Set local descriptor to inital values
     l_desc_.budget = -1;
-    l_desc_.next = nullptr;
-    bool passed;
+    l_desc_.next = UNLOCKED;
     // to acquire the lock a thread atomically appends its own local node at the
     // tail of the list returning tail's previous contents
-    auto prior_node = l_l_tail_ptr_.exchange(&l_desc_, std::memory_order_acquire);
-    if (prior_node != nullptr) {
+    uint64_t addr = reinterpret_cast<uint64_t>(&l_desc_); //pointer to LocalDescriptor
+    ROME_DEBUG("LocalLock() my ldesc addr is {:x}", addr);
+    ROME_DEBUG("l_l_tail {:x}", *l_l_tail_);
+    auto prior_node = __atomic_exchange_n(l_l_tail_, addr, __ATOMIC_ACQUIRE);
+    if (prior_node != UNLOCKED) {
+      ROME_DEBUG("Someone has the local lock. Enqueing {}", self_.id);
         // l_desc_.budget = -1;
         // if the list was not previously empty, it sets the predecessor’s next
         // field to refer to its own local node
-        prior_node->next = &l_desc_;
+        LocalDescriptor* prev = reinterpret_cast<LocalDescriptor*>(prior_node);
+        prev->next = &l_desc_;
         ROME_DEBUG("[Lock] Local Enqueued: (id={})",
                 static_cast<uint64_t>(self_.id));
         // thread then spins on its local locked field, waiting until its
@@ -272,14 +265,12 @@ private:
             Reacquire();
             l_desc_.budget = init_budget_;
         }
-        passed = true;
+        return true;
     } else {
+      ROME_DEBUG("First on local lock (id={})", self_.id);
       l_desc_.budget = init_budget_;
-      passed = false; 
+      return false; 
     }
-    // now first in the queue, own the lock and enter the critical section...
-    ROME_DEBUG("Client {} is first in q on l_tail {:x}", self_.id, &l_l_tail_ptr_);
-    return passed;
   }
 
   inline void LocalLock(){
@@ -330,24 +321,30 @@ private:
       ROME_DEBUG("LocalUnLock()");
       //...leave the critical section
       // check whether this thread's local node’s next field is null
+
       if (l_desc_.next == nullptr) {
+        ROME_DEBUG("LocalUnlock: next pointer is null");
         // if so, then either:
         //  1. no other thread is contending for the lock
         //  2. there is a race condition with another thread about to
         // in order to distinguish between these cases atomic compare exchange the tail field
         // if the call succeeds, then no other thread is trying to acquire the lock,
         // tail is set to nullptr, and unlock() returns
-        LocalDescriptor* p = &l_desc_;
-        // LocalDescriptor* tail = reinterpret_cast<LocalDescriptor*>(l_lock_ + TAIL_PTR_OFFSET);
+        uint64_t addr = reinterpret_cast<uint64_t>(&l_desc_); // pointer to my local descriptor
+        ROME_DEBUG("LocalUnlock() my ldesc addr is {:x}", static_cast<uint64_t>(addr));
+        ROME_DEBUG("l_l_tail_ is {:x}", __atomic_load_n(l_l_tail_, __ATOMIC_SEQ_CST));
         // ROME_DEBUG("local tail is {:x}", static_cast<uint64_t>(tail));
-        if (l_l_tail_ptr_.compare_exchange_strong(p, nullptr, std::memory_order_release,
-                                        std::memory_order_relaxed)) {                  
+        bool ret = __atomic_compare_exchange_n(l_l_tail_, &addr, UNLOCKED, false,
+                                            __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); 
+        ROME_DEBUG("atomic cas: ret={}, ltail={:x}, addr={:x}", ret, __atomic_load_n(l_l_tail_, __ATOMIC_SEQ_CST), addr);                                    
+        if (ret) {                  
             return;
         }
         // otherwise, another thread is in the process of trying to acquire the
         // lock, so spins waiting for it to finish
         while (l_desc_.next == nullptr) { cpu_relax(); }
       }
+      ROME_DEBUG("LocalUnlock(): setting successor's budget to {}", l_desc_.budget-1);
       // in either case, once the successor has appeared, the unlock() method sets
       // its successor’s budget, indicating that the lock is now free
       l_desc_.next->budget = l_desc_.budget - 1;
@@ -359,6 +356,7 @@ private:
   // uint64_t reaq_count_;
   // uint64_t local_count_;
   // uint64_t remote_count_;
+  
   int64_t init_budget_;
   bool is_local_; //resued for each call to lock for easy check on whether worker is local to key we are attempting to lock
   std::unordered_set<int> local_clients_; 
@@ -375,19 +373,13 @@ private:
   remote_ptr<uint64_t> r_victim_;
 
   // Access to fields locally
-  // volatile atomic_ptr<RemoteDescriptor*> l_r_tail_;
-  // volatile atomic_ptr<LocalDescriptor*> l_l_tail_;
-  // volatile atomic_ptr<uint64_t> l_victim_;
-  volatile std::atomic<ALock**> l_lock_ptr_;
-  volatile std::atomic<RemoteDescriptor**> l_r_tail_ptr_;
-  volatile std::atomic<LocalDescriptor**> l_l_tail_ptr_;
-  volatile std::atomic<uint64_t**> l_victim_ptr_;
+  uint64_t* l_r_tail_;
+  uint64_t* l_l_tail_; 
+  uint64_t* l_victim_;
   
   // Prealloc used for rdma writes of rdma descriptor in RemoteUnlock
   remote_ptr<ALock> prealloc_;
   remote_ptr<remote_ptr<RemoteDescriptor>> r_prealloc_;
-  // remote_ptr<remote_ptr<LocalDescriptor>> l_prealloc_;
-  // remote_ptr<uint64_t> v_prealloc_;
 
   // Pointers to pre-allocated descriptor to be used locally
   remote_ptr<LocalDescriptor> l_desc_pointer_;

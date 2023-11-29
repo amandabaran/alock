@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
       #ifdef REMOTE_ONLY
         ROME_DEBUG("Including self in others for loopback connection");
         std::copy(nodes.begin(), nodes.end(), std::back_inserter(others));
-      #elif
+      #else
         if (std::is_same<LockType, X::ALock>::value){
           std::copy_if(nodes.begin(), nodes.end(), std::back_inserter(others),
                         [c](auto &p) { return p.id != c.id; });

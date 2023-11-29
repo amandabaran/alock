@@ -15,10 +15,10 @@ namespace X {
 using ::rome::rdma::remote_nullptr;
 using ::rome::rdma::remote_ptr;
 
-// ! DOING THIS WAY CUS ITS WAY EASIER
+// Note: Uncomment this line to use override local keys to use RDMA ops
 // #define REMOTE_ONLY
 
-#define LOCAL_VICTIM  0
+#define LOCAL_VICTIM  2
 #define REMOTE_VICTIM 1
 
 // Used for tracking status of descriptors
