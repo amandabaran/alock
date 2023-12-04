@@ -50,9 +50,9 @@ save_dir="remote_test"
 
 for num_nodes in 2
 do 
-  for num_threads in 1
+  for num_threads in 2
   do 
-    for keys in 10
+    for keys in 1
     do
       num_clients=$((num_threads * num_nodes))  
       bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --max_key=${keys} --budget=5 --gdb=True 

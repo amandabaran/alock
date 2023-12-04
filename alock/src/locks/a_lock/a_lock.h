@@ -18,8 +18,8 @@ using ::rome::rdma::remote_ptr;
 // Note: Uncomment this line to use override local keys to use RDMA ops
 // #define REMOTE_ONLY
 
-#define LOCAL_VICTIM  2
-#define REMOTE_VICTIM 1
+#define LOCAL_VICTIM  1
+#define REMOTE_VICTIM 2
 
 // Used for tracking status of descriptors
 #define UNLOCKED 0

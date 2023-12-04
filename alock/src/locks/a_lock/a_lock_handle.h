@@ -122,19 +122,17 @@ private:
   inline void LocalPetersons(){
     ROME_DEBUG("Client {} setting local to victim", self_.id);
     //set local to victim
-    // ((*l_lock_ptr_).victim).atomic_exchange(LOCAL_VICTIM, std::memory_order_acquire);
     ROME_DEBUG("l_victim {:x}", *l_victim_);
-    auto prev = __atomic_exchange_n(l_victim_, LOCAL_VICTIM, __ATOMIC_ACQUIRE);
-
+    auto prev = __atomic_exchange_n(l_victim_, LOCAL_VICTIM, __ATOMIC_SEQ_CST);
     while (true){
       //break if remote tail isn't locked
       ROME_DEBUG("l_r_tail_ {:x}", *l_r_tail_);
-      if (__atomic_load_n(l_r_tail_, __ATOMIC_ACQUIRE) == UNLOCKED){
+      if (__atomic_load_n(l_r_tail_, __ATOMIC_SEQ_CST) == UNLOCKED){
         ROME_DEBUG("remote tail is no longer locked, break");
         break;
       }
       //break if local is no longer victim
-      if (__atomic_load_n(l_victim_, __ATOMIC_ACQUIRE) != LOCAL_VICTIM){
+      if (__atomic_load_n(l_victim_, __ATOMIC_SEQ_CST) != LOCAL_VICTIM){
         ROME_DEBUG("local is no longer victim, break");
         break;
       } 
@@ -241,31 +239,30 @@ private:
     uint64_t addr = reinterpret_cast<uint64_t>(&l_desc_); //pointer to LocalDescriptor
     ROME_DEBUG("LocalLock() my ldesc addr is {:x}", addr);
     ROME_DEBUG("l_l_tail {:x}", *l_l_tail_);
-    auto prior_node = __atomic_exchange_n(l_l_tail_, addr, __ATOMIC_ACQUIRE);
+    auto prior_node = __atomic_exchange_n(l_l_tail_, addr, __ATOMIC_SEQ_CST);
     if (prior_node != UNLOCKED) {
       ROME_DEBUG("Someone has the local lock. Enqueing {}", self_.id);
-        // l_desc_.budget = -1;
-        // if the list was not previously empty, it sets the predecessor’s next
-        // field to refer to its own local node
-        LocalDescriptor* prev = reinterpret_cast<LocalDescriptor*>(prior_node);
-        prev->next = &l_desc_;
-        ROME_DEBUG("[Lock] Local Enqueued: (id={})",
-                static_cast<uint64_t>(self_.id));
-        // thread then spins on its local locked field, waiting until its
-        // predecessor sets this field to false
-        while (l_desc_.budget < 0){
-            cpu_relax(); 
-            ROME_TRACE("Client {} waiting for local lock", self_.id);
-        }
-        // If budget exceeded, then reinitialize.
-        if (l_desc_.budget == 0) {
-            ROME_DEBUG("Local Budget exhausted (id={})",
-                        static_cast<uint64_t>(self_.id));
-            // Release the lock before trying to continue
-            Reacquire();
-            l_desc_.budget = init_budget_;
-        }
-        return true;
+      // if the list was not previously empty, it sets the predecessor’s next
+      // field to refer to its own local node
+      LocalDescriptor* prev = reinterpret_cast<LocalDescriptor*>(prior_node);
+      prev->next = &l_desc_;
+      ROME_DEBUG("[Lock] Local Enqueued: (id={})",
+              static_cast<uint64_t>(self_.id));
+      // thread then spins on its local locked field, waiting until its
+      // predecessor sets this field to false
+      while (l_desc_.budget < 0){
+          cpu_relax(); 
+          ROME_TRACE("Client {} waiting for local lock", self_.id);
+      }
+      // If budget exceeded, then reinitialize.
+      if (l_desc_.budget == 0) {
+          ROME_DEBUG("Local Budget exhausted (id={})",
+                      static_cast<uint64_t>(self_.id));
+          // Release the lock before trying to continue
+          Reacquire();
+          l_desc_.budget = init_budget_;
+      }
+      return true;
     } else {
       ROME_DEBUG("First on local lock (id={})", self_.id);
       l_desc_.budget = init_budget_;

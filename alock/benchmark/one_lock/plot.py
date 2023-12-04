@@ -2,6 +2,7 @@ from enum import Enum
 from math import ceil
 from absl import flags
 from absl import app
+import math
 import os
 import google.protobuf.text_format as text_format
 import google.protobuf.descriptor as descriptor
@@ -60,12 +61,51 @@ def getData(proto, path=''):
                          0 else '') + field.name] = getattr(proto, field.name)
     return data
 
+def generate_csv(results_dir, datafile):
+    assert(os.path.exists(results_dir))
+    result_files = os.walk(results_dir)
+    results_protos = []
+    data_files = []
+    # builds list of data files to read
+    for root, _, files in result_files:
+        if len(files) == 0:
+            continue
+        for name in files:
+            data_files.append(os.path.join(root, name))
 
-x1_ = 'experiment_params.num_clients'
-x2_ = 'lock_type'
-x3_ = 'experiment_params.workload.max_key'
-# x4_ = 'experiment_params.num_nodes'
-x_ = [x1_, x2_, x3_]
+    # combines ResultsProto from each data file into list
+    with alive_bar(len(data_files), title="Reading data...") as bar:
+        for f in data_files:
+            with open(f) as result_file:
+                results = text_format.Parse(
+                    result_file.read(), experiment.ResultsProto())
+                results_protos.append(results)
+                bar()
+
+    results = []
+    with alive_bar(len(results_protos), title="Preparing data...") as bar:
+        for proto in results_protos:
+            results.append(getData(proto))
+            bar()
+    data = pandas.DataFrame()
+    dfs = []
+    with alive_bar(len(results), title="Generating datafile: {}".format(datafile)) as bar:
+        for r in results[:-1]:
+            dfs.append(pandas.DataFrame([r]))
+            bar()
+        dfs.append(pandas.DataFrame(results[-1]))
+        bar.text = "Aggregating final data..."
+        data = pandas.concat(dfs, ignore_index=True)
+        bar()
+    data.to_csv(datafile, index_label='row')
+
+# Globals
+x1_ = 'lock_type'
+x2_ = 'experiment_params.workload.max_key'
+x3_ = 'experiment_params.num_clients'
+x4_ = 'experiment_params.num_nodes'
+x5_ = 'experiment_params.budget'
+x_ = [x1_, x2_, x3_, x4_]
 y_ = 'results.driver.qps.summary.mean'
 cols_ = [x1_, x2_, x3_, y_]
 
@@ -91,70 +131,16 @@ def get_summary(data):
 def plot_total_throughput():
     pass
 
-def plot_budgets(nodes, budgets, xcol, originals, summary, hue, xlabel, hue_label, name):
-    global x1_, x2_, x3_, y_
-    # make a grid of subplots with a row for each node number and a column for each key setup
-    fig, axes = plt.subplots(len(nodes), len(budgets), figsize=(15, 3))
-    seaborn.set_theme(style='ticks')
-    markersize = 8
-
-    if hue != None:
-        num_hues = len(summary.reset_index()[hue].dropna().unique())
-    else:
-        num_hues = 1
-    palette = seaborn.color_palette("viridis", num_hues)
-    
-    plt.subplots_adjust(hspace = 0.8)
-    
-    for i, node in enumerate(nodes):
-        for j, budget in enumerate(budgets):
-            data = originals[originals['experiment_params.budget'] == budget]
-            data = data[data['experiment_params.num_nodes'] == node]
-            seaborn.lineplot(
-                    data=data,
-                    x=xcol,
-                    y=y_,
-                    ax=axes[i][j],
-                    hue=hue,
-                    style=hue,
-                    markers=True,
-                    markersize=markersize,
-                    palette=palette
-            )
-            h2, l2 = axes[i][j].get_legend_handles_labels()
-            axes[i][j].set_ylabel('') 
-            axes[i][j].set_xlabel('')
-        axes[i][ceil(j/2)].set_title(str(node) + " Nodes")
-        axes[i][0].set_ylabel('Throughput (ops/s)', labelpad=20)
-    
-    for j in range(len(budgets)):    
-        axes[len(nodes)-1][j].set_xlabel(xlabel)
-
-    h2, l2 = axes[i][j].get_legend_handles_labels()
-    for h in h2:
-        h.set_markersize(24)
-        h.set_linewidth(3)
-    labels_handles = {}
-    labels_handles.update(dict(zip(l2, h2)))
-    
-    for ax in axes.flatten():
-        ax.legend().remove()
-    
-    fig.legend(h2, l2,
-        # h2, l2, bbox_to_anchor=(.5, 1.27),
-        loc='upper center', fontsize=12, title_fontsize=16, title=hue_label,
-        ncol=num_hues if num_hues < 6 else int(num_hues / 2),
-        columnspacing=1, edgecolor='white', borderpad=0)
-    
-    plt.show()
-
-
-def plot_grid(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, name):
+def plot_grid(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, name, plot_total):
     global x1_, x2_, x3_, y_
     # make a grid of subplots with a row for each node number and a column for each key setup
     fig, axes = plt.subplots(len(nodes), len(keys), figsize=(15, 3))
     seaborn.set_theme(style='ticks')
     markersize = 8
+    
+    if plot_total:
+        # plot total throughput
+        originals = summary
 
     if hue != None:
         num_hues = len(summary.reset_index()[hue].dropna().unique())
@@ -162,7 +148,8 @@ def plot_grid(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, nam
         num_hues = 1
     palette = seaborn.color_palette("viridis", num_hues)
     
-    plt.subplots_adjust(hspace = 0.8)
+    plt.subplots_adjust(hspace = 1.0)
+    plt.subplots_adjust(wspace = 0.25)
     
     for i, node in enumerate(nodes):
         for j, key in enumerate(keys):
@@ -179,16 +166,19 @@ def plot_grid(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, nam
                     markersize=markersize,
                     palette=palette
             )
+            # set y axis to start at 0
+            axes[i][j].set_ylim(0, axes[i][j].get_ylim()[1])
+            # set 3 ticks on y axis with values auto-chosen
+            axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
             h2, l2 = axes[i][j].get_legend_handles_labels()
             axes[i][j].set_ylabel('') 
             axes[i][j].set_xlabel('')
-        axes[i][ceil(j/2)].set_title(str(node) + " Nodes")
+            axes[i][j].set_title(str(key) + " Keys, " + str(node) + " Nodes")
         axes[i][0].set_ylabel('Throughput (ops/s)', labelpad=20)
     
     for j in range(len(keys)):    
      axes[len(nodes)-1][j].set_xlabel(xlabel)
 
-    h2, l2 = axes[i][j].get_legend_handles_labels()
     for h in h2:
         h.set_markersize(24)
         h.set_linewidth(3)
@@ -199,7 +189,6 @@ def plot_grid(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, nam
         ax.legend().remove()
     
     fig.legend(h2, l2,
-        # h2, l2, bbox_to_anchor=(.5, 1.27),
         loc='upper center', fontsize=12, title_fontsize=16, title=hue_label,
         ncol=num_hues if num_hues < 6 else int(num_hues / 2),
         columnspacing=1, edgecolor='white', borderpad=0)
@@ -212,13 +201,22 @@ def plot_grid(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, nam
     # fig.savefig(filename, dpi=300, bbox_extra_artists=(legend,)
     #             if legend is not None else None, bbox_inches='tight')
     
-
-def plot_multi(node, keys, xcol, originals, summary, hue, xlabel, hue_label, name):
+ 
+def plot_budget(nodes, keys, clients, xcol, originals, summary, hue, xlabel, hue_label, name, plot_total):
     global x1_, x2_, x3_, y_
-    # make a grid of subplots with a column for each key setup
-    fig, axes = plt.subplots(1, len(keys), figsize=(15, 3))
+    node_keys = []
+    for i, node in enumerate(nodes):
+        for j, key in enumerate(keys):
+            node_keys.append((node, key))
+            
+    # make a grid of subplots with a row for each node number and a column for each key setup
+    fig, axes = plt.subplots(len(node_keys), len(clients), figsize=(15, 3))
     seaborn.set_theme(style='ticks')
     markersize = 8
+    
+    if plot_total:
+        # plot total throughput
+        originals = summary
 
     if hue != None:
         num_hues = len(summary.reset_index()[hue].dropna().unique())
@@ -226,27 +224,52 @@ def plot_multi(node, keys, xcol, originals, summary, hue, xlabel, hue_label, nam
         num_hues = 1
     palette = seaborn.color_palette("viridis", num_hues)
     
+    plt.subplots_adjust(hspace = 1.0)
+    plt.subplots_adjust(wspace = 0.25)
     
+    for i, (node, key) in enumerate(node_keys):
+        for j, client in enumerate(clients):
+            data = originals[originals['experiment_params.workload.max_key'] == key]
+            data = data[data['experiment_params.num_nodes'] == node]
+            data = data[data['experiment_params.num_clients'] == client]
+            seaborn.lineplot(
+                    data=data,
+                    x=xcol,
+                    y=y_,
+                    ax=axes[i][j],
+                    hue=hue,
+                    style=hue,
+                    markers=True,
+                    markersize=markersize,
+                    palette=palette
+            )
+            # set y axis to start at 0
+            axes[i][j].set_ylim(0, axes[i][j].get_ylim()[1])
+            # set 3 ticks on y axis with values auto-chosen
+            # axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
+            h2, l2 = axes[i][j].get_legend_handles_labels()
+            axes[i][j].set_ylabel('') 
+            axes[i][j].set_xlabel('')
+            axes[i][j].set_title(str(key) + " Keys, " + str(node) + " Nodes, Clients: " + str(client))
+        axes[i][0].set_ylabel('Throughput (ops/s)', labelpad=20)
     
-    for j, key in enumerate(keys):
-        data = originals[originals['experiment_params.workload.max_key'] == key]
-        data = data[data['experiment_params.num_nodes'] == node]
-        seaborn.lineplot(
-                data=data,
-                x=xcol,
-                y=y_,
-                ax=axes[j],
-                hue=hue,
-                style=hue,
-                markers=True,
-                markersize=markersize,
-                palette=palette
-        )
-        axes[j].set_title('Key Max: ' + str(key) + ' Nodes: ' + str(node))
-        axes[j].set_ylabel('Throughput (ops/s)', labelpad=20)
-        axes[j].set_xlabel(xlabel)
+    for j in range(len(keys)):    
+     axes[len(nodes)-1][j].set_xlabel(xlabel)
+
+    for h in h2:
+        h.set_markersize(24)
+        h.set_linewidth(3)
+    labels_handles = {}
+    labels_handles.update(dict(zip(l2, h2)))
     
-    # plt.tight_layout()
+    for ax in axes.flatten():
+        ax.legend().remove()
+    
+    fig.legend(h2, l2,
+        loc='upper center', fontsize=12, title_fontsize=16, title=hue_label,
+        ncol=num_hues if num_hues < 6 else int(num_hues / 2),
+        columnspacing=1, edgecolor='white', borderpad=0)
+    
     plt.show()
 
     # filename = name + ".png"
@@ -255,7 +278,7 @@ def plot_multi(node, keys, xcol, originals, summary, hue, xlabel, hue_label, nam
     # fig.savefig(filename, dpi=300, bbox_extra_artists=(legend,)
     #             if legend is not None else None, bbox_inches='tight')
     
-    
+            
 def plot_throughput(xcol, originals, summary, hue, xlabel, hue_label, name):
     global x1_, x2_, x3_, y_
     # make a grid of subplots with r X c plots of size figsize
@@ -348,46 +371,6 @@ def plot_latency(data):
     print(data)
     # data = data[data['experiment_params.name'].str.count('.*_c.*') == 0]
 
-
-def generate_csv(results_dir, datafile):
-    assert(os.path.exists(results_dir))
-    result_files = os.walk(results_dir)
-    results_protos = []
-    data_files = []
-    # builds list of data files to read
-    for root, _, files in result_files:
-        if len(files) == 0:
-            continue
-        for name in files:
-            data_files.append(os.path.join(root, name))
-
-    # combines ResultsProto from each data file into list
-    with alive_bar(len(data_files), title="Reading data...") as bar:
-        for f in data_files:
-            with open(f) as result_file:
-                results = text_format.Parse(
-                    result_file.read(), experiment.ResultsProto())
-                results_protos.append(results)
-                bar()
-
-    results = []
-    with alive_bar(len(results_protos), title="Preparing data...") as bar:
-        for proto in results_protos:
-            results.append(getData(proto))
-            bar()
-    data = pandas.DataFrame()
-    dfs = []
-    with alive_bar(len(results), title="Generating datafile: {}".format(datafile)) as bar:
-        for r in results[:-1]:
-            dfs.append(pandas.DataFrame([r]))
-            bar()
-        dfs.append(pandas.DataFrame(results[-1]))
-        bar.text = "Aggregating final data..."
-        data = pandas.concat(dfs, ignore_index=True)
-        bar()
-    data.to_csv(datafile, index_label='row')
-
-
 def plot(datafile, lock_type):
     data = pandas.read_csv(datafile)
     print(data)
@@ -404,8 +387,9 @@ def plot(datafile, lock_type):
     spin['lock_type'] = 'Spin'
  
     data = pandas.concat([alock, mcs, spin])
+    # data = pandas.concat([alock, spin])
 
-    data = data[['experiment_params.num_clients', 'experiment_params.num_nodes', 'lock_type', 'experiment_params.workload.max_key', 'results.driver.qps.summary.mean']]
+    data = data[['experiment_params.num_clients', 'experiment_params.num_nodes', 'lock_type', 'experiment_params.workload.max_key', 'results.driver.qps.summary.mean', 'experiment_params.budget']]
     data['results.driver.qps.summary.mean'] = data['results.driver.qps.summary.mean'].apply(
         lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
     data = data.explode('results.driver.qps.summary.mean')
@@ -418,12 +402,13 @@ def plot(datafile, lock_type):
 
     # data = alock
     # plot_throughput(x1_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'n2_m10'))
-    nodes = [1, 2, 5, 10, 15, 20]
-    keys = [10, 100, 1000]
-    # plot_grid(nodes, keys, x1_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, '20nodescale') )
-    nodes = [2]
-    budgets = [5, 10, 100, 1000]
-    plot_budgets(nodes, budgets, x1_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'budget_test') )
-    
+    nodes = [1, 2, 5, 10]
+    keys = [1, 10, 100, 1000]
+    # plot_grid(nodes, keys, x3_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'alock_spin'), False)
+    nodes = [10, 20]
+    keys = [1, 10]
+    clients = [80, 160]
+    plot_budget(nodes, keys, clients, x5_, data, summary, 'lock_type', 'Budget', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'alock_spin'), False)
+   
     # plot_2(x1_, data, summary, 'lock_type', 'Keys', 'Lock type', os.path.join(FLAGS.figdir, 'alock_n2'))
     # plot_latency(data)

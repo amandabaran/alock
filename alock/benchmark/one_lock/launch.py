@@ -331,13 +331,12 @@ def main(args):
             os.remove(datafile)
     else:
         # lock type, number of nodes, think time, max key
-        columns = ['lock', 'n', 'm', 'c', 'done']
-        # columns = ['lock', 'n', 'b', 'c', 'done']
+        columns = ['lock', 'n', 'b', 'm', 'c', 'done']
         experiments = {}
         configurations = list(itertools.product(
             set(FLAGS.lock_type),
             set(FLAGS.nodes),
-            # set(FLAGS.budget),
+            set(FLAGS.budget),
             set(FLAGS.max_key),
             set(FLAGS.num_clients),
             [False]))
@@ -354,7 +353,7 @@ def main(args):
                 lock = row['lock']
                 n_count = row['n']
                 max_key = row['m']
-                # budget = row['b']
+                budget = row['b']
                 num_clients = row['c']
 
                 nodes_csv = partition_nodefile(FLAGS.nodefile)
@@ -366,7 +365,7 @@ def main(args):
                 cluster_proto.MergeFrom(temp) 
 
                 commands = []
-                experiment_name = lock + '_n' + str(len(nodes)) + '_c' + str(num_clients) + '_m' + str(max_key)
+                experiment_name = lock + '_n' + str(len(nodes)) + '_c' + str(num_clients) + '_m' + str(max_key) + '_b' + str(budget)
                 bar.text = f'Lock type: {lock} | Current experiment: {experiment_name}'
                 if not FLAGS.get_data:
                     for n in set(nodes.keys()):

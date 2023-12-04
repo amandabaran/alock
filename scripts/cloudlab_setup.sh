@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Source cluster-dependent variables
-source "config2.conf"
+source "config.conf"
 
 #** FUNCTION DEFINITIONS **#
 
