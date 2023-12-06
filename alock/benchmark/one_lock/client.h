@@ -65,7 +65,8 @@ class Client : public rome::ClientAdaptor<key_type> {
 
     auto *client_ptr = client.get();
 
-    auto stream = CreateOpStream(experiment_params);
+    auto stream = CreateOpStream(experiment_params, client_ptr->node_proto_);
+    // auto stream = CreateOpStream(experiment_params);
     std::barrier<>* barr = client_ptr->barrier_;
     barr->arrive_and_wait();
     ROME_INFO("Starting client {}...", client_ptr->self_.id);
@@ -130,7 +131,7 @@ class Client : public rome::ClientAdaptor<key_type> {
         auto lock_ptr = root_type(temp_ptr);
         return lock_ptr;
     }
-    ROME_ERROR("ERROR - COULD NOT FIND KEY: {}", key);
+    ROME_ERROR("ERROR - KEY OUTSIDE RANGE: {}", key);
     return X::remote_nullptr;
   }
 

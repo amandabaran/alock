@@ -104,8 +104,9 @@ x1_ = 'lock_type'
 x2_ = 'experiment_params.workload.max_key'
 x3_ = 'experiment_params.num_clients'
 x4_ = 'experiment_params.num_nodes'
-x5_ = 'experiment_params.budget'
-x_ = [x1_, x2_, x3_, x4_]
+# x5_ = 'experiment_params.budget'
+x6_ = 'experiment_params.workload.p_local'
+x_ = [x1_, x2_, x3_, x4_, x6_]
 y_ = 'results.driver.qps.summary.mean'
 cols_ = [x1_, x2_, x3_, y_]
 
@@ -201,7 +202,76 @@ def plot_grid(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, nam
     # fig.savefig(filename, dpi=300, bbox_extra_artists=(legend,)
     #             if legend is not None else None, bbox_inches='tight')
     
- 
+def plot_locality(nodes, keys, clients, xcol, originals, summary, hue, xlabel, hue_label, name, plot_total):
+    global x1_, x2_, x3_, y_
+    node_keys = []
+    for i, node in enumerate(nodes):
+        for j, key in enumerate(keys):
+            node_keys.append((node, key))
+            
+    # make a grid of subplots with a row for each node number and a column for each key setup
+    fig, axes = plt.subplots(len(node_keys), len(clients), figsize=(15, 3))
+    seaborn.set_theme(style='ticks')
+    markersize = 8
+    
+    if plot_total:
+        # plot total throughput
+        originals = summary
+
+    if hue != None:
+        num_hues = len(summary.reset_index()[hue].dropna().unique())
+    else:
+        num_hues = 1
+    palette = seaborn.color_palette("viridis", num_hues)
+    
+    plt.subplots_adjust(hspace = 1.0)
+    plt.subplots_adjust(wspace = 0.25)
+    
+    for i, (node, key) in enumerate(node_keys):
+        for j, client in enumerate(clients):
+            data = originals[originals['experiment_params.workload.max_key'] == key]
+            data = data[data['experiment_params.num_nodes'] == node]
+            data = data[data['experiment_params.num_clients'] == client]
+            seaborn.lineplot(
+                    data=data,
+                    x=xcol,
+                    y=y_,
+                    ax=axes[i][j],
+                    hue=hue,
+                    style=hue,
+                    markers=True,
+                    markersize=markersize,
+                    palette=palette
+            )
+            # set y axis to start at 0
+            axes[i][j].set_ylim(0, axes[i][j].get_ylim()[1])
+            # set 3 ticks on y axis with values auto-chosen
+            # axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
+            h2, l2 = axes[i][j].get_legend_handles_labels()
+            axes[i][j].set_ylabel('') 
+            axes[i][j].set_xlabel('')
+            axes[i][j].set_title(str(key) + " Keys, " + str(node) + " Nodes, Clients: " + str(client))
+        axes[i][0].set_ylabel('Throughput (ops/s)', labelpad=20)
+    
+    for j in range(len(keys)):    
+     axes[len(nodes)-1][j].set_xlabel(xlabel)
+
+    for h in h2:
+        h.set_markersize(24)
+        h.set_linewidth(3)
+    labels_handles = {}
+    labels_handles.update(dict(zip(l2, h2)))
+    
+    for ax in axes.flatten():
+        ax.legend().remove()
+    
+    fig.legend(h2, l2,
+        loc='upper center', fontsize=12, title_fontsize=16, title=hue_label,
+        ncol=num_hues if num_hues < 6 else int(num_hues / 2),
+        columnspacing=1, edgecolor='white', borderpad=0)
+    
+    plt.show()
+    
 def plot_budget(nodes, keys, clients, xcol, originals, summary, hue, xlabel, hue_label, name, plot_total):
     global x1_, x2_, x3_, y_
     node_keys = []
@@ -405,10 +475,11 @@ def plot(datafile, lock_type):
     nodes = [1, 2, 5, 10]
     keys = [1, 10, 100, 1000]
     # plot_grid(nodes, keys, x3_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'alock_spin'), False)
-    nodes = [10, 20]
+    nodes = [5, 10, 20]
     keys = [1, 10]
-    clients = [80, 160]
-    plot_budget(nodes, keys, clients, x5_, data, summary, 'lock_type', 'Budget', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'alock_spin'), False)
-   
+    clients = [80, 180]
+    # plot_budget(nodes, keys, clients, x5_, data, summary, 'lock_type', 'Budget', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'alock_spin'), False)
+    plot_locality(x5_, data, summary, 'num_clients', 'Percent Local', 'Cluster Config', os.path.join(FLAGS.figdir, FLAGS.exp, 'locality'), False)
     # plot_2(x1_, data, summary, 'lock_type', 'Keys', 'Lock type', os.path.join(FLAGS.figdir, 'alock_n2'))
     # plot_latency(data)
+ 

@@ -25,8 +25,6 @@ using ::rome::rdma::remote_nullptr;
 using ::rome::rdma::remote_ptr;
 using ::rome::rdma::RemoteObjectProto;
 
-using address_type = uint64_t;
-
 class ALockHandle {
 
 public: 

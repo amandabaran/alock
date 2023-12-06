@@ -95,30 +95,30 @@ absl::Status ValidateExperimentParams(const ExperimentParams& params) {
 }
 
 auto CreateOpStream(const ExperimentParams& params, const X::NodeProto& node){
-  std::uniform_real_distribution<double> dist = std::uniform_real_distribution<double>(0.0, 1.0);
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::bernoulli_distribution bernoulliDist(params.workload().p_local());
-
   int local_start = node.local_range().low();
   int local_end = node.local_range().high();
-  int local_range = local_end - local_start + 1;
-
   int min_key = params.workload().min_key();
   int max_key = params.workload().max_key();
-  int key_range = max_key - min_key + 1;
-
+  
   //apply this to determine a key for each op
-  std::function<key_type(void)> generator = [&](){
+  std::function<key_type(void)> generator = [=](){
     // Determine whether to use the local range 
-    bool useLocalRange = bernoulliDist(gen);
     key_type key;
-    if (useLocalRange){
-      key = dist(gen) * local_range + local_start;
+    std::mt19937 gen;
+    std::uniform_int_distribution<key_type> local_dist(local_start, local_end);
+    std::uniform_int_distribution<key_type> full_dist(min_key, max_key);
+    std::bernoulli_distribution bernoulliDist(params.workload().p_local());
+    if (params.workload().p_local() == 1.0){
+      key = local_dist(gen);
+      return key;
+    } 
+    bool useLocalRange = bernoulliDist(gen);
+    if (useLocalRange) {
+      key = local_dist(gen);
     } else {
-      key = dist(gen) * key_range + min_key;
+      key = full_dist(gen);
       while (key <= local_end && key >= local_start){
-        key = dist(gen) * key_range + min_key;
+        key = full_dist(gen);
       }
     }
     return key;

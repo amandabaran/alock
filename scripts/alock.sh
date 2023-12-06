@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Source cluster-dependent variables
-source "config2.conf"
+source "config.conf"
 
 #** FUNCTION DEFINITIONS **#
 
@@ -41,23 +41,26 @@ sync
 
 clean
 
+save_dir="test_local_p"
+
 lock="alock"
 log_level='info'
-# echo "Building ${lock}..."
-# build ${lock}
+echo "Building ${lock}..."
+build ${lock}
 
-save_dir="remote_test"
-
-for num_nodes in 2
-do 
-  for num_threads in 2
-  do 
-    for keys in 1
-    do
-      num_clients=$((num_threads * num_nodes))  
-      bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --max_key=${keys} --budget=5 --gdb=True 
+for num_nodes in 1
+do
+  for num_threads in 1
+    do 
+      for max in 10
+      do
+        for local_p in 1.0 0.5
+        do 
+          num_clients=$((num_threads * num_nodes))
+          bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --threads=${num_threads} --budget=5 --max_key=${max} --p_local=${local_p} --lock_type=${lock} --ssh_user=adb321 --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=False
+        done
+      done
     done
-  done
 done
 
 # for num_nodes in 2 4 8 12 16 20

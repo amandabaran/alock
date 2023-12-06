@@ -29,7 +29,7 @@ flags.DEFINE_bool(
     'Whether or not to print commands to retrieve data from client nodes')
 flags.DEFINE_string(
     'save_root',
-    '~/alock/alock/',
+    'users/adb321/results/alock/',
     'Directory results are saved under when running')
 flags.DEFINE_string('nodefile', None, 'Path to nodefile',
                     short_name='n', required=True)
@@ -51,7 +51,7 @@ flags.DEFINE_integer('min_key', 1, 'Minimum key')
 flags.DEFINE_multi_integer('max_key', int(1e4), 'Maximum key')
 flags.DEFINE_integer('threads', 1, 'Number of Workers (threads) to launch per node')
 flags.DEFINE_float('theta', 0.99, 'Theta in Zipfian distribution')
-flags.DEFINE_float('p_local', 0.5, 'Percentage of operations that are local to each node')
+flags.DEFINE_multi_float('p_local', 0.5, 'Percentage of operations that are local to each node')
 flags.DEFINE_multi_integer('budget', 5, 'Budget to be used for alock before reacquiring global lock')
 
 flags.DEFINE_integer('runtime', 10, 'Number of seconds to run experiment')
@@ -250,7 +250,7 @@ def fill_experiment_params(
     proto.save_dir = build_save_dir(lock)
     proto.workload.min_key = FLAGS.min_key
     proto.workload.max_key = FLAGS.max_key[0]
-    proto.workload.p_local = FLAGS.p_local
+    proto.workload.p_local = FLAGS.p_local[0]
     # proto.workload.theta = FLAGS.theta
     proto.prefill = FLAGS.prefill
     proto.num_threads = FLAGS.threads
@@ -331,12 +331,13 @@ def main(args):
             os.remove(datafile)
     else:
         # lock type, number of nodes, think time, max key
-        columns = ['lock', 'n', 'b', 'm', 'c', 'done']
+        columns = ['lock', 'n', 'p', 'm', 'c', 'done']
         experiments = {}
         configurations = list(itertools.product(
             set(FLAGS.lock_type),
             set(FLAGS.nodes),
-            set(FLAGS.budget),
+            set(FLAGS.p_local),
+            # set(FLAGS.budget),
             set(FLAGS.max_key),
             set(FLAGS.num_clients),
             [False]))
@@ -353,7 +354,8 @@ def main(args):
                 lock = row['lock']
                 n_count = row['n']
                 max_key = row['m']
-                budget = row['b']
+                p_local = row['p']
+                # budget = row['b']
                 num_clients = row['c']
 
                 nodes_csv = partition_nodefile(FLAGS.nodefile)
@@ -365,7 +367,7 @@ def main(args):
                 cluster_proto.MergeFrom(temp) 
 
                 commands = []
-                experiment_name = lock + '_n' + str(len(nodes)) + '_c' + str(num_clients) + '_m' + str(max_key) + '_b' + str(budget)
+                experiment_name = lock + '_n' + str(len(nodes)) + '_c' + str(num_clients) + '_m' + str(max_key) + '_p' + str(p_local)
                 bar.text = f'Lock type: {lock} | Current experiment: {experiment_name}'
                 if not FLAGS.get_data:
                     for n in set(nodes.keys()):
