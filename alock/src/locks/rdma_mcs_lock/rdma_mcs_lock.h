@@ -37,7 +37,7 @@ static_assert(sizeof(RdmaMcsLock) == 64);
 class RdmaMcsLockHandle {
 public: 
   RdmaMcsLockHandle(MemoryPool::Peer self, MemoryPool &pool, std::unordered_set<int> local_clients, uint64_t budget)
-      : self_(self), pool_(pool), local_clients_(local_clients), init_budget_(budget) {}
+      : self_(self), pool_(pool), local_clients_(local_clients), init_budget_(budget), lock_count_(0) {}
 
   absl::Status Init() {    
     // Reserve remote memory for the local descriptor.
@@ -51,8 +51,8 @@ public:
     return absl::OkStatus();
   }
 
-  uint64_t GetReaqCount(){
-    return 0;
+  std::vector<uint64_t> GetCounts(){
+    return {lock_count_};
   }
 
   bool IsLocked() {
@@ -114,6 +114,7 @@ public:
               static_cast<uint64_t>(desc_pointer_.id()));
     //  make sure Lock operation finished
     std::atomic_thread_fence(std::memory_order_acquire);
+    lock_count_++;
   }
 
   void Unlock(remote_ptr<RdmaMcsLock> lock) {
@@ -141,7 +142,8 @@ public:
                 descriptor_->budget);
   }
 
-private:
+private: 
+  uint64_t lock_count_; 
   int64_t init_budget_;  
   bool is_host_;
   MemoryPool::Peer self_;

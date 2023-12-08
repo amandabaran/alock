@@ -99,6 +99,14 @@ def generate_csv(results_dir, datafile):
         bar()
     data.to_csv(datafile, index_label='row')
 
+def merge_csv(csv1, csv2):
+    df1 = pandas.read_csv(csv1)
+    df2 = pandas.read_csv(csv2)
+    frames = [df1, df2]
+    data = pandas.concat(frames)
+    data.to_csv("/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/one_lock/plots/locality_test.csv", index_label='row')
+    return data
+    
 # Globals
 x1_ = 'lock_type'
 x2_ = 'experiment_params.workload.max_key'
@@ -133,7 +141,7 @@ def plot_total_throughput():
     pass
 
 def plot_grid(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, name, plot_total):
-    global x1_, x2_, x3_, y_
+    global y_
     # make a grid of subplots with a row for each node number and a column for each key setup
     fig, axes = plt.subplots(len(nodes), len(keys), figsize=(15, 3))
     seaborn.set_theme(style='ticks')
@@ -202,15 +210,18 @@ def plot_grid(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, nam
     # fig.savefig(filename, dpi=300, bbox_extra_artists=(legend,)
     #             if legend is not None else None, bbox_inches='tight')
     
-def plot_locality(nodes, keys, clients, xcol, originals, summary, hue, xlabel, hue_label, name, plot_total):
-    global x1_, x2_, x3_, y_
-    node_keys = []
+    
+# since this only applies to alock, hue is always the number of keys and x is locality
+def plot_alock_locality(nodes, clients, originals, summary, hue, hue_label, name, plot_total):
+    global x6_, y_
+    
+    node_clis = []
     for i, node in enumerate(nodes):
-        for j, key in enumerate(keys):
-            node_keys.append((node, key))
+        for j, cli in enumerate(clients):
+            node_clis.append((node, cli))
             
     # make a grid of subplots with a row for each node number and a column for each key setup
-    fig, axes = plt.subplots(len(node_keys), len(clients), figsize=(15, 3))
+    fig, axes = plt.subplots(len(nodes), len(clients), figsize=(12, 3))
     seaborn.set_theme(style='ticks')
     markersize = 8
     
@@ -224,7 +235,89 @@ def plot_locality(nodes, keys, clients, xcol, originals, summary, hue, xlabel, h
         num_hues = 1
     palette = seaborn.color_palette("viridis", num_hues)
     
-    plt.subplots_adjust(hspace = 1.0)
+    plt.subplots_adjust(hspace = 1.2)
+    plt.subplots_adjust(wspace = 0.25)
+    
+    axes = axes.flatten()
+    
+    for i, (node, cli) in enumerate(node_clis):
+        data = originals[originals['experiment_params.num_nodes'] == node]
+        data = data[data['experiment_params.num_clients'] == cli]
+        if len(data) == 0: 
+            "empty skip"
+            continue
+        seaborn.lineplot(
+                data=data,
+                x=x6_,
+                y=y_,
+                ax=axes[i],
+                hue=hue,
+                style=hue,
+                markers=True,
+                markersize=markersize,
+                palette=palette
+        )
+        
+        # set y axis to start at 0
+        axes[i].set_ylim(0)
+        # set 3 ticks on y axis with values auto-chosen
+        axes[i].set_yticks(axes[i].get_yticks()[::len(axes[i].get_yticks()) // 5])
+        axes[i].set_xlim(0, 1)
+        axes[i].invert_xaxis()
+        # set 5 ticks on x axis with values auto-chosen
+        # axes[i].set_xticks(axes[i].get_xticks()[::len(axes[i].get_xticks()) // 5])
+        axes[i].set_ylabel('') 
+        axes[i].set_title(str(cli) + " CLients, " + str(node) + " Nodes", fontsize=10)
+        axes[i].set_xlabel('Percent Local')
+        
+    axes[0].set_ylabel('Throughput (ops/s)', labelpad=20)
+        
+    h2, l2 = axes[0].get_legend_handles_labels()
+
+    for h in h2:
+        h.set_markersize(12)
+        h.set_linewidth(3)
+    labels_handles = {}
+    labels_handles.update(dict(zip(l2, h2)))
+    
+    for ax in axes:
+        ax.legend().remove()
+    
+    fig.legend(h2, l2,
+        loc='upper center', fontsize=12, title_fontsize=14, title=hue_label,
+        ncol=num_hues if num_hues < 6 else int(num_hues / 2),
+        columnspacing=1, edgecolor='white', borderpad=0)
+    
+    plt.show()
+    
+
+
+# this produces a multi-row grid, where each row is a different # of keys and hue is for different locks
+def plot_locality(nodes, clients, keys, originals, summary, hue, hue_label, name, plot_total):
+    global x6_, y_
+    
+    node_keys = []
+    for i, node in enumerate(nodes):
+        for j, key in enumerate(keys):
+            node_keys.append((node, key))
+    print(len(node_keys), len(clients))
+            
+    # make a grid of subplots with a row for each node number and a column for each key setup
+    fig, axes = plt.subplots(len(node_keys), len(clients), figsize=(12, 3))
+    seaborn.set_theme(style='ticks')
+    markersize = 8
+    
+    if plot_total:
+        # plot total throughput
+        originals = summary
+
+    if hue != None:
+        num_hues = len(summary.reset_index()[hue].dropna().unique())
+    else:
+        num_hues = 1
+    palette = seaborn.color_palette("viridis", num_hues)
+    
+    plt.subplots_adjust(hspace = 1.2)
     plt.subplots_adjust(wspace = 0.25)
     
     for i, (node, key) in enumerate(node_keys):
@@ -234,7 +327,7 @@ def plot_locality(nodes, keys, clients, xcol, originals, summary, hue, xlabel, h
             data = data[data['experiment_params.num_clients'] == client]
             seaborn.lineplot(
                     data=data,
-                    x=xcol,
+                    x=x6_,
                     y=y_,
                     ax=axes[i][j],
                     hue=hue,
@@ -248,13 +341,14 @@ def plot_locality(nodes, keys, clients, xcol, originals, summary, hue, xlabel, h
             # set 3 ticks on y axis with values auto-chosen
             # axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
             h2, l2 = axes[i][j].get_legend_handles_labels()
+            axes[i][j].invert_xaxis()
             axes[i][j].set_ylabel('') 
-            axes[i][j].set_xlabel('')
+            axes[i][j].set_xlabel('Percent Local')
             axes[i][j].set_title(str(key) + " Keys, " + str(node) + " Nodes, Clients: " + str(client))
         axes[i][0].set_ylabel('Throughput (ops/s)', labelpad=20)
-    
+        
     for j in range(len(keys)):    
-     axes[len(nodes)-1][j].set_xlabel(xlabel)
+        axes[len(nodes)-1][j].set_xlabel("Percent Local")
 
     for h in h2:
         h.set_markersize(24)
@@ -267,6 +361,11 @@ def plot_locality(nodes, keys, clients, xcol, originals, summary, hue, xlabel, h
     
     fig.legend(h2, l2,
         loc='upper center', fontsize=12, title_fontsize=16, title=hue_label,
+        ncol=num_hues if num_hues < 6 else int(num_hues / 2),
+        columnspacing=1, edgecolor='white', borderpad=0)
+    
+    fig.legend(h2, l2,
+        loc='upper center', fontsize=12, title_fontsize=14, title=hue_label,
         ncol=num_hues if num_hues < 6 else int(num_hues / 2),
         columnspacing=1, edgecolor='white', borderpad=0)
     
@@ -352,7 +451,7 @@ def plot_budget(nodes, keys, clients, xcol, originals, summary, hue, xlabel, hue
 def plot_throughput(xcol, originals, summary, hue, xlabel, hue_label, name):
     global x1_, x2_, x3_, y_
     # make a grid of subplots with r X c plots of size figsize
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 3))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 5))
     seaborn.set_theme(style='ticks')
     markersize = 8
 
@@ -442,8 +541,13 @@ def plot_latency(data):
     # data = data[data['experiment_params.name'].str.count('.*_c.*') == 0]
 
 def plot(datafile, lock_type):
-    data = pandas.read_csv(datafile)
+    datafile2 = "/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/one_lock/plots/sanity_check.csv"
+    if datafile2 is not None:
+        data = merge_csv(datafile, datafile2)
+    else:
+        data = pandas.read_csv(datafile)
     print(data)
+    exit(0)
     # Choose what you want to plot by filtering data
     # data = data[data['cluster_size'] == 180] #modify what this takes to plot differernt set of
     # data = data[data['experiment_params.workload.max_key'] == 10]
@@ -459,7 +563,7 @@ def plot(datafile, lock_type):
     data = pandas.concat([alock, mcs, spin])
     # data = pandas.concat([alock, spin])
 
-    data = data[['experiment_params.num_clients', 'experiment_params.num_nodes', 'lock_type', 'experiment_params.workload.max_key', 'results.driver.qps.summary.mean', 'experiment_params.budget']]
+    data = data[['experiment_params.num_clients', 'experiment_params.num_nodes', 'lock_type', 'experiment_params.workload.max_key', 'results.driver.qps.summary.mean', 'experiment_params.workload.p_local']]
     data['results.driver.qps.summary.mean'] = data['results.driver.qps.summary.mean'].apply(
         lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
     data = data.explode('results.driver.qps.summary.mean')
@@ -475,11 +579,12 @@ def plot(datafile, lock_type):
     nodes = [1, 2, 5, 10]
     keys = [1, 10, 100, 1000]
     # plot_grid(nodes, keys, x3_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'alock_spin'), False)
-    nodes = [5, 10, 20]
-    keys = [1, 10]
-    clients = [80, 180]
+    nodes = [5]
+    keys = [100, 1000]
+    clients = [10, 40, 80]
     # plot_budget(nodes, keys, clients, x5_, data, summary, 'lock_type', 'Budget', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'alock_spin'), False)
-    plot_locality(x5_, data, summary, 'num_clients', 'Percent Local', 'Cluster Config', os.path.join(FLAGS.figdir, FLAGS.exp, 'locality'), False)
+    # plot_alock_locality(nodes, clients, data, summary, 'experiment_params.workload.max_key', '# of Keys', os.path.join(FLAGS.figdir, FLAGS.exp, 'locality'), False)
     # plot_2(x1_, data, summary, 'lock_type', 'Keys', 'Lock type', os.path.join(FLAGS.figdir, 'alock_n2'))
     # plot_latency(data)
+    plot_locality(nodes, clients, keys, data, summary, 'lock_type', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'locality2'), False)
  

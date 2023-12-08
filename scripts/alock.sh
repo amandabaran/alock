@@ -41,70 +41,98 @@ sync
 
 clean
 
-save_dir="test_local_p"
 
-lock="alock"
+# save_dir="5node_localp"
+# lock="alock"
+# log_level='info'
+
+# echo "Building ${lock}..."
+# build ${lock}
+
+# for num_nodes in 5
+# do
+#   for num_clients in 5 10 20 40 80
+#     do 
+#       for max in 100 1000
+#       do
+#         for local_p in 1 .95 .9 .8 .7 .6 .5 .4 .3 .2 .1 .05 0
+#         do 
+#           num_threads=$((num_clients / num_nodes))
+#           bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --threads=${num_threads} --budget=5 --max_key=${max} --p_local=${local_p} --lock_type=${lock} --ssh_user=adb321 --think_ns=0 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=False
+#         done
+#       done
+#     done
+# done
+
+
+save_dir="sanity_check"
+
+# lock="spin"
+# log_level='info'
+
+# echo "Building ${lock}..."
+# build ${lock}
+
+# for num_nodes in 5
+# do
+#   for num_clients in 40 80
+#     do 
+#       for max in 100 1000
+#       do
+#         for local_p in 1 .95 .9 .8 .7 .6 .5 .4 .3 .2 .1 .05 0
+#         do 
+#           num_threads=$((num_clients / num_nodes))
+#           bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --threads=${num_threads} --budget=5 --max_key=${max} --p_local=${local_p} --lock_type=${lock} --ssh_user=adb321 --think_ns=0 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=False
+#         done
+#       done
+#     done
+# done
+
+# echo "Getting ${lock} data"
+# zsh get_data.sh ${save_dir}
+
+lock="mcs"
 log_level='info'
+
 echo "Building ${lock}..."
 build ${lock}
 
-for num_nodes in 1
+for num_nodes in 5
 do
-  for num_threads in 1
+  for num_clients in 10 40 80
     do 
-      for max in 10
+      for max in 100 1000
       do
-        for local_p in 1.0 0.5
+        for local_p in 1 .95 .9 .8 .7 .6 .5 .4 .3 .2 .1 .05 0
         do 
-          num_clients=$((num_threads * num_nodes))
-          bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --threads=${num_threads} --budget=5 --max_key=${max} --p_local=${local_p} --lock_type=${lock} --ssh_user=adb321 --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=False
+          num_threads=$((num_clients / num_nodes))
+          bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --threads=${num_threads} --budget=5 --max_key=${max} --p_local=${local_p} --lock_type=${lock} --ssh_user=adb321 --think_ns=0 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=False
         done
       done
     done
 done
 
-# for num_nodes in 2 4 8 12 16 20
-# do 
-#   for num_threads in 2 4 8 16 32 48
-#   do 
-#     for keys in 1 10 100 1000
-#     do
-#       num_clients=$((num_threads * num_nodes))  
-#       bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --max_key=${keys} --budget=5
-#     done
-#   done
-# done
+echo "Getting ${lock} data"
+zsh get_data.sh ${save_dir}
 
-# echo "Getting ${lock} data"
-# bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile}  --ssh_user=adb321  --get_data  --local_save_dir=${workspace}/benchmark/one_lock/results/${save_dir}/ --remote_save_dir=/users/adb321/alock/alock/bazel-bin/alock/benchmark/one_lock/main.runfiles/alock/${save_dir} --lock_type=${lock}
+# save_dir="xortest_local_p"
+# lock="alock"
+# log_level='info'
 
+# echo "Building ${lock}..."
+# build ${lock}
 
-
-# for num_nodes in 1
+# for num_nodes in 5 10
 # do
-#   for num_threads in 8 16 24 32 48
-#   do
-#     bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --gdb=False --max_key=100 --dry_run=False
-#   done
-# done
-
-# for num_nodes in 1 2 5 10 15 20
-# do
-#   for num_threads in  1 2 3 4 5 6 7 8 
-#   # for num_threads in 50 100 150 200 250 300 350 400 450 500 550 600 650 700 750 800 850 900 950 1000
+#   for num_clients in 40 80 160
 #     do 
-#       for max in 10 100 1000 10000 
-#       # for max in 100 1000 10000
+#       for max in 10 100
 #       do
-#         bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --gdb=False --max_key=${max} --dry_run=False
+#         for local_p in 1.0 0.99 0.9 0.8 0.7 0.6 0.5 0.4 0.3 0.2 0.15 0.1 0.05 0.01
+#         do 
+#           num_threads=$((num_clients / num_nodes))
+#           bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --threads=${num_threads} --budget=5 --max_key=${max} --p_local=${local_p} --lock_type=${lock} --ssh_user=adb321 --think_ns=0 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=False
+#         done
 #       done
 #     done
-# done
-
-# for num_nodes in 1
-# do
-#   for max in 10 20 50 100 1000 10000
-#   do
-#     bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=80 --gdb=False --max_key=${max} --dry_run=False
-#   done
 # done

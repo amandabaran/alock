@@ -34,7 +34,7 @@ static_assert(sizeof(RdmaSpinLock) == CACHELINE_SIZE);
 class RdmaSpinLockHandle{
 public:
   RdmaSpinLockHandle(MemoryPool::Peer self, MemoryPool& pool, std::unordered_set<int> local_clients, uint64_t budget)
-    : self_(self), pool_(pool), local_clients_(local_clients) {}
+    : self_(self), pool_(pool), local_clients_(local_clients), lock_count_(0) {}
 
   absl::Status Init() {
     // Preallocate memory for RDMA writes
@@ -43,8 +43,8 @@ public:
     return absl::OkStatus();
   }
 
-  uint64_t GetReaqCount(){
-    return 0;
+  std::vector<uint64_t> GetCounts(){
+    return {lock_count_};
   }
 
   bool IsLocked(remote_ptr<RdmaSpinLock> lock) { 
@@ -62,6 +62,7 @@ public:
       cpu_relax();
     }
     std::atomic_thread_fence(std::memory_order_release);
+    lock_count_++;
     return;
   }
 
@@ -76,6 +77,7 @@ public:
     
 private:
 
+  uint64_t lock_count_;
 
   static constexpr uint64_t kUnlocked = 0;
   bool is_host_;

@@ -30,8 +30,8 @@ class ALockHandle {
 public: 
 
   ALockHandle(MemoryPool::Peer self, MemoryPool& pool, std::unordered_set<int> local_clients, int64_t budget) 
-    : self_(self), pool_(pool), local_clients_(local_clients), init_budget_(budget) {}
-      // : self_(self), pool_(pool), local_clients_(local_clients), init_budget_(budget), reaq_count_(0), local_count_(0), remote_count_(0) {}
+    // : self_(self), pool_(pool), local_clients_(local_clients), init_budget_(budget) {}
+    : self_(self), pool_(pool), local_clients_(local_clients), init_budget_(budget), lock_count_(0), reaq_count_(0), local_count_(0), remote_count_(0) {}
 
   absl::Status Init() {
     r_desc_pointer_ = pool_.Allocate<RemoteDescriptor>();
@@ -52,9 +52,9 @@ public:
     return absl::OkStatus();
   }
 
-  // std::vector<uint64_t> GetCounts(){
-  //   return {reaq_count_, local_count_, remote_count_};
-  // }
+  std::vector<uint64_t> GetCounts(){
+    return {lock_count_, reaq_count_, local_count_, remote_count_};
+  }
  
   void Lock(remote_ptr<ALock> alock){
     ROME_ASSERT(a_lock_pointer_ == remote_nullptr, "Attempting to lock handle that is already locked.");
@@ -80,12 +80,14 @@ public:
         ROME_DEBUG("l_r_tail_ is {:x}", *l_r_tail_);
         ROME_DEBUG("l_l_tail_ is {:x}", *l_l_tail_);
         ROME_DEBUG("l_victim_ is {}", *l_victim_);
+        
         LocalLock();
       } else {
         is_local_ = false;
         RemoteLock();
       }
     #endif
+    lock_count_++;
   }
 
   void Unlock(remote_ptr<ALock> alock){
@@ -108,7 +110,7 @@ public:
       RemotePetersons();
     }
     std::atomic_thread_fence(std::memory_order_release);
-    // reaq_count_++;
+    reaq_count_++;
   }
 
 private: 
@@ -223,9 +225,9 @@ private:
       // returns when remote wins petersons alg
       RemotePetersons();
     }
-    // remote_count_++;
     std::atomic_thread_fence(std::memory_order_release);
     ROME_DEBUG("Remote wins");
+    remote_count_++;
   }
 
   inline bool LockLocalMcsQueue(){
@@ -274,9 +276,9 @@ private:
       if (passed == false){
         LocalPetersons();
       }
-      // local_count_++;
       ROME_DEBUG("Local wins, passed is {}", passed);
       std::atomic_thread_fence(std::memory_order_release);
+      local_count_++;
   }
 
   inline void RemoteUnlock(){
@@ -348,9 +350,10 @@ private:
       l_desc_.next = nullptr;
   }
 
-  // uint64_t reaq_count_;
-  // uint64_t local_count_;
-  // uint64_t remote_count_;
+  uint64_t lock_count_;
+  uint64_t reaq_count_;
+  uint64_t local_count_;
+  uint64_t remote_count_;
   
   int64_t init_budget_;
   bool is_local_; //resued for each call to lock for easy check on whether worker is local to key we are attempting to lock
