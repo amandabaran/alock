@@ -104,7 +104,7 @@ def merge_csv(csv1, csv2):
     df2 = pandas.read_csv(csv2)
     frames = [df1, df2]
     data = pandas.concat(frames)
-    data.to_csv("/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/one_lock/plots/locality_test.csv", index_label='row')
+    data.to_csv(csv1, index_label='row')
     return data
     
 # Globals
@@ -114,7 +114,7 @@ x3_ = 'experiment_params.num_clients'
 x4_ = 'experiment_params.num_nodes'
 # x5_ = 'experiment_params.budget'
 x6_ = 'experiment_params.workload.p_local'
-x_ = [x1_, x2_, x3_, x4_, x6_]
+x_ = [x1_, x2_, x3_, x4_]
 y_ = 'results.driver.qps.summary.mean'
 cols_ = [x1_, x2_, x3_, y_]
 
@@ -306,7 +306,7 @@ def plot_locality(nodes, clients, keys, originals, summary, hue, hue_label, name
     fig, axes = plt.subplots(len(node_keys), len(clients), figsize=(12, 3))
     seaborn.set_theme(style='ticks')
     markersize = 8
-    
+
     if plot_total:
         # plot total throughput
         originals = summary
@@ -541,17 +541,13 @@ def plot_latency(data):
     # data = data[data['experiment_params.name'].str.count('.*_c.*') == 0]
 
 def plot(datafile, lock_type):
-    datafile2 = "/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/one_lock/plots/sanity_check.csv"
-    if datafile2 is not None:
-        data = merge_csv(datafile, datafile2)
-    else:
-        data = pandas.read_csv(datafile)
+    data = pandas.read_csv(datafile)
+    # datafile2 = "/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/one_lock/plots/5node_localp.csv"
+    # if os.path.exists(datafile2) :
+    #     data = merge_csv(datafile, datafile2)
+    # else:
+    #     data = pandas.read_csv(datafile)
     print(data)
-    exit(0)
-    # Choose what you want to plot by filtering data
-    # data = data[data['cluster_size'] == 180] #modify what this takes to plot differernt set of
-    # data = data[data['experiment_params.workload.max_key'] == 10]
-    # data = data[data['cluster_size'] == 2]
                
     alock = data[data['experiment_params.name'].str.count("alock.*") == 1]
     alock['lock_type'] = 'ALock'
@@ -561,7 +557,6 @@ def plot(datafile, lock_type):
     spin['lock_type'] = 'Spin'
  
     data = pandas.concat([alock, mcs, spin])
-    # data = pandas.concat([alock, spin])
 
     data = data[['experiment_params.num_clients', 'experiment_params.num_nodes', 'lock_type', 'experiment_params.workload.max_key', 'results.driver.qps.summary.mean', 'experiment_params.workload.p_local']]
     data['results.driver.qps.summary.mean'] = data['results.driver.qps.summary.mean'].apply(
@@ -570,21 +565,19 @@ def plot(datafile, lock_type):
     data = data.reset_index(drop=True)
 
     summary = get_summary(data)
-    # alock_summary = get_summary(alock)
-    # spin_summary = get_summary(spin)
-    # summary = [spin_summary, alock_summary]
-
+ 
     # data = alock
     # plot_throughput(x1_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'n2_m10'))
+    
     nodes = [1, 2, 5, 10]
     keys = [1, 10, 100, 1000]
     # plot_grid(nodes, keys, x3_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'alock_spin'), False)
+    
     nodes = [5]
     keys = [100, 1000]
     clients = [10, 40, 80]
     # plot_budget(nodes, keys, clients, x5_, data, summary, 'lock_type', 'Budget', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'alock_spin'), False)
     # plot_alock_locality(nodes, clients, data, summary, 'experiment_params.workload.max_key', '# of Keys', os.path.join(FLAGS.figdir, FLAGS.exp, 'locality'), False)
-    # plot_2(x1_, data, summary, 'lock_type', 'Keys', 'Lock type', os.path.join(FLAGS.figdir, 'alock_n2'))
-    # plot_latency(data)
+    
     plot_locality(nodes, clients, keys, data, summary, 'lock_type', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'locality2'), False)
  

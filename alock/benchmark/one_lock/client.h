@@ -65,15 +65,15 @@ class Client : public rome::ClientAdaptor<key_type> {
 
     auto *client_ptr = client.get();
 
-    auto stream = CreateOpStream2(experiment_params, client_ptr->node_proto_);
+    auto stream = CreateOpStream4(experiment_params, client_ptr->node_proto_);
     // auto stream = CreateOpStream(experiment_params);
     std::barrier<>* barr = client_ptr->barrier_;
     barr->arrive_and_wait();
     ROME_INFO("Starting client {}...", client_ptr->self_.id);
     // Create and start the workload driver (also starts client).
     auto driver = rome::WorkloadDriver<key_type>::Create(
-        std::move(client), std::move(stream),
-        qps_controller.get(),
+        std::move(client), std::move(stream), nullptr,
+        // qps_controller.get(),
         std::chrono::milliseconds(experiment_params.sampling_rate_ms()));
     ROME_ASSERT_OK(driver->Start());
 
@@ -167,8 +167,8 @@ class Client : public rome::ClientAdaptor<key_type> {
   absl::Status Stop() override {
     std::this_thread::sleep_for(std::chrono::seconds(1)); //sleep for a sec to let remote ops finish?
     ROME_INFO("Stopping...");
-    std::vector<uint64_t> counts = lock_handle_.GetCounts();
-    ROME_INFO("counts: locks: {}", counts[0]);
+    // std::vector<uint64_t> counts = lock_handle_.GetCounts();
+    // ROME_INFO("counts: locks: {}", counts[0]);
     // ROME_INFO("COUNTs: locks: {}, reaq: {}, local: {}, remote: {}", counts[0], counts[1], counts[2], counts[3]);
     // ROME_ASSERT(counts[0] == (counts[2] + counts[3]), "ERROR: Number of locks != local + remote calls");
     // Waits for all other co located clients (threads)

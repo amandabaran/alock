@@ -14,9 +14,12 @@ public:
 
     // Generate a random 64-bit unsigned integer
     uint64_t next() {
-        state ^= (state << 21);
-        state ^= (state >> 35);
-        state ^= (state << 4);
+        state ^= (state << 13);
+        state ^= (state >> 7);
+        state ^= (state << 17);
+        // state ^= (state << 21);
+        // state ^= (state >> 35);
+        // state ^= (state << 4);
         return state;
     }
 

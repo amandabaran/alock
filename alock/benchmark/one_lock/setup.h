@@ -95,8 +95,9 @@ absl::Status ValidateExperimentParams(const ExperimentParams& params) {
   return absl::OkStatus();
 }
 
+//Using this one since it seems to perform equally to opstream3, and is more trusted
 auto CreateOpStream4(const ExperimentParams& params, const X::NodeProto& node){
-  auto num_keys = 100e6;
+  auto num_keys = 10e6; //10M
 
   int local_start = node.local_range().low();
   int local_end = node.local_range().high();
@@ -217,6 +218,7 @@ auto CreateOpStream2(const ExperimentParams& params, const X::NodeProto& node){
   return std::make_unique<rome::EndlessStream<key_type>>(generator);  
 }
 
+//SLOWEST
 auto CreateOpStream(const ExperimentParams& params, const X::NodeProto& node){
   int local_start = node.local_range().low();
   int local_end = node.local_range().high();
