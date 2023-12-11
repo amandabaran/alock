@@ -114,7 +114,7 @@ public:
               static_cast<uint64_t>(desc_pointer_.id()));
     //  make sure Lock operation finished
     std::atomic_thread_fence(std::memory_order_acquire);
-    lock_count_++;
+    // lock_count_++;
   }
 
   void Unlock(remote_ptr<RdmaMcsLock> lock) {

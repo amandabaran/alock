@@ -95,8 +95,54 @@ absl::Status ValidateExperimentParams(const ExperimentParams& params) {
   return absl::OkStatus();
 }
 
+auto CreateOpStream4(const ExperimentParams& params, const X::NodeProto& node){
+  auto num_keys = 100e6;
+
+  int local_start = node.local_range().low();
+  int local_end = node.local_range().high();
+  int local_range = local_end - local_start + 1;
+  int min_key = params.workload().min_key();
+  int max_key = params.workload().max_key();
+  int full_range = max_key - min_key + 1;
+  auto p_local = params.workload().p_local() * 100; //change to represent a percentage
+
+  std::vector<key_type> keys;
+  keys.reserve(num_keys); //reserve room for 5M keys
+
+  std::mt19937 gen;
+  std::uniform_int_distribution<> dist(1, max_key);
+
+
+  for (auto i = 0; i < num_keys; i++){
+    volatile int random = dist(gen);
+    ROME_DEBUG("random % 100 is {}", random % 100 + 1);
+    auto random_p = (random % 100) + 1;
+    if ( p_local == 1.0 || random_p <= p_local ){
+      keys.push_back(static_cast<key_type>((random % local_range) + local_start));
+      ROME_DEBUG("local key");
+    } else {
+      //scale random float to number in full key range
+      key_type key = (random % full_range) + min_key;
+      ROME_DEBUG("remote key");
+      //retry until key is remote (i.e. not in local)
+      while (key <= local_end && key >= local_start){
+        random = dist(gen);
+        ROME_DEBUG("random % range is {}", random % full_range);
+        key = (random % full_range) + min_key;
+      }
+      keys.push_back(key);
+    }
+  }
+  ROME_ASSERT(keys.size() == num_keys, "Error generating vector for prefilled stream");
+
+  // creates a stream such that the random numbers are already generated, and are popped from vector for each operation
+  return std::make_unique<rome::PrefilledStream<key_type>>(keys, num_keys);
+
+}
+
 auto CreateOpStream3(const ExperimentParams& params, const X::NodeProto& node){
-  #define NUM_KEYS 5e6
+  auto num_keys = 10e6; //10M
+
   int local_start = node.local_range().low();
   int local_end = node.local_range().high();
   int local_range = local_end - local_start + 1;
@@ -108,33 +154,32 @@ auto CreateOpStream3(const ExperimentParams& params, const X::NodeProto& node){
   XorShift64 rng(std::chrono::system_clock::now().time_since_epoch().count());
 
   std::vector<key_type> keys;
-  keys.reserve(NUM_KEYS); //reserve room for 5M keys
+  keys.reserve(num_keys); 
 
-  for (auto i = 0; i < NUM_KEYS; i++){
-    XorShift64 rng(std::chrono::system_clock::now().time_since_epoch().count());
+  for (auto i = 0; i < num_keys; i++){
     volatile uint64_t random = rng.next();
-    ROME_DEBUG("p_Local is {}", p_local);
+    // ROME_DEBUG("p_Local is {}", p_local);
     if ( p_local == 1.0 || (random % 100) <= p_local ){
       // scale random float to a number within local key range
-      ROME_DEBUG("random % local is {}", (random % local_range) + local_start);
+      // ROME_DEBUG("random % local is {}", (random % local_range) + local_start);
       keys.push_back((random % local_range) + local_start);
     } else {
       //scale random float to number in full key range
       key_type key = (random % full_range) + min_key;
-      ROME_DEBUG("remote key");
+      // ROME_DEBUG("remote key");
       //retry until key is remote (i.e. not in local)
       while (key <= local_end && key >= local_start){
         random = rng.next();
-        ROME_DEBUG("random % range is {}", random % full_range);
+        // ROME_DEBUG("random % range is {}", random % full_range);
         key = (random % full_range) + min_key;
       }
       keys.push_back(key);
     }
   }
-  ROME_ASSERT(keys.size() == NUM_KEYS, "Error generating vector for prefilled stream");
+  ROME_ASSERT(keys.size() == num_keys, "Error generating vector for prefilled stream");
 
   // creates a stream such that the random numbers are already generated, and are popped from vector for each operation
-  return std::make_unique<rome::PrefilledStream<key_type>>(keys, NUM_KEYS);
+  return std::make_unique<rome::PrefilledStream<key_type>>(keys, num_keys);
 
 }
 
@@ -149,9 +194,7 @@ auto CreateOpStream2(const ExperimentParams& params, const X::NodeProto& node){
 
   //apply this to determine a key for each op
   std::function<key_type(void)> generator = [=](){
-    // XorShift64 rng(std::chrono::system_clock::now().time_since_epoch().count());
-    std::mt19937 gen;
-    std::unfirm
+    XorShift64 rng(std::chrono::system_clock::now().time_since_epoch().count());
     volatile uint64_t random = rng.next();
     ROME_DEBUG("random % 100 is {}", random % 100 + 1);
     if ( p_local == 1.0 || (random % 100 + 1) <= p_local ){
@@ -177,34 +220,37 @@ auto CreateOpStream2(const ExperimentParams& params, const X::NodeProto& node){
 auto CreateOpStream(const ExperimentParams& params, const X::NodeProto& node){
   int local_start = node.local_range().low();
   int local_end = node.local_range().high();
+  int local_range = local_end - local_start + 1;
   int min_key = params.workload().min_key();
   int max_key = params.workload().max_key();
-  
+  int full_range = max_key - min_key + 1;
+  auto p_local = params.workload().p_local() * 100; //change to represent a percentage
+
   //apply this to determine a key for each op
   std::function<key_type(void)> generator = [=](){
-    // Determine whether to use the local range 
-    key_type key;
     std::mt19937 gen;
-    std::uniform_int_distribution<key_type> local_dist(local_start, local_end);
-    std::uniform_int_distribution<key_type> full_dist(min_key, max_key);
-    std::bernoulli_distribution bernoulliDist(params.workload().p_local());
-    if (params.workload().p_local() == 1.0){
-      key = local_dist(gen);
-      return key;
-    } 
-    bool useLocalRange = bernoulliDist(gen);
-    if (useLocalRange) {
-      key = local_dist(gen);
+    std::uniform_int_distribution<> dist(1, max_key);
+    volatile int random = dist(gen);
+    ROME_DEBUG("random % 100 is {}", random % 100 + 1);
+    auto random_p = (random % 100) + 1;
+    if ( p_local == 1.0 || random_p <= p_local ){
+      return static_cast<key_type>((random % local_range) + local_start);
+      ROME_DEBUG("local key");
     } else {
-      key = full_dist(gen);
+      //scale random float to number in full key range
+      key_type key = (random % full_range) + min_key;
+      ROME_DEBUG("remote key");
+      //retry until key is remote (i.e. not in local)
       while (key <= local_end && key >= local_start){
-        key = full_dist(gen);
+        random = dist(gen);
+        ROME_DEBUG("random % range is {}", random % full_range);
+        key = (random % full_range) + min_key;
       }
+      return static_cast<key_type>(key);
     }
-    return key;
   };
 
-  return std::make_unique<rome::EndlessStream<key_type>>(generator);            
+  return std::make_unique<rome::EndlessStream<key_type>>(generator);     
 }
 
 auto CreateOpStream(const ExperimentParams& params) {
