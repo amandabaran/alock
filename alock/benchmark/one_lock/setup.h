@@ -261,6 +261,49 @@ auto CreateOpStream(const ExperimentParams& params) {
       params.workload().min_key(), params.workload().max_key());
 }
 
+ResultProto CalcualteLatResults(std::vector<uint64_t> lat_counts, std::vector<std::vector<uint64_t> > lat_vecs){
+  SummaryProto local_summary;
+  SummaryProto remote_summary;
+  ResultProto result;
+  local_summary.set_count(lat_counts.at(0));
+  remote_summary.set_count(lat_counts.at(1));
+  if (lat_counts.at(0) != lat_vecs.at(0).size()){
+    ROME_WARN("LOCAL LATENCY COUNT DOESN'T MATCH LATENCY VECTOR SIZE");
+  }
+  if (lat_counts.at(1) != lat_vecs.at(1).size()){
+    ROME_WARN("REMOTE LATENCY COUNT DOESN'T MATCH LATENCY VECTOR SIZE");
+  }
+  for (int i = 0; i < lat_vecs.size(); i++){
+    auto durations = lat_vecs.at(i);
+    auto total_duration = std::accumulate(durations.begin(), durations.end(), 0);
+    // Sort the vector to find the median
+    std::sort(durations.begin(), durations.end());
+    // Calculate the median (p50)
+    std::chrono::nanoseconds::rep median;
+    if (durations.size() % 2 == 0) {
+        // If the size is even, average the middle two values
+        median = (durations[durations.size() / 2 - 1] + durations[durations.size() / 2]) / 2;
+    } else {
+        // If the size is odd, take the middle value
+        median = durations[durations.size() / 2];
+    }
+    if (i == 0){
+      local_summary.set_p50(median);
+    } else {
+      remote_summary.set_p50(median);
+    }
+  }
+  MetricProto local;
+  MetricProto remote;
+  local.set_name("local_latency");
+  remote.set_name("remote_latency");
+  local.mutable_summary()->CopyFrom(local_summary);
+  remote.mutable_summary()->CopyFrom(remote_summary);
+  result.mutable_local_summary()->CopyFrom(local);
+  result.mutable_remote_summary()->CopyFrom(remote);
+  return result;
+}
+
 void RecordResults(const ExperimentParams &experiment_params,
                           const std::vector<ResultProto> &experiment_results) {                      
   ResultsProto results;

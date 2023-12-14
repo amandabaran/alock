@@ -62,7 +62,6 @@ public:
       cpu_relax();
     }
     std::atomic_thread_fence(std::memory_order_release);
-    // lock_count_++;
     return;
   }
 

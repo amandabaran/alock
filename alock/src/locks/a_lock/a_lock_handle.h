@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <thread>
+#include <vector>
 
 #include "rome/rdma/channel/sync_accessor.h"
 #include "rome/rdma/connection_manager/connection.h"
@@ -14,6 +15,7 @@
 #include "rome/rdma/memory_pool/memory_pool.h"
 #include "rome/rdma/memory_pool/remote_ptr.h"
 #include "rome/rdma/rdma_memory.h"
+#include "rome/metrics/stopwatch.h"
 
 #include "a_lock.h"
 
@@ -30,7 +32,10 @@ class ALockHandle {
 public: 
 
   ALockHandle(MemoryPool::Peer self, MemoryPool& pool, std::unordered_set<int> local_clients, int64_t budget) 
-    : self_(self), pool_(pool), local_clients_(local_clients), init_budget_(budget) {}
+    : self_(self), pool_(pool), local_clients_(local_clients), init_budget_(budget), local_ops_(0), remote_ops_(0), stopwatch_(nullptr)  {
+      local_lats_.reserve(NUM_OPS);
+      remote_lats_.reserve(NUM_OPS);
+    }
     // : self_(self), pool_(pool), local_clients_(local_clients), init_budget_(budget), lock_count_(0), reaq_count_(0), local_count_(0), remote_count_(0) {}
 
   absl::Status Init() {
@@ -49,7 +54,17 @@ public:
     prealloc_ = pool_.Allocate<ALock>();
     r_prealloc_ = pool_.Allocate<remote_ptr<RemoteDescriptor>>();
     
+    stopwatch_ = metrics::Stopwatch::Create("driver_stopwatch");
+
     return absl::OkStatus();
+  }
+
+  std::vector<uint64_t> GetLatCounts(){
+    return {local_ops_, remote_ops_};
+  }
+
+  std::vector<std::vector<uint64_t> > GetLatVecs(){
+    return {local_lats_, remote_lats_};
   }
 
   // std::vector<uint64_t> GetCounts(){
@@ -80,11 +95,29 @@ public:
         ROME_DEBUG("l_r_tail_ is {:x}", *l_r_tail_);
         ROME_DEBUG("l_l_tail_ is {:x}", *l_l_tail_);
         ROME_DEBUG("l_victim_ is {}", *l_victim_);
-        
+    
+        #ifdef LAT_TEST
+        auto start = std::chrono::high_resolution_clock::now();
         LocalLock();
+        auto stop = std::chrono::high_resolution_clock::now();
+        local_ops_++;
+        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
+        local_lats_.push_back(duration.count());
+        #else
+        LocalLock();
+        #endif 
       } else {
         is_local_ = false;
+        #ifdef LAT_TEST
+        auto start = std::chrono::high_resolution_clock::now();
         RemoteLock();
+        auto stop = std::chrono::high_resolution_clock::now();
+        remote_ops_++;
+        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
+        remote_lats_.push_back(duration.count());
+        #else
+        RemoteLock();
+        #endif 
       }
     #endif
     // lock_count_++;
@@ -354,7 +387,13 @@ private:
   // uint64_t reaq_count_;
   // uint64_t local_count_;
   // uint64_t remote_count_;
+  uint64_t local_ops_;
+  uint64_t remote_ops_;
+  std::vector<uint64_t> local_lats_;
+  std::vector<uint64_t> remote_lats_;
+  std::unique_ptr<metrics::Stopwatch> stopwatch_;
   
+
   int64_t init_budget_;
   bool is_local_; //resued for each call to lock for easy check on whether worker is local to key we are attempting to lock
   std::unordered_set<int> local_clients_; 

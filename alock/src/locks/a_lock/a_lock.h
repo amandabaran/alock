@@ -18,6 +18,10 @@ using ::rome::rdma::remote_ptr;
 // Note: Uncomment this line to use override local keys to use RDMA ops
 // #define REMOTE_ONLY
 
+// ! COMMENT OUT FOR THROUGHPUT EXPERIMENTS
+#define LAT_TEST
+#define NUM_OPS 10e6
+
 #define LOCAL_VICTIM  1
 #define REMOTE_VICTIM 2
 

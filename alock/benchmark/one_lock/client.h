@@ -87,10 +87,14 @@ class Client : public rome::ClientAdaptor<key_type> {
     ROME_ASSERT_OK(driver->Stop());
     // Output results.
     ResultProto result;
+    //TODO: COMMENT OUT NEXT 3 LINES FOR THROUGHPUT EXPERIMENTS
+    auto lat_counts = client_ptr->lock_handle_.GetLatCounts();
+    auto lat_vecs = client_ptr->lock_handle_.GetLatVecs();
+    //Add latency results to proto
+    result = CalcualteLatResults(lat_counts, lat_vecs);
     result.mutable_experiment_params()->CopyFrom(experiment_params);
     result.mutable_client()->CopyFrom(client_ptr->ToProto());
     result.mutable_driver()->CopyFrom(driver->ToProto());
-
     // Sleep for a hot sec to let the node receive the messages sent by the
     // clients before disconnecting.
     // (see https://github.com/jacnel/project-x/issues/15)
@@ -167,11 +171,6 @@ class Client : public rome::ClientAdaptor<key_type> {
   absl::Status Stop() override {
     std::this_thread::sleep_for(std::chrono::seconds(1)); //sleep for a sec to let remote ops finish?
     ROME_INFO("Stopping...");
-    // std::vector<uint64_t> counts = lock_handle_.GetCounts();
-    // ROME_INFO("counts: locks: {}", counts[0]);
-    // ROME_INFO("COUNTs: locks: {}, reaq: {}, local: {}, remote: {}", counts[0], counts[1], counts[2], counts[3]);
-    // ROME_ASSERT(counts[0] == (counts[2] + counts[3]), "ERROR: Number of locks != local + remote calls");
-    // Waits for all other co located clients (threads)
     barrier_->arrive_and_wait();
     return absl::OkStatus();
   }
