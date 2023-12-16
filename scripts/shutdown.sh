@@ -18,5 +18,4 @@ command() {
   cd ${tmp}
 }
 
-clean
 command "pkill -9 -f bazel"

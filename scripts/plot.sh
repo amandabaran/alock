@@ -3,7 +3,7 @@
 source "config.conf"
 
 # Source cluster-dependent variables
-save_dir="nodescale"
+save_dir=$1
 datafile="${save_dir}.csv"
 echo "Plotting results in ${save_dir}"
 
