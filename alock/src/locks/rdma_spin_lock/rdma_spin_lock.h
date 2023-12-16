@@ -33,7 +33,7 @@ static_assert(sizeof(RdmaSpinLock) == CACHELINE_SIZE);
 
 class RdmaSpinLockHandle{
 public:
-  RdmaSpinLockHandle(MemoryPool::Peer self, MemoryPool& pool, std::unordered_set<int> local_clients, uint64_t budget)
+  RdmaSpinLockHandle(MemoryPool::Peer self, MemoryPool& pool, std::unordered_set<int> local_clients, int64_t local_budget, int64_t remote_budget)
     : self_(self), pool_(pool), local_clients_(local_clients), lock_count_(0) {}
 
   absl::Status Init() {

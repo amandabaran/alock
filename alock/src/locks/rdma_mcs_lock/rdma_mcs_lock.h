@@ -36,8 +36,8 @@ static_assert(sizeof(RdmaMcsLock) == 64);
 
 class RdmaMcsLockHandle {
 public: 
-  RdmaMcsLockHandle(MemoryPool::Peer self, MemoryPool &pool, std::unordered_set<int> local_clients, uint64_t budget)
-      : self_(self), pool_(pool), local_clients_(local_clients), init_budget_(budget), lock_count_(0) {}
+  RdmaMcsLockHandle(MemoryPool::Peer self, MemoryPool &pool, std::unordered_set<int> local_clients, int64_t local_budget, int64_t remote_budget)
+      : self_(self), pool_(pool), local_clients_(local_clients), lock_count_(0), remote_budget_(remote_budget) {}
 
   absl::Status Init() {    
     // Reserve remote memory for the local descriptor.
@@ -102,11 +102,11 @@ public:
       if (descriptor_->budget == 0) {
         ROME_DEBUG("Budget exhausted (id={})",
                   static_cast<uint64_t>(desc_pointer_.id()));
-        descriptor_->budget = init_budget_;
+        descriptor_->budget = remote_budget_;
       }
     } else { //no one had the lock, we were swapped in
       // set lock holders descriptor budget to initBudget since we are the first lockholder
-      descriptor_->budget = init_budget_;
+      descriptor_->budget = remote_budget_;
     }
     // budget was set to greater than 0, CS can be entered
     ROME_DEBUG("[Lock] Acquired: prev={:x}, budget={:x} (id={})",
@@ -144,7 +144,7 @@ public:
 
 private: 
   uint64_t lock_count_; 
-  int64_t init_budget_;  
+  int64_t remote_budget_;
   bool is_host_;
   MemoryPool::Peer self_;
   MemoryPool &pool_; //reference to pool object, so all descriptors in same pool
