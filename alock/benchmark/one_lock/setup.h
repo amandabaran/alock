@@ -96,7 +96,7 @@ absl::Status ValidateExperimentParams(const ExperimentParams& params) {
 }
 
 //Using this one since it seems to perform equally to opstream3, and is more trusted
-auto CreateOpStream4(const ExperimentParams& params, const X::NodeProto& node){
+auto CreateOpStream(const ExperimentParams& params, const X::NodeProto& node){
   auto num_keys = 10e6; //10M
 
   int local_start = node.local_range().low();
@@ -141,167 +141,10 @@ auto CreateOpStream4(const ExperimentParams& params, const X::NodeProto& node){
 
 }
 
-auto CreateOpStream3(const ExperimentParams& params, const X::NodeProto& node){
-  auto num_keys = 10e6; //10M
-
-  int local_start = node.local_range().low();
-  int local_end = node.local_range().high();
-  int local_range = local_end - local_start + 1;
-  int min_key = params.workload().min_key();
-  int max_key = params.workload().max_key();
-  int full_range = max_key - min_key + 1;
-  auto p_local = params.workload().p_local() * 100; //change to represent a percentage
-
-  XorShift64 rng(std::chrono::system_clock::now().time_since_epoch().count());
-
-  std::vector<key_type> keys;
-  keys.reserve(num_keys); 
-
-  for (auto i = 0; i < num_keys; i++){
-    volatile uint64_t random = rng.next();
-    // ROME_DEBUG("p_Local is {}", p_local);
-    if ( p_local == 1.0 || (random % 100) <= p_local ){
-      // scale random float to a number within local key range
-      // ROME_DEBUG("random % local is {}", (random % local_range) + local_start);
-      keys.push_back((random % local_range) + local_start);
-    } else {
-      //scale random float to number in full key range
-      key_type key = (random % full_range) + min_key;
-      // ROME_DEBUG("remote key");
-      //retry until key is remote (i.e. not in local)
-      while (key <= local_end && key >= local_start){
-        random = rng.next();
-        // ROME_DEBUG("random % range is {}", random % full_range);
-        key = (random % full_range) + min_key;
-      }
-      keys.push_back(key);
-    }
-  }
-  ROME_ASSERT(keys.size() == num_keys, "Error generating vector for prefilled stream");
-
-  // creates a stream such that the random numbers are already generated, and are popped from vector for each operation
-  return std::make_unique<rome::PrefilledStream<key_type>>(keys, num_keys);
-
-}
-
-auto CreateOpStream2(const ExperimentParams& params, const X::NodeProto& node){
-  int local_start = node.local_range().low();
-  int local_end = node.local_range().high();
-  int local_range = local_end - local_start + 1;
-  int min_key = params.workload().min_key();
-  int max_key = params.workload().max_key();
-  int full_range = max_key - min_key + 1;
-  auto p_local = params.workload().p_local() * 100; //change to represent a percentage
-
-  //apply this to determine a key for each op
-  std::function<key_type(void)> generator = [=](){
-    XorShift64 rng(std::chrono::system_clock::now().time_since_epoch().count());
-    volatile uint64_t random = rng.next();
-    ROME_DEBUG("random % 100 is {}", random % 100 + 1);
-    if ( p_local == 1.0 || (random % 100 + 1) <= p_local ){
-      return (random % local_range) + local_start;
-      ROME_DEBUG("local key");
-    } else {
-      //scale random float to number in full key range
-      key_type key = (random % full_range) + min_key;
-      ROME_DEBUG("remote key");
-      //retry until key is remote (i.e. not in local)
-      while (key <= local_end && key >= local_start){
-        random = rng.next();
-        ROME_DEBUG("random % range is {}", random % full_range);
-        key = (random % full_range) + min_key;
-      }
-      return key;
-    }
-  };
-
-  return std::make_unique<rome::EndlessStream<key_type>>(generator);  
-}
-
-//SLOWEST
-auto CreateOpStream(const ExperimentParams& params, const X::NodeProto& node){
-  int local_start = node.local_range().low();
-  int local_end = node.local_range().high();
-  int local_range = local_end - local_start + 1;
-  int min_key = params.workload().min_key();
-  int max_key = params.workload().max_key();
-  int full_range = max_key - min_key + 1;
-  auto p_local = params.workload().p_local() * 100; //change to represent a percentage
-
-  //apply this to determine a key for each op
-  std::function<key_type(void)> generator = [=](){
-    std::mt19937 gen;
-    std::uniform_int_distribution<> dist(1, max_key);
-    volatile int random = dist(gen);
-    ROME_DEBUG("random % 100 is {}", random % 100 + 1);
-    auto random_p = (random % 100) + 1;
-    if ( p_local == 1.0 || random_p <= p_local ){
-      return static_cast<key_type>((random % local_range) + local_start);
-      ROME_DEBUG("local key");
-    } else {
-      //scale random float to number in full key range
-      key_type key = (random % full_range) + min_key;
-      ROME_DEBUG("remote key");
-      //retry until key is remote (i.e. not in local)
-      while (key <= local_end && key >= local_start){
-        random = dist(gen);
-        ROME_DEBUG("random % range is {}", random % full_range);
-        key = (random % full_range) + min_key;
-      }
-      return static_cast<key_type>(key);
-    }
-  };
-
-  return std::make_unique<rome::EndlessStream<key_type>>(generator);     
-}
-
 auto CreateOpStream(const ExperimentParams& params) {
   return std::make_unique<rome::RandomDistributionStream<
       std::uniform_int_distribution<key_type>, key_type, key_type>>(
       params.workload().min_key(), params.workload().max_key());
-}
-
-ResultProto CalcualteLatResults(std::vector<uint64_t> lat_counts, std::vector<std::vector<uint64_t> > lat_vecs){
-  SummaryProto local_summary;
-  SummaryProto remote_summary;
-  ResultProto result;
-  local_summary.set_count(lat_counts.at(0));
-  remote_summary.set_count(lat_counts.at(1));
-  if (lat_counts.at(0) != lat_vecs.at(0).size()){
-    ROME_WARN("LOCAL LATENCY COUNT DOESN'T MATCH LATENCY VECTOR SIZE");
-  }
-  if (lat_counts.at(1) != lat_vecs.at(1).size()){
-    ROME_WARN("REMOTE LATENCY COUNT DOESN'T MATCH LATENCY VECTOR SIZE");
-  }
-  for (int i = 0; i < lat_vecs.size(); i++){
-    auto durations = lat_vecs.at(i);
-    auto total_duration = std::accumulate(durations.begin(), durations.end(), 0);
-    // Sort the vector to find the median
-    std::sort(durations.begin(), durations.end());
-    // Calculate the median (p50)
-    std::chrono::nanoseconds::rep median;
-    if (durations.size() % 2 == 0) {
-        // If the size is even, average the middle two values
-        median = (durations[durations.size() / 2 - 1] + durations[durations.size() / 2]) / 2;
-    } else {
-        // If the size is odd, take the middle value
-        median = durations[durations.size() / 2];
-    }
-    if (i == 0){
-      local_summary.set_p50(median);
-    } else {
-      remote_summary.set_p50(median);
-    }
-  }
-  MetricProto local;
-  MetricProto remote;
-  local.set_name("local_latency");
-  remote.set_name("remote_latency");
-  local.mutable_summary()->CopyFrom(local_summary);
-  remote.mutable_summary()->CopyFrom(remote_summary);
-  result.mutable_local_summary()->CopyFrom(local);
-  result.mutable_remote_summary()->CopyFrom(remote);
-  return result;
 }
 
 void RecordResults(const ExperimentParams &experiment_params,

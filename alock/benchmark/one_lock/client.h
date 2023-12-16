@@ -65,7 +65,7 @@ class Client : public rome::ClientAdaptor<key_type> {
 
     auto *client_ptr = client.get();
 
-    auto stream = CreateOpStream4(experiment_params, client_ptr->node_proto_);
+    auto stream = CreateOpStream(experiment_params, client_ptr->node_proto_);
     // auto stream = CreateOpStream(experiment_params);
     std::barrier<>* barr = client_ptr->barrier_;
     barr->arrive_and_wait();
@@ -87,14 +87,13 @@ class Client : public rome::ClientAdaptor<key_type> {
     ROME_ASSERT_OK(driver->Stop());
     // Output results.
     ResultProto result;
-    //TODO: COMMENT OUT NEXT 3 LINES FOR THROUGHPUT EXPERIMENTS
-    auto lat_counts = client_ptr->lock_handle_.GetLatCounts();
-    auto lat_vecs = client_ptr->lock_handle_.GetLatVecs();
-    //Add latency results to proto
-    result = CalcualteLatResults(lat_counts, lat_vecs);
     result.mutable_experiment_params()->CopyFrom(experiment_params);
     result.mutable_client()->CopyFrom(client_ptr->ToProto());
     result.mutable_driver()->CopyFrom(driver->ToProto());
+    //TODO: COMMENT OUT NEXT 3 LINES FOR THROUGHPUT EXPERIMENT
+    //Add latency results to proto
+    result.mutable_local_summary()->CopyFrom(client_ptr->lock_handle_.GetLocalLatSummary());
+    result.mutable_remote_summary()->CopyFrom(client_ptr->lock_handle_.GetRemoteLatSummary());
     // Sleep for a hot sec to let the node receive the messages sent by the
     // clients before disconnecting.
     // (see https://github.com/jacnel/project-x/issues/15)
@@ -172,6 +171,7 @@ class Client : public rome::ClientAdaptor<key_type> {
     std::this_thread::sleep_for(std::chrono::seconds(1)); //sleep for a sec to let remote ops finish?
     ROME_INFO("Stopping...");
     barrier_->arrive_and_wait();
+    ROME_INFO("Client {} Reaq Count {}", self_.id, lock_handle_.GetReaqCount());
     return absl::OkStatus();
   }
 
@@ -191,7 +191,7 @@ class Client : public rome::ClientAdaptor<key_type> {
         key_range_map_(kr_map), 
         root_ptrs_(root_ptr_map),
         local_clients_(locals),
-        lock_handle_(self, pool_, locals, params.budget()), 
+        lock_handle_(self, pool_, locals, params.local_budget(), params.remote_budget()), 
         root_lock_ptr_(root_ptrs_->at(self.id)) {}
 
   const Peer self_;

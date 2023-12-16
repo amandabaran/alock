@@ -16,6 +16,7 @@
 #include "rome/rdma/memory_pool/remote_ptr.h"
 #include "rome/rdma/rdma_memory.h"
 #include "rome/metrics/stopwatch.h"
+#include "rome/metrics/summary.h"
 
 #include "a_lock.h"
 
@@ -31,11 +32,8 @@ class ALockHandle {
 
 public: 
 
-  ALockHandle(MemoryPool::Peer self, MemoryPool& pool, std::unordered_set<int> local_clients, int64_t budget) 
-    : self_(self), pool_(pool), local_clients_(local_clients), init_budget_(budget), local_ops_(0), remote_ops_(0), stopwatch_(nullptr)  {
-      local_lats_.reserve(NUM_OPS);
-      remote_lats_.reserve(NUM_OPS);
-    }
+  ALockHandle(MemoryPool::Peer self, MemoryPool& pool, std::unordered_set<int> local_clients, int64_t local_budget, int64_t remote_budget) 
+    : self_(self), pool_(pool), local_clients_(local_clients), local_budget_(local_budget), remote_budget_(remote_budget), stopwatch_(nullptr), lat_sampling_rate_(10), local_summary_("local_lat", "ns", 1000), remote_summary_("remote_lat", "ns", 1000)  {}
     // : self_(self), pool_(pool), local_clients_(local_clients), init_budget_(budget), lock_count_(0), reaq_count_(0), local_count_(0), remote_count_(0) {}
 
   absl::Status Init() {
@@ -54,22 +52,17 @@ public:
     prealloc_ = pool_.Allocate<ALock>();
     r_prealloc_ = pool_.Allocate<remote_ptr<RemoteDescriptor>>();
     
-    stopwatch_ = metrics::Stopwatch::Create("driver_stopwatch");
+    stopwatch_ = rome::metrics::Stopwatch::Create("driver_stopwatch");
 
     return absl::OkStatus();
   }
 
-  std::vector<uint64_t> GetLatCounts(){
-    return {local_ops_, remote_ops_};
-  }
+  rome::metrics::MetricProto GetLocalLatSummary() { return local_summary_.ToProto(); }
+  rome::metrics::MetricProto GetRemoteLatSummary() { return remote_summary_.ToProto(); }
 
-  std::vector<std::vector<uint64_t> > GetLatVecs(){
-    return {local_lats_, remote_lats_};
+  uint64_t GetReaqCount(){
+    return reaq_count_;
   }
-
-  // std::vector<uint64_t> GetCounts(){
-  //   return {lock_count_, reaq_count_, local_count_, remote_count_};
-  // }
  
   void Lock(remote_ptr<ALock> alock){
     ROME_ASSERT(a_lock_pointer_ == remote_nullptr, "Attempting to lock handle that is already locked.");
@@ -97,24 +90,24 @@ public:
         ROME_DEBUG("l_victim_ is {}", *l_victim_);
     
         #ifdef LAT_TEST
-        auto start = std::chrono::high_resolution_clock::now();
+        auto curr_lap = stopwatch_->GetLapSplit();
+        auto curr_lap_ms = std::chrono::duration_cast<std::chrono::milliseconds>(curr_lap.GetRuntimeNanoseconds());
         LocalLock();
-        auto stop = std::chrono::high_resolution_clock::now();
-        local_ops_++;
-        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
-        local_lats_.push_back(duration.count());
+        if (curr_lap_ms > lat_sampling_rate_) {
+          local_summary_ << (stopwatch_->GetLapSplit().GetRuntimeNanoseconds().count() - curr_lap.GetRuntimeNanoseconds().count());
+        }
         #else
         LocalLock();
         #endif 
       } else {
         is_local_ = false;
         #ifdef LAT_TEST
-        auto start = std::chrono::high_resolution_clock::now();
+        auto curr_lap = stopwatch_->GetLapSplit();
+        auto curr_lap_ms = std::chrono::duration_cast<std::chrono::milliseconds>(curr_lap.GetRuntimeNanoseconds());
         RemoteLock();
-        auto stop = std::chrono::high_resolution_clock::now();
-        remote_ops_++;
-        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
-        remote_lats_.push_back(duration.count());
+        if (curr_lap_ms > lat_sampling_rate_) {
+          remote_summary_ << (stopwatch_->GetLapSplit().GetRuntimeNanoseconds().count() - curr_lap.GetRuntimeNanoseconds().count());
+        }
         #else
         RemoteLock();
         #endif 
@@ -143,7 +136,7 @@ public:
       RemotePetersons();
     }
     std::atomic_thread_fence(std::memory_order_release);
-    // reaq_count_++;
+    reaq_count_++;
   }
 
 private: 
@@ -232,7 +225,7 @@ private:
                           static_cast<uint64_t>(r_desc_pointer_.id()));
               // Release the lock before trying to continue
               Reacquire();
-              r_desc_->budget = init_budget_;
+              r_desc_->budget = remote_budget_;
           }
            // budget was set to greater than 0, CS can be entered
           ROME_DEBUG("[Lock] Acquired: prev={:x}, budget={:x} (id={})",
@@ -241,7 +234,7 @@ private:
           return true; //lock was passed to us
       } else { //no one had the lock, we were swapped in
           // set lock holders RemoteDescriptor budget to initBudget since we are the first lockholder
-          r_desc_->budget = init_budget_;
+          r_desc_->budget = remote_budget_;
           // budget was set to greater than 0, CS can be entered
           ROME_DEBUG("[Lock] Acquired: (NULL) prev={:x}, budget={:x} (id={})",
                     static_cast<uint64_t>(prev), r_desc_->budget,
@@ -293,12 +286,12 @@ private:
                       static_cast<uint64_t>(self_.id));
           // Release the lock before trying to continue
           Reacquire();
-          l_desc_.budget = init_budget_;
+          l_desc_.budget = local_budget_;
       }
       return true;
     } else {
       ROME_DEBUG("First on local lock (id={})", self_.id);
-      l_desc_.budget = init_budget_;
+      l_desc_.budget = local_budget_;
       return false; 
     }
   }
@@ -383,18 +376,15 @@ private:
       l_desc_.next = nullptr;
   }
 
-  // uint64_t lock_count_;
-  // uint64_t reaq_count_;
-  // uint64_t local_count_;
-  // uint64_t remote_count_;
-  uint64_t local_ops_;
-  uint64_t remote_ops_;
-  std::vector<uint64_t> local_lats_;
-  std::vector<uint64_t> remote_lats_;
-  std::unique_ptr<metrics::Stopwatch> stopwatch_;
-  
+  uint64_t reaq_count_;
+  std::unique_ptr<rome::metrics::Stopwatch> stopwatch_;
+  std::chrono::milliseconds lat_sampling_rate_;
+  rome::metrics::Summary<double> local_summary_;
+  rome::metrics::Summary<double> remote_summary_;
 
-  int64_t init_budget_;
+  int64_t local_budget_;
+  int64_t remote_budget_;
+  // int64_t init_budget_;
   bool is_local_; //resued for each call to lock for easy check on whether worker is local to key we are attempting to lock
   std::unordered_set<int> local_clients_; 
   

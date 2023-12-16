@@ -52,7 +52,8 @@ flags.DEFINE_multi_integer('max_key', int(1e4), 'Maximum key')
 flags.DEFINE_integer('threads', 1, 'Number of Workers (threads) to launch per node')
 flags.DEFINE_float('theta', 0.99, 'Theta in Zipfian distribution')
 flags.DEFINE_multi_float('p_local', 0.5, 'Percentage of operations that are local to each node')
-flags.DEFINE_multi_integer('budget', 5, 'Budget to be used for alock before reacquiring global lock')
+flags.DEFINE_multi_integer('local_budget', 5, 'Budget to be used for alock local cohort')
+flags.DEFINE_multi_integer('remote_budget', 5, 'Budget to be used for alock remote cohort')
 
 flags.DEFINE_integer('runtime', 10, 'Number of seconds to run experiment')
 
@@ -244,7 +245,8 @@ def fill_experiment_params(
         proto.client_ids.extend(n.nid for n in nodes)
     proto.name = experiment_name
     proto.num_nodes = num_nodes
-    proto.budget = FLAGS.budget[0]
+    proto.local_budget = FLAGS.local_budget[0]
+    proto.remote_budget = FLAGS.remote_budget[0]
     proto.workload.runtime = FLAGS.runtime
     proto.workload.think_time_ns = FLAGS.think_ns[0]
     proto.save_dir = build_save_dir(lock)
@@ -330,15 +332,16 @@ def main(args):
         if FLAGS.datafile is None:
             os.remove(datafile)
     else:
-        # lock type, number of nodes, think time, max key
-        columns = ['lock', 'n', 'p', 'm', 'c', 'done']
+        # lock type, #nodes, %local, max key, # clients
+        columns = ['lock', 'n', 'm', 'p', 'lb', 'rb', 'c', 'done']
         experiments = {}
         configurations = list(itertools.product(
             set(FLAGS.lock_type),
             set(FLAGS.nodes),
-            set(FLAGS.p_local),
-            # set(FLAGS.budget),
             set(FLAGS.max_key),
+            set(FLAGS.p_local),
+            set(FLAGS.local_budget),
+            set(FLAGS.remote_budget),
             set(FLAGS.num_clients),
             [False]))
         experiments = pandas.DataFrame(configurations, columns=columns)
@@ -355,19 +358,20 @@ def main(args):
                 n_count = row['n']
                 max_key = row['m']
                 p_local = row['p']
-                # budget = row['b']
+                local_budget = row['lb']
+                remote_budget = row['rb']
                 num_clients = row['c']
 
                 nodes_csv = partition_nodefile(FLAGS.nodefile)
                 if nodes_csv is None:
                     continue
                 cluster_proto = experiment_pb2.CloudlabClusterProto()
-                print("NCOUNT: ", n_count)
                 temp, nodes = parse_nodes(nodes_csv, 0, n_count)
                 cluster_proto.MergeFrom(temp) 
 
                 commands = []
-                experiment_name = lock + '_n' + str(len(nodes)) + '_c' + str(num_clients) + '_m' + str(max_key) + '_p' + str(p_local)
+                # Modify below line to change name of the log saved to accurately represent the experiment configuration
+                experiment_name = lock + '_n' + str(n_count) + '_c' + str(num_clients) + '_m' + str(max_key) + '_p' + str(p_local) + '_lb' + str(local_budget) + '_rb' + str(remote_budget)
                 bar.text = f'Lock type: {lock} | Current experiment: {experiment_name}'
                 if not FLAGS.get_data:
                     for n in set(nodes.keys()):

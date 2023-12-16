@@ -18,6 +18,7 @@ cc_library(
         "@rome//rome/rdma/memory_pool",
         "@rome//rome/rdma/memory_pool:remote_ptr",
         "@rome//rome/metrics:stopwatch",
+        "@rome//rome/metrics:summary",
         "//alock:util",
     ],
 )
