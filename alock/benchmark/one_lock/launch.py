@@ -29,7 +29,7 @@ flags.DEFINE_bool(
     'Whether or not to print commands to retrieve data from client nodes')
 flags.DEFINE_string(
     'save_root',
-    'users/adb321/results/alock/',
+    '/users/adb321/results/',
     'Directory results are saved under when running')
 flags.DEFINE_string('nodefile', None, 'Path to nodefile',
                     short_name='n', required=True)
@@ -227,7 +227,7 @@ def quote(line):
 
 
 def build_save_dir(lock):
-    return os.path.join(FLAGS.remote_save_dir, lock)
+    return os.path.join(FLAGS.save_root, FLAGS.remote_save_dir, lock)
 
 
 def build_remote_save_dir(lock):
