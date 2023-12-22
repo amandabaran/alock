@@ -12,6 +12,7 @@
 #include "rome/rdma/connection_manager/connection_manager.h"
 #include "rome/rdma/memory_pool/memory_pool.h"
 #include "rome/rdma/rdma_memory.h"
+#include "rome/metrics/summary.h"
 #include "../../../util.h"
 
 
@@ -51,8 +52,17 @@ public:
     return absl::OkStatus();
   }
 
-  std::vector<uint64_t> GetCounts(){
-    return {lock_count_};
+  uint64_t GetReaqCount(){
+    return 0;
+  }
+
+  rome::metrics::MetricProto GetLocalLatSummary() { 
+    rome::metrics::Summary<double> local("local_lat", "ns", 1000);
+    return local.ToProto(); 
+  }
+  rome::metrics::MetricProto GetRemoteLatSummary() { 
+    rome::metrics::Summary<double> remote("local_lat", "ns", 1000);
+    return remote.ToProto(); 
   }
 
   bool IsLocked() {
