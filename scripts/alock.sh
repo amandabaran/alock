@@ -42,24 +42,24 @@ sync
 clean
 
 
-save_dir="keys10k"
+save_dir="20keys"
 lock="alock"
 log_level='info'
 
 echo "Building ${lock}..."
 build ${lock}
 
-for num_nodes in 5
+for num_nodes in 5 10 20
 do
-  for num_clients in 120
-    do 
-      for max in 10000
-      do
-        for local_p in .6 .5
-        do 
-          num_threads=$((num_clients / num_nodes))
-          bazel run --action_env=BAZEL_CXXOPTS='-std=c++20' //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --threads=${num_threads} --max_key=${max} --p_local=${local_p} --lock_type=${lock} --ssh_user=adb321 --think_ns=0 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=False
-        done
+  for num_threads in 4 6 8 10 12
+  do 
+    for max in 20
+    do
+      for local_p in 1 .95 .9 .85
+      do 
+        num_clients=$(( num_threads*num_nodes ))
+        bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --local_budget=${local_budget} --remote_budget=${remote_budget} --max_key=${max} --dry_run=False --p_local=${p_local}
       done
     done
+  done
 done

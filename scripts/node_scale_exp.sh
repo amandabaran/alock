@@ -48,16 +48,16 @@ log_level='info'
 echo "Building ${lock}..."
 build ${lock}
 
-for num_nodes in 5 10 15 20
+for num_nodes in 15
 do
-  for num_clients in 40 80 120 180
+  for num_clients in 40 120 180
     do 
       for max in 100 1000
       do
         for local_p in 1 .95 .9 .8 .7 .6 .5
         do 
           num_threads=$((num_clients / num_nodes))
-          bazel run --action_env=BAZEL_CXXOPTS='-std=c++20' //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --threads=${num_threads} --budget=5 --max_key=${max} --p_local=${local_p} --lock_type=${lock} --ssh_user=adb321 --think_ns=0 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=False
+          bazel run --action_env=BAZEL_CXXOPTS='-std=c++20' //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --threads=${num_threads} --max_key=${max} --p_local=${local_p} --lock_type=${lock} --ssh_user=adb321 --think_ns=0 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=False
         done
       done
     done
@@ -66,48 +66,48 @@ done
 echo "Getting ${lock} data"
 zsh get_data.sh ${save_dir}
 
-lock="spin"
+# lock="spin"
 
-echo "Building ${lock}..."
-build ${lock}
+# echo "Building ${lock}..."
+# build ${lock}
 
-for num_nodes in 5 10 15 20
-do
-  for num_clients in 40 80 120 180
-    do 
-      for max in 100 1000
-      do
-        for local_p in 1 .95 .9 .8 .7 .6 .5
-        do 
-          num_threads=$((num_clients / num_nodes))
-          bazel run -c opt //alock/benchmark/one_lock:launch --action_env=BAZEL_CXXOPTS='-std=c++20' -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --threads=${num_threads} --budget=5 --max_key=${max} --p_local=${local_p} --lock_type=${lock} --ssh_user=adb321 --think_ns=0 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=False
-        done
-      done
-    done
-done
+# for num_nodes in 5 10 15
+# do
+#   for num_clients in 40 120 180
+#     do 
+#       for max in 100 1000
+#       do
+#         for local_p in 1 .95 .9 .8 .7 .6 .5
+#         do 
+#           num_threads=$((num_clients / num_nodes))
+#           bazel run --action_env=BAZEL_CXXOPTS='-std=c++20' //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --threads=${num_threads} --max_key=${max} --p_local=${local_p} --lock_type=${lock} --ssh_user=adb321 --think_ns=0 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=False
+#         done
+#       done
+#     done
+# done
 
-echo "Getting ${lock} data"
-zsh get_data.sh ${save_dir}
+# echo "Getting ${lock} data"
+# zsh get_data.sh ${save_dir}
 
-lock="mcs"
+# lock="mcs"
 
-echo "Building ${lock}..."
-build ${lock}
+# echo "Building ${lock}..."
+# build ${lock}
 
-for num_nodes in 5 10 15 20
-do
-  for num_clients in 40 80 120 180
-    do 
-      for max in 100 1000
-      do
-        for local_p in 1 .95 .9 .8 .7 .6
-        do 
-          num_threads=$((num_clients / num_nodes))
-          bazel run -c opt //alock/benchmark/one_lock:launch --action_env=BAZEL_CXXOPTS='-std=c++20' -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --threads=${num_threads} --budget=5 --max_key=${max} --p_local=${local_p} --lock_type=${lock} --ssh_user=adb321 --think_ns=0 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=False
-        done
-      done
-    done
-done
+# for num_nodes in 5 10 15
+# do
+#   for num_clients in 40 120 180
+#     do 
+#       for max in 100 1000
+#       do
+#         for local_p in 1 .95 .9 .8 .7 .6 .5
+#         do 
+#           num_threads=$((num_clients / num_nodes))
+#           bazel run --action_env=BAZEL_CXXOPTS='-std=c++20' //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --threads=${num_threads} --max_key=${max} --p_local=${local_p} --lock_type=${lock} --ssh_user=adb321 --think_ns=0 --runtime=5 --remote_save_dir=${save_dir} --log_level=${log_level} --dry_run=False --gdb=False
+#         done
+#       done
+#     done
+# done
 
-echo "Getting ${lock} data"
-zsh get_data.sh ${save_dir}
+# echo "Getting ${lock} data"
+# zsh get_data.sh ${save_dir}

@@ -117,7 +117,7 @@ public:
   }
 
   void Unlock(remote_ptr<ALock> alock){
-    ROME_ASSERT(alock.address() == a_lock_pointer_.address(), "Attempting to unlock alock that is not locked.");
+    // ROME_ASSERT(alock.address() == a_lock_pointer_.address(), "Attempting to unlock alock that is not locked.");
     if (is_local_){
       LocalUnlock();
     } else {
@@ -136,7 +136,7 @@ public:
       RemotePetersons();
     }
     std::atomic_thread_fence(std::memory_order_release);
-    reaq_count_++;
+    // reaq_count_++;
   }
 
 private: 

@@ -84,10 +84,10 @@ template <typename K, typename V>
 absl::Status Node<K, V>::Prefill(const key_type& min_key,
                                    const key_type& max_key) {
   if (prefill_){
-    ROME_INFO("Prefilling lock table... [{}, {}]", min_key, max_key);
+    ROME_DEBUG("Prefilling lock table... [{}, {}]", min_key, max_key);
     root_lock_ptr_ = lock_table_.AllocateLocks(min_key, max_key);
   } else {
-    ROME_INFO("Prefilling set to false, one lock per lock table");
+    ROME_DEBUG("Prefilling set to false, one lock per lock table");
     root_lock_ptr_ = lock_table_.AllocateLocks(min_key, min_key);
   }
   root_ptrs_.emplace(self_.nid(), root_lock_ptr_);
