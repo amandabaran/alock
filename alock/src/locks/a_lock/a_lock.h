@@ -19,7 +19,7 @@ using ::rome::rdma::remote_ptr;
 // #define REMOTE_ONLY
 
 // ! COMMENT OUT FOR THROUGHPUT EXPERIMENTS
-#define LAT_TEST
+// #define LAT_TEST
 #define NUM_OPS 10e6
 
 #define LOCAL_VICTIM  1

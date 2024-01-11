@@ -53,7 +53,6 @@ cc_library(
         "//alock/src/locks/rdma_mcs_lock:rdma_mcs_lock",
         "//alock/src/locks/rdma_spin_lock:rdma_spin_lock",
         "//alock/src/locks/a_lock:a_lock",
-        "//alock/src/locks/spin_lock:spin_lock",
         "@absl//absl/status",
         "@absl//absl/status:statusor",
         "@rome//rome/rdma/connection_manager",
@@ -67,7 +66,6 @@ string_flag(
         "mcs",
         "spin",
         "alock",
-        "lspin",
     ],
 )
 
@@ -89,13 +87,6 @@ config_setting(
     name = "spin",
     flag_values = {
         ":lock_type": "spin",
-    },
-)
-
-config_setting(
-    name = "lspin",
-    flag_values = {
-        ":lock_type": "lspin",
     },
 )
 

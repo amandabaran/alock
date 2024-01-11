@@ -67,7 +67,7 @@ public:
 
   void Lock(remote_ptr<RdmaSpinLock> lock) {  
     lock_ = decltype(lock_)(lock.id(), lock.address());
-    //TODO: switch to read and write to see if CAS introduces an issue with the rdma card because its atomic
+    //?: IDEA: switch to read and write to see if CAS introduces an issue with the rdma card because its atomic
     while (pool_.CompareAndSwap(lock_, kUnlocked, self_.id) != kUnlocked) {
       cpu_relax();
     }

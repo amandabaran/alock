@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 import seaborn
 from rome.rome.util.debugpy_util import debugpy_hook
 
+pandas.options.mode.chained_assignment = None  # default='warn'
+
 
 flags.DEFINE_string("figdir", '/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/one_lock/plots/',
                     "Directory name to save figures under")
@@ -112,12 +114,13 @@ x1_ = 'lock_type'
 x2_ = 'experiment_params.workload.max_key'
 x3_ = 'experiment_params.num_clients'
 x4_ = 'experiment_params.num_nodes'
-x5_ = 'experiment_params.local_budget'
-x6_ = 'experiment_params.workload.p_local'
+x5_ = 'experiment_params.workload.p_local'
+x6_ = 'experiment_params.local_budget'
 x7_ = 'experiment_params.remote_budget'
-x_ = [x1_, x2_, x3_, x4_]
+x8_ = 'experiment_params.num_threads'
+x_ = [x1_, x2_, x3_, x4_, x5_, x6_, x7_, x8_]
 y_ = 'results.driver.qps.summary.mean'
-cols_ = [x1_, x2_, x3_, y_]
+cols_ = [x1_, x2_, x3_, x4_, x5_, x6_, x7_, x8_, y_]
 
 def get_summary(data):
     # Calculate totals grouped by the cluster size
@@ -214,7 +217,7 @@ def plot_grid(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, nam
 
 # this produces a multi-row grid, where each row is a different # of keys and hue is for different locks
 def plot_locality(nodes, clients, keys, originals, summary, hue, hue_label, name, plot_total):
-    global x6_, y_
+    global x5_, y_
     
     node_keys = []
     for i, node in enumerate(nodes):
@@ -246,7 +249,7 @@ def plot_locality(nodes, clients, keys, originals, summary, hue, hue_label, name
             data = data[data['experiment_params.num_clients'] == client]
             seaborn.lineplot(
                     data=data,
-                    x=x6_,
+                    x=x5_,
                     y=y_,
                     ax=axes[i][j],
                     hue=hue,
@@ -290,8 +293,8 @@ def plot_locality(nodes, clients, keys, originals, summary, hue, hue_label, name
     
     plt.show()
     
-def plot_budget(nodes, keys, clients, plocal, xcol, originals, summary, hue, xlabel, hue_label, name, plot_total):
-    global x1_, x2_, x3_, y_
+def plot_budget(nodes, keys, clients, plocal, originals, summary, hue, xlabel, hue_label, name, plot_total):
+    global x1_, x2_, x3_, x6_, x7_, y_
     node_keys = []
     for i, node in enumerate(nodes):
         for j, key in enumerate(keys):
@@ -324,7 +327,7 @@ def plot_budget(nodes, keys, clients, plocal, xcol, originals, summary, hue, xla
             data = data[data['experiment_params.num_clients'] == client]
             seaborn.lineplot(
                     data=data,
-                    x=xcol,
+                    x=x6_,
                     y=y_,
                     ax=axes[i][j],
                     hue=hue,
@@ -332,6 +335,17 @@ def plot_budget(nodes, keys, clients, plocal, xcol, originals, summary, hue, xla
                     markers=True,
                     markersize=markersize,
                     palette=palette
+            )
+            seaborn.lineplot(
+                    data=data,
+                    x=x7_,
+                    y=y_,
+                    ax=axes[i][j],
+                    hue=hue,
+                    style=hue,
+                    markers=True,
+                    markersize=markersize,
+                    palette=['red']
             )
             # set y axis to start at 0
             axes[i][j].set_ylim(0, axes[i][j].get_ylim()[1])
@@ -451,15 +465,99 @@ def plot_throughput(xcol, originals, summary, hue, xlabel, hue_label, name):
                 if legend is not None else None, bbox_inches='tight')
 
 
-def plot_latency(data):
+def plot_p50(data):
     print("Plotting latency...")
-    columns = ['experiment_params.name', 'lock_type',
-               'experiment_params.cluster_size', 'experiment_params.workload.max_key',
-               'driver.qps.summary.mean', 'driver.latency.summary.mean',
-               'driver.latency.summary.p99', 'driver.latency.summary.p999']
+    
+    columns = ['lock_type', 'experiment_params.num_clients', 'experiment_params.num_nodes', 
+               'experiment_params.workload.max_key', 'experiment_params.workload.p_local',
+               'experiment_params.remote_budget', 'experiment_params.local_budget', 
+               'results.driver.latency.summary.p50']
     data = data[columns]
+    
+    data['results.driver.latency.summary.p50'] = data['results.driver.latency.summary.p50'].apply(lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
+    data = data.explode('results.driver.latency.summary.p50')
+    # reset index number to label each row
+    data = data.reset_index(drop=True)
     print(data)
-    # data = data[data['experiment_params.name'].str.count('.*_c.*') == 0]
+
+def plot_locality_lines(nodes, keys, summary, name):
+    global x8_, y_
+            
+    # make a grid of subplots with a row for each node number and a column for each key setup
+    fig, axes = plt.subplots(len(nodes), len(keys), figsize=(12, 3))
+    seaborn.set_theme(style='ticks')
+    markersize = 8
+    
+    # if hue != None:
+    #     num_hues = len(summary.reset_index()[hue].dropna().unique())
+    # else:
+    #     num_hues = 1
+   
+    
+    plt.subplots_adjust(hspace = 1.2)
+
+    # reset index in order to access all fields for hue
+    summary = summary.reset_index()
+
+    #filter data to only include desire p_local lines
+    plocal = [.95, .9, .85]
+    summary = summary[summary['experiment_params.workload.p_local'].isin(plocal)]
+    summary = summary.reset_index(drop=True)
+    
+    # filter out the data with 16 threads
+    summary = summary[summary[x8_] < 13]
+    summary = summary.reset_index(drop=True)
+    
+    #filter data to only include desire remote_budget data
+    budget = [10]
+    summary = summary[summary['experiment_params.remote_budget'].isin(budget)]
+    summary = summary.reset_index(drop=True)
+
+    plt.subplots_adjust(wspace = 0.25)
+
+    for i, node in enumerate(nodes):
+        for j, key in enumerate(keys):
+            data = summary[summary['experiment_params.workload.max_key'] == key]
+            data = data[data['experiment_params.num_nodes'] == node]
+            data = data.reset_index(drop=True)
+            seaborn.lineplot(
+                    data=data,
+                    x=x8_,
+                    y='total',
+                    ax=axes[i][j],
+                    hue='lock_type',
+                    style='experiment_params.workload.p_local',
+                    markers=True,
+                    markersize=markersize,
+                    palette="husl",
+            )
+            # set y axis to start at 0
+            axes[i][j].set_ylim(0, axes[i][j].get_ylim()[1])
+            # set 3 ticks on y axis with values auto-chosen
+            # axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
+            h2, l2 = axes[i][j].get_legend_handles_labels()
+            axes[i][j].set_ylabel('') 
+            axes[i][j].set_xlabel('Threads per Node')
+            axes[i][j].set_title(str(key) + " Keys, " + str(node) + " Nodes")
+        axes[i][0].set_ylabel('Aggregated Throughput (ops/s)', labelpad=20)
+
+    
+    for h in h2:
+        h.set_markersize(24)
+        h.set_linewidth(3)
+    labels_handles = {}
+    labels_handles.update(dict(zip(l2, h2)))
+
+    
+    for ax in axes.flatten():
+        ax.legend().remove()
+    
+    fig.legend(h2, l2,
+        loc='upper center', fontsize=8, title_fontsize=10, title='Lock', markerscale=.5,
+        ncol=2, columnspacing=1, edgecolor='white', borderpad=0)
+   
+    
+    plt.show()
 
 def plot(datafile, lock_type):
     data = pandas.read_csv(datafile)
@@ -468,7 +566,6 @@ def plot(datafile, lock_type):
     #     data = merge_csv(datafile, datafile2)
     # else:
     #     data = pandas.read_csv(datafile)
-    print(data)
                
     alock = data[data['experiment_params.name'].str.count("alock.*") == 1]
     alock['lock_type'] = 'ALock'
@@ -478,8 +575,12 @@ def plot(datafile, lock_type):
     spin['lock_type'] = 'Spin'
  
     data = pandas.concat([alock, mcs, spin])
-
-    data = data[['experiment_params.num_clients', 'experiment_params.num_nodes', 'lock_type', 'experiment_params.workload.max_key', 'results.driver.qps.summary.mean', 'experiment_params.workload.p_local', 'experiment_params.remote_budget']]
+    # plot_p50(data)
+    columns = ['lock_type', 'experiment_params.num_threads', 'experiment_params.num_clients', 'experiment_params.num_nodes', 
+               'experiment_params.workload.max_key', 'experiment_params.workload.p_local', 
+               'experiment_params.remote_budget', 'experiment_params.local_budget', 'results.driver.qps.summary.mean']
+    data = data[columns]
+    print(data)
     data['results.driver.qps.summary.mean'] = data['results.driver.qps.summary.mean'].apply(
         lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
     data = data.explode('results.driver.qps.summary.mean')
@@ -492,12 +593,12 @@ def plot(datafile, lock_type):
     
     # plot_grid(nodes, keys, x3_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'alock_spin'), False)
     
-    nodes = [5]
+    nodes = [5, 10, 20]
     keys = [100, 1000]
-    clients = [40, 120]
-    p_local = [.3, .5, .8]
-    plot_budget(nodes, keys, clients, p_local, x7_, data, summary, 'lock_type', 'Remote Budget', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'local_budget'), False)
-    # plot_alock_locality(nodes, clients, data, summary, 'experiment_params.workload.max_key', '# of Keys', os.path.join(FLAGS.figdir, FLAGS.exp, 'locality'), False)
-    
+    # clients = [40, 120, 180]
+    # p_local = [.3, .5, .8]
+    # plot_budget(nodes, keys, clients, p_local, data, summary, 'lock_type', 'Remote Budget', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'local_budget'), False)
+   
     # plot_locality(nodes, clients, keys, data, summary, 'lock_type', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'locality2'), False)
+    plot_locality_lines(nodes, keys, summary, os.path.join(FLAGS.figdir, FLAGS.exp, 'locality2'))
  
