@@ -15,6 +15,8 @@
 #include "rome/metrics/summary.h"
 #include "../../../util.h"
 
+// Uses MCS algorithm from page 10 of: "Algorithms for Scalable Synchronization on Shared-Memory Multiprocessor" 
+// by John Mellor-Crummey and Michael L. Scott https://www.cs.rochester.edu/u/scott/papers/1991_TOCS_synch.pdf 
 
 namespace X {
 
@@ -25,10 +27,12 @@ using ::rome::rdma::remote_ptr;
 using ::rome::rdma::RemoteObjectProto;
 
 #define NEXT_PTR_OFFSET 32
+#define UNLOCKED 0
+#define LOCKED 1
 
 struct alignas(64) RdmaMcsLock          {
-  int64_t budget{-1};
-  uint8_t pad1[NEXT_PTR_OFFSET - sizeof(budget)];
+  uint8_t locked{0};
+  uint8_t pad1[NEXT_PTR_OFFSET - sizeof(locked)];
   remote_ptr<RdmaMcsLock> next{0};
   uint8_t pad2[CACHELINE_SIZE - NEXT_PTR_OFFSET - sizeof(uintptr_t)];
 };
@@ -38,7 +42,7 @@ static_assert(sizeof(RdmaMcsLock) == 64);
 class RdmaMcsLockHandle {
 public: 
   RdmaMcsLockHandle(MemoryPool::Peer self, MemoryPool &pool, std::unordered_set<int> local_clients, int64_t local_budget, int64_t remote_budget)
-      : self_(self), pool_(pool), local_clients_(local_clients), lock_count_(0), remote_budget_(remote_budget) {}
+      : self_(self), pool_(pool), local_clients_(local_clients), lock_count_(0) {}
 
   absl::Status Init() {    
     // Reserve remote memory for the local descriptor.
@@ -88,12 +92,13 @@ public:
     tail_pointer_ = decltype(tail_pointer_)(lock.id(), lock.address() + NEXT_PTR_OFFSET);
     ROME_DEBUG("tail_pointer_: {:x}", static_cast<uint64_t>(tail_pointer_));
     // Set local descriptor to initial values
-    descriptor_->budget = -1;
+    descriptor_->locked = UNLOCKED;
     descriptor_->next = remote_nullptr;
     // swap local descriptor in at the address of the hosts lock pointer
     auto prev =
         pool_.AtomicSwap(tail_pointer_, static_cast<uint64_t>(desc_pointer_));
     if (prev != remote_nullptr) { //someone else has the lock
+      descriptor_->locked = LOCKED; //set descriptor to locked to indicate we are waiting for 
       auto temp_ptr = remote_ptr<uint8_t>(prev);
       temp_ptr += NEXT_PTR_OFFSET; //temp_ptr = next field of the current tail's descriptor
       // make prev point to the current tail descriptor's next pointer
@@ -105,22 +110,14 @@ public:
       ROME_DEBUG("[Lock] Enqueued: {} --> (id={})",
                 static_cast<uint64_t>(prev.id()),
                 static_cast<uint64_t>(desc_pointer_.id()));
-      // spins, waits for Unlock() to write to the budget
-      while (descriptor_->budget < 0) {
+      // spins, waits for Unlock() to unlock our desriptor and let us enter the CS
+      while (descriptor_->locked == LOCKED) {
         cpu_relax();
       }
-      if (descriptor_->budget == 0) {
-        ROME_DEBUG("Budget exhausted (id={})",
-                  static_cast<uint64_t>(desc_pointer_.id()));
-        descriptor_->budget = remote_budget_;
-      }
-    } else { //no one had the lock, we were swapped in
-      // set lock holders descriptor budget to initBudget since we are the first lockholder
-      descriptor_->budget = remote_budget_;
-    }
-    // budget was set to greater than 0, CS can be entered
-    ROME_DEBUG("[Lock] Acquired: prev={:x}, budget={:x} (id={})",
-              static_cast<uint64_t>(prev), descriptor_->budget,
+    } 
+    // Once here, we can enter the critical section
+    ROME_DEBUG("[Lock] Acquired: prev={:x}, locked={:x} (id={})",
+              static_cast<uint64_t>(prev), descriptor_->locked,
               static_cast<uint64_t>(desc_pointer_.id()));
     //  make sure Lock operation finished
     std::atomic_thread_fence(std::memory_order_acquire);
@@ -142,19 +139,18 @@ public:
       std::atomic_thread_fence(std::memory_order_acquire);
       // gets a pointer to the next descriptor object
       auto next = const_cast<remote_ptr<RdmaMcsLock> &>(descriptor_->next);
-      //writes to the the next descriptors budget which lets it know it has the lock now
+      //writes a 0 to the next descriptors locked field which lets it know it has the lock now
       pool_.Write<uint64_t>(static_cast<remote_ptr<uint64_t>>(next),
-                            descriptor_->budget - 1,
+                            UNLOCKED,
                             static_cast<remote_ptr<uint64_t>>(prealloc_));
     } 
-    ROME_DEBUG("[Unlock] Unlocked (id={}), budget={:x}",
+    ROME_DEBUG("[Unlock] Unlocked (id={}), locked={:x}",
                 static_cast<uint64_t>(desc_pointer_.id()),
-                descriptor_->budget);
+                descriptor_->locked);
   }
 
 private: 
   uint64_t lock_count_; 
-  int64_t remote_budget_;
   bool is_host_;
   MemoryPool::Peer self_;
   MemoryPool &pool_; //reference to pool object, so all descriptors in same pool
