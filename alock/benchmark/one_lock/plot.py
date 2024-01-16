@@ -24,9 +24,7 @@ flags.DEFINE_string(
 
 flags.DEFINE_string('exp', 'exp1', 'Experiment to plot')
 
-
 FLAGS = flags.FLAGS
-
 
 def getData(proto, path=''):
     data = {}
@@ -141,246 +139,123 @@ def get_summary(data):
     print(summary)
     return summary
 
-def plot_total_throughput():
-    pass
-
-def plot_grid(nodes, keys, xcol, originals, summary, hue, xlabel, hue_label, name, plot_total):
-    global y_
-    # make a grid of subplots with a row for each node number and a column for each key setup
-    fig, axes = plt.subplots(len(nodes), len(keys), figsize=(15, 3))
-    seaborn.set_theme(style='ticks')
-    markersize = 8
+def plot_budget(nodes, plocal, summary, name):
+    global x6_, x7_, y_
     
-    if plot_total:
-        # plot total throughput
-        originals = summary
-
-    if hue != None:
-        num_hues = len(summary.reset_index()[hue].dropna().unique())
-    else:
-        num_hues = 1
-    palette = seaborn.color_palette("viridis", num_hues)
-    
-    plt.subplots_adjust(hspace = 1.0)
-    plt.subplots_adjust(wspace = 0.25)
-    
-    for i, node in enumerate(nodes):
-        for j, key in enumerate(keys):
-            data = originals[originals['experiment_params.workload.max_key'] == key]
-            data = data[data['experiment_params.num_nodes'] == node]
-            seaborn.lineplot(
-                    data=data,
-                    x=xcol,
-                    y=y_,
-                    ax=axes[i][j],
-                    hue=hue,
-                    style=hue,
-                    markers=True,
-                    markersize=markersize,
-                    palette=palette
-            )
-            # set y axis to start at 0
-            axes[i][j].set_ylim(0, axes[i][j].get_ylim()[1])
-            # set 3 ticks on y axis with values auto-chosen
-            axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
-            h2, l2 = axes[i][j].get_legend_handles_labels()
-            axes[i][j].set_ylabel('') 
-            axes[i][j].set_xlabel('')
-            axes[i][j].set_title(str(key) + " Keys, " + str(node) + " Nodes")
-        axes[i][0].set_ylabel('Throughput (ops/s)', labelpad=20)
-    
-    for j in range(len(keys)):    
-     axes[len(nodes)-1][j].set_xlabel(xlabel)
-
-    for h in h2:
-        h.set_markersize(24)
-        h.set_linewidth(3)
-    labels_handles = {}
-    labels_handles.update(dict(zip(l2, h2)))
-    
-    for ax in axes.flatten():
-        ax.legend().remove()
-    
-    fig.legend(h2, l2,
-        loc='upper center', fontsize=12, title_fontsize=16, title=hue_label,
-        ncol=num_hues if num_hues < 6 else int(num_hues / 2),
-        columnspacing=1, edgecolor='white', borderpad=0)
-    
-    plt.show()
-
-    # filename = name + ".png"
-    # dirname = os.path.dirname(filename)
-    # os.makedirs(dirname, exist_ok=True)
-    # fig.savefig(filename, dpi=300, bbox_extra_artists=(legend,)
-    #             if legend is not None else None, bbox_inches='tight')
-
-
-# this produces a multi-row grid, where each row is a different # of keys and hue is for different locks
-def plot_locality(nodes, clients, keys, originals, summary, hue, hue_label, name, plot_total):
-    global x5_, y_
-    
-    node_keys = []
-    for i, node in enumerate(nodes):
-        for j, key in enumerate(keys):
-            node_keys.append((node, key))
+    local_budgets = [5, 10, 20, 30]
             
     # make a grid of subplots with a row for each node number and a column for each key setup
-    fig, axes = plt.subplots(len(node_keys), len(clients), figsize=(12, 3))
+    # add 1 to len(keys) for final column of 100p% local for each node config
+    fig1, axes1 = plt.subplots(len(local_budgets), len(plocal), figsize=(8, 8))
+    fig2, axes2 = plt.subplots(len(local_budgets), len(plocal), figsize=(8, 8))
     seaborn.set_theme(style='ticks')
-    markersize = 8
+    markersize = 10
+    
+    # reset index in order to access all fields for hue
+    summary = summary.reset_index()
+    
+    # save original data
+    original = summary
+    
+    #filter data to only include alocks
+    alock = summary[summary['lock_type'] == 'ALock']
+    alock = alock.reset_index(drop=True)
 
-    if plot_total:
-        # plot total throughput
-        originals = summary
-
-    if hue != None:
-        num_hues = len(summary.reset_index()[hue].dropna().unique())
-    else:
-        num_hues = 1
-    palette = seaborn.color_palette("viridis", num_hues)
+    fig2.subplots_adjust(hspace = 1.2, wspace = 0.35)
     
-    plt.subplots_adjust(hspace = 1.2)
-    plt.subplots_adjust(wspace = 0.25)
-    
-    for i, (node, key) in enumerate(node_keys):
-        for j, client in enumerate(clients):
-            data = originals[originals['experiment_params.workload.max_key'] == key]
-            data = data[data['experiment_params.num_nodes'] == node]
-            data = data[data['experiment_params.num_clients'] == client]
-            seaborn.lineplot(
-                    data=data,
-                    x=x5_,
-                    y=y_,
-                    ax=axes[i][j],
-                    hue=hue,
-                    style=hue,
-                    markers=True,
-                    markersize=markersize,
-                    palette=palette
-            )
-            # set y axis to start at 0
-            axes[i][j].set_ylim(0, axes[i][j].get_ylim()[1])
-            # set 3 ticks on y axis with values auto-chosen
-            # axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
-            h2, l2 = axes[i][j].get_legend_handles_labels()
-            axes[i][j].invert_xaxis()
-            axes[i][j].set_ylabel('') 
-            axes[i][j].set_xlabel('Percent Local')
-            axes[i][j].set_title(str(key) + " Keys, " + str(node) + " Nodes, Clients: " + str(client))
-        axes[i][0].set_ylabel('Throughput (ops/s)', labelpad=20)
-        
-    for j in range(len(keys)):    
-        axes[len(nodes)-1][j].set_xlabel("Percent Local")
-
-    for h in h2:
-        h.set_markersize(24)
-        h.set_linewidth(3)
-    labels_handles = {}
-    labels_handles.update(dict(zip(l2, h2)))
-    
-    for ax in axes.flatten():
-        ax.legend().remove()
-    
-    fig.legend(h2, l2,
-        loc='upper center', fontsize=12, title_fontsize=16, title=hue_label,
-        ncol=num_hues if num_hues < 6 else int(num_hues / 2),
-        columnspacing=1, edgecolor='white', borderpad=0)
-    
-    fig.legend(h2, l2,
-        loc='upper center', fontsize=12, title_fontsize=14, title=hue_label,
-        ncol=num_hues if num_hues < 6 else int(num_hues / 2),
-        columnspacing=1, edgecolor='white', borderpad=0)
-    
-    plt.show()
-    
-def plot_budget(nodes, keys, clients, plocal, originals, summary, hue, xlabel, hue_label, name, plot_total):
-    global x1_, x2_, x3_, x6_, x7_, y_
-    node_keys = []
-    for i, node in enumerate(nodes):
-        for j, key in enumerate(keys):
-            for k, pl in enumerate(plocal):
-                node_keys.append((node, key, pl))
-            
-    # make a grid of subplots with a row for each node number and a column for each key setup
-    fig, axes = plt.subplots(len(node_keys), len(clients), figsize=(15, 3))
-    seaborn.set_theme(style='ticks')
-    markersize = 8
-    
-    if plot_total:
-        # plot total throughput
-        originals = summary
-
-    if hue != None:
-        num_hues = len(summary.reset_index()[hue].dropna().unique())
-    else:
-        num_hues = 1
-    palette = seaborn.color_palette("viridis", num_hues)
-    
-    plt.subplots_adjust(hspace = 1.2)
-    plt.subplots_adjust(wspace = 0.25)
-    
-    for i, (node, key, pl) in enumerate(node_keys):
-        for j, client in enumerate(clients):
-            data = originals[originals['experiment_params.workload.max_key'] == key]
-            data = data[data['experiment_params.num_nodes'] == node]
-            data = data[data['experiment_params.workload.p_local'] == pl]
-            data = data[data['experiment_params.num_clients'] == client]
-            seaborn.lineplot(
-                    data=data,
-                    x=x6_,
-                    y=y_,
-                    ax=axes[i][j],
-                    hue=hue,
-                    style=hue,
-                    markers=True,
-                    markersize=markersize,
-                    palette=palette
-            )
+    # Remote Plots
+    for i, budget in enumerate(local_budgets):
+        for j, pl in enumerate(plocal):
+            data = alock[alock['experiment_params.workload.p_local'] == pl]
+            data = data[data['experiment_params.num_nodes'] == 20]
+            data = data[data['experiment_params.local_budget'] == budget]
+            data = data.reset_index(drop=True)
             seaborn.lineplot(
                     data=data,
                     x=x7_,
-                    y=y_,
-                    ax=axes[i][j],
-                    hue=hue,
-                    style=hue,
+                    y='total',
+                    ax=axes1[i][j],
+                    hue='experiment_params.workload.max_key',
+                    style='experiment_params.num_clients',
                     markers=True,
                     markersize=markersize,
-                    palette=['red']
+                    palette="colorblind",
             )
             # set y axis to start at 0
-            axes[i][j].set_ylim(0, axes[i][j].get_ylim()[1])
-            # set 3 ticks on y axis with values auto-chosen
-            # axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
-            h2, l2 = axes[i][j].get_legend_handles_labels()
-            axes[i][j].set_ylabel('') 
-            axes[i][j].set_xlabel('')
-            axes[i][j].set_title(str(node) + " N, " +  str(key) + " K, " +  str(client) + " C, " + str(pl*100) + " PL ")
-        axes[i][0].set_ylabel('Throughput (ops/s)', labelpad=20)
-    
-    for j in range(len(keys)):    
-     axes[len(nodes)-1][j].set_xlabel(xlabel)
+            axes1[i][j].set_ylim(0, axes1[i][j].get_ylim()[1])  
+            h2, l2 = axes1[i][j].get_legend_handles_labels()
+            axes1[i][j].set_ylabel('') 
+            axes1[i][j].set_xlabel('Remote Budget', fontsize=7)
+            axes1[i][j].set_title(str(int((pl*100))) + " % Local, Local Budget = " + str(budget), fontsize=9)
+            # axes[i][j].title.set_size(8)
+            axes1[i][j].set_ylabel('Aggregated T-put (ops/s)', labelpad=20, fontsize=7)
+        
+    fig1.subplots_adjust(hspace = 1, wspace = 0.35)    
+    for i, budget in enumerate(local_budgets):
+        for j, pl in enumerate(plocal):
+            data = alock[alock['experiment_params.workload.p_local'] == pl]
+            data = data[data['experiment_params.num_nodes'] == 20]
+            data = data[data['experiment_params.remote_budget'] == budget]
+            data = data.reset_index(drop=True)
+            seaborn.lineplot(
+                    data=data,
+                    x=x6_,
+                    y='total',
+                    ax=axes2[i][j],
+                    hue='experiment_params.workload.max_key',
+                    style='experiment_params.num_clients',
+                    markers=True,
+                    markersize=markersize,
+                    palette="colorblind",
+            )
+            # set y axis to start at 0
+            axes2[i][j].set_ylim(0, axes2[i][j].get_ylim()[1])  
+            h3, l3 = axes2[i][j].get_legend_handles_labels()
+            axes2[i][j].set_ylabel('') 
+            axes2[i][j].set_xlabel('Local Budget', fontsize=7)
+            axes2[i][j].set_title(str(int((pl*100))) + " % Local, Remote Budget = " + str(budget), fontsize=9)
+            # axes[i][j].title.set_size(8)
+            axes2[i][j].set_ylabel('Aggregated T-put (ops/s)', labelpad=20, fontsize=7)
 
+
+    # Legend creation
+    # This is a hacky way to change the labels in the legend
+    l2[0] = 'Keys'
+    l2[4] = 'Clients'
+    
     for h in h2:
-        h.set_markersize(8)
+        h.set_markersize(24)
         h.set_linewidth(3)
-    labels_handles = {}
-    labels_handles.update(dict(zip(l2, h2)))
-    
-    for ax in axes.flatten():
+        
+    for h in h3:
+        h.set_markersize(24)
+        h.set_linewidth(3)
+        
+    for ax in axes1.flatten():
         ax.legend().remove()
+    for ax in axes2.flatten():
+        ax.legend().remove()
+
+    legend1 = fig1.legend(h2, l2, bbox_to_anchor=(.5, 1.15),
+        loc='upper center', fontsize=8, title_fontsize=10, title='Legend', markerscale=.3,
+        ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
     
-    fig.legend(h2, l2,
-        loc='upper center', fontsize=12, title_fontsize=16, title=hue_label,
-        ncol=num_hues if num_hues < 6 else int(num_hues / 2),
-        columnspacing=1, edgecolor='white', borderpad=0)
+    legend2 = fig2.legend(h3, l3, bbox_to_anchor=(.5, 1.15),
+        loc='upper center', fontsize=8, title_fontsize=10, title='Legend', markerscale=.3,
+        ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
     
     plt.show()
-
-    # filename = name + ".png"
-    # dirname = os.path.dirname(filename)
-    # os.makedirs(dirname, exist_ok=True)
-    # fig.savefig(filename, dpi=300, bbox_extra_artists=(legend,)
-    #             if legend is not None else None, bbox_inches='tight')
+    
+    filename_remote = name + "_remote" + ".png"
+    filename_local = name + "_local" + ".png"
+    dirname = os.path.dirname(name)
+    os.makedirs(dirname, exist_ok=True)
+    
+    fig1.savefig(os.path.join(dirname, filename_remote), dpi=300, bbox_extra_artists=(legend1,)
+                if legend1 is not None else None, bbox_inches='tight')
+    fig2.savefig(os.path.join(dirname, filename_local), dpi=300, bbox_extra_artists=(legend2,)
+                if legend2 is not None else None, bbox_inches='tight')
+   
     
             
 def plot_throughput(xcol, originals, summary, hue, xlabel, hue_label, name):
@@ -484,36 +359,36 @@ def plot_locality_lines(nodes, keys, summary, name):
     global x8_, y_
             
     # make a grid of subplots with a row for each node number and a column for each key setup
-    fig, axes = plt.subplots(len(nodes), len(keys), figsize=(12, 3))
+    # add 1 to len(keys) for final column of 100p% local for each node config
+    fig, axes = plt.subplots(len(nodes), len(keys), figsize=(14, 7))
     seaborn.set_theme(style='ticks')
-    markersize = 8
+    markersize = 10
     
-    # if hue != None:
-    #     num_hues = len(summary.reset_index()[hue].dropna().unique())
-    # else:
-    #     num_hues = 1
-   
     
-    plt.subplots_adjust(hspace = 1.2)
 
     # reset index in order to access all fields for hue
     summary = summary.reset_index()
+    
+    # save original data
+    original = summary
 
     #filter data to only include desire p_local lines
-    plocal = [.95, .9, .85]
+    plocal = [.75, .5]
     summary = summary[summary['experiment_params.workload.p_local'].isin(plocal)]
     summary = summary.reset_index(drop=True)
     
-    # filter out the data with 16 threads
-    summary = summary[summary[x8_] < 13]
-    summary = summary.reset_index(drop=True)
-    
-    #filter data to only include desire remote_budget data
-    budget = [10]
-    summary = summary[summary['experiment_params.remote_budget'].isin(budget)]
-    summary = summary.reset_index(drop=True)
+    #filter data to only include desire remote_budget data for alocks only
+    # budget = [20]
+    # alock = summary[summary['lock_type'] == 'ALock']
+    # other = summary[summary['lock_type'] != "ALock"]
+    # alock = alock[alock['experiment_params.remote_budget'].isin(budget)]
+    # alock = alock.reset_index(drop=True)
+    # # rejoin data to plot competitors (since budget is irrelevant to them)
+    # summary = pandas.concat([alock, other])
 
-    plt.subplots_adjust(wspace = 0.25)
+    plt.subplots_adjust(hspace = 0, wspace = 0.25)
+    # phttps://file+.vscode-resource.vscode-cdn.net/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/one_lock/plots/alock_budgets/local_v_remote.png?version%3D1705252647573lt.subplots_adjust(wspace = 0.25)
+    
 
     for i, node in enumerate(nodes):
         for j, key in enumerate(keys):
@@ -529,35 +404,96 @@ def plot_locality_lines(nodes, keys, summary, name):
                     style='experiment_params.workload.p_local',
                     markers=True,
                     markersize=markersize,
-                    palette="husl",
+                    palette="colorblind",
             )
             # set y axis to start at 0
             axes[i][j].set_ylim(0, axes[i][j].get_ylim()[1])
             # set 3 ticks on y axis with values auto-chosen
             # axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
             h2, l2 = axes[i][j].get_legend_handles_labels()
+            print(l2)
             axes[i][j].set_ylabel('') 
             axes[i][j].set_xlabel('Threads per Node')
             axes[i][j].set_title(str(key) + " Keys, " + str(node) + " Nodes")
         axes[i][0].set_ylabel('Aggregated Throughput (ops/s)', labelpad=20)
 
+    # # Add final column with 100p local by filtering original data again
+    # p100 = original[original['experiment_params.workload.p_local'] == 1.0]
+    # p100 = p100[p100['experiment_params.remote_budget'] == 5]
+    # p100 = p100.reset_index(drop=True)
     
+    # # plot final column with 100p local
+    # for i, node in enumerate(nodes):
+    #     # data = p100[p100['experiment_params.workload.max_key'] == 100]
+    #     data = p100
+    #     data = data[data['experiment_params.num_nodes'] == node]
+    #     data = data.reset_index(drop=True)
+    #     seaborn.lineplot(
+    #             data=data,
+    #             x=x8_,
+    #             y='total',
+    #             ax=axes[i][len(keys)],
+    #             hue='lock_type',
+    #             style='experiment_params.workload.max_key',
+    #             markers=True,
+    #             markersize=markersize,
+    #             palette="magma",
+    #     )
+    #     # set y axis to start at 0
+    #     axes[i][len(keys)].set_ylim(0, axes[i][len(keys)].get_ylim()[1])
+    #     # set 3 ticks on y axis with values auto-chosen
+    #     # axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
+    #     h3, l3 = axes[i][len(keys)].get_legend_handles_labels()
+    #     axes[i][len(keys)].set_ylabel('') 
+    #     axes[i][len(keys)].set_xlabel('Threads per Node')
+    #     axes[i][len(keys)].set_title("100% Local, " + str(node) + " Nodes")
+       
+    
+     
+    # Legend creation
+    # This is a hacky way to change the labels in the legend
+    l2[0] = 'Lock Type'
+    l2[4] = 'Percent Local'
     for h in h2:
         h.set_markersize(24)
         h.set_linewidth(3)
     labels_handles = {}
     labels_handles.update(dict(zip(l2, h2)))
-
     
     for ax in axes.flatten():
         ax.legend().remove()
     
-    fig.legend(h2, l2,
-        loc='upper center', fontsize=8, title_fontsize=10, title='Lock', markerscale=.5,
-        ncol=2, columnspacing=1, edgecolor='white', borderpad=0)
-   
+    legend1 = fig.legend(h2, l2, bbox_to_anchor=(.45, 1.1),
+        loc='upper center', fontsize=9, title_fontsize=11, title='Legend', markerscale=.3,
+        ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
     
-    plt.show()
+    # Legend for 100p plot
+    # This is a hacky way to change the labels in the legend
+    # l3[0] = 'Lock Type'
+    # l3[4] = 'Keys'
+    # for h in h3:
+    #     h.set_markersize(24)
+    #     h.set_linewidth(3)
+    # labels_handles = {}
+    # labels_handles.update(dict(zip(l3, h3)))
+    
+    # for ax in axes.flatten():
+    #     ax.legend().remove()
+    
+    # legend2 = fig.legend(h3, l3, bbox_to_anchor=(.9, 1.1),
+    #     loc='upper right', fontsize=9, title_fontsize=11, title='100% Local Legend', markerscale=.3,
+    #     ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
+
+    filename = name + ".png"
+    dirname = os.path.dirname(filename)
+    os.makedirs(dirname, exist_ok=True)
+    fig.savefig(filename, dpi=300, bbox_extra_artists=(legend1,)
+                if legend1 is not None else None, bbox_inches='tight')
+    # fig.savefig(filename, dpi=300, bbox_extra_artists=(legend1, legend2)
+    #             if legend1 or legend2 is not None else None, bbox_inches='tight')
+   
+    # plt.tight_layout()
+    # plt.show()
 
 def plot(datafile, lock_type):
     data = pandas.read_csv(datafile)
@@ -593,12 +529,14 @@ def plot(datafile, lock_type):
     
     # plot_grid(nodes, keys, x3_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'alock_spin'), False)
     
-    nodes = [5, 10, 20]
-    keys = [100, 1000]
+    nodes = [5, 10]
+    keys = [20, 100, 1000]
     # clients = [40, 120, 180]
     # p_local = [.3, .5, .8]
     # plot_budget(nodes, keys, clients, p_local, data, summary, 'lock_type', 'Remote Budget', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'local_budget'), False)
-   
-    # plot_locality(nodes, clients, keys, data, summary, 'lock_type', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'locality2'), False)
-    plot_locality_lines(nodes, keys, summary, os.path.join(FLAGS.figdir, FLAGS.exp, 'locality2'))
+
+    plot_locality_lines(nodes, keys, summary, os.path.join(FLAGS.figdir, FLAGS.exp, 'test'))
+    
+    # plocal = [1.0, .95, .85]
+    # plot_budget(nodes, plocal, summary, os.path.join(FLAGS.figdir, FLAGS.exp, 'local_v_remote20'))
  
