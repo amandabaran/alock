@@ -41,26 +41,46 @@ clean
 echo "Pushing local repo to remote nodes..."
 sync
 
-save_dir="budget_combos"
+save_dir="alock_budgets_20"
 
 lock="alock"
 log_level='info'
 echo "Building ${lock}..."
 build ${lock}
 
-num_nodes=5
+num_nodes=20
 
-for p_local in .8
+for p_local in .95
 do
-  for num_clients in 120
+  for num_threads in 4 8 12
     do 
-      for max in 1000
+      for max in 20 100 1000
       do
-        for local_budget in 1000 5000 10000
+        for local_budget in 5 10 20 30
         do 
-          for remote_budget in 10 15 25 50 100 500 1000 5000 10000
+          for remote_budget in 5 10 20 30
           do 
-          num_threads=$(expr $num_clients / $num_nodes)
+          num_clients=$(( num_threads*num_nodes ))
+          bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --local_budget=${local_budget} --remote_budget=${remote_budget} --max_key=${max} --dry_run=False --p_local=${p_local}
+          done
+        done
+      done
+    done
+done
+
+z
+
+for p_local in .85
+do
+  for num_threads in 4 8 12
+    do 
+      for max in 20 100 1000
+      do
+        for local_budget in 5 10 20 30
+        do 
+          for remote_budget in 5 10 20 30
+          do 
+          num_clients=$(( num_threads*num_nodes ))
           bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --local_budget=${local_budget} --remote_budget=${remote_budget} --max_key=${max} --dry_run=False --p_local=${p_local}
           done
         done
@@ -69,3 +89,29 @@ do
 done
 
 zsh get_data.sh ${save_dir}
+sleep 2
+zsh shutdown.sh
+sleep 2
+
+for p_local in 1
+do
+  for num_threads in 4 8 12
+    do 
+      for max in 20 100 1000
+      do
+        for local_budget in 5 10 20 30
+        do 
+          for remote_budget in 5 10 20 30
+          do 
+          num_clients=$(( num_threads*num_nodes ))
+          bazel run //alock/benchmark/one_lock:launch -- -n ${nodefile} -C ${num_clients} --nodes=${num_nodes} --ssh_user=adb321 --lock_type=${lock} --think_ns=0 --runtime=10 --remote_save_dir=${save_dir} --log_level=${log_level} --threads=${num_threads} --local_budget=${local_budget} --remote_budget=${remote_budget} --max_key=${max} --dry_run=False --p_local=${p_local}
+          done
+        done
+      done
+    done
+done
+
+zsh get_data.sh ${save_dir}
+sleep 2
+zsh shutdown.sh
+sleep 2
