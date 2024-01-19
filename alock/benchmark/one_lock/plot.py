@@ -118,11 +118,12 @@ x7_ = 'experiment_params.remote_budget'
 x8_ = 'experiment_params.num_threads'
 x_ = [x1_, x2_, x3_, x4_, x5_, x6_, x7_, x8_]
 y_ = 'results.driver.qps.summary.mean'
+y_2 = 'results.driver.latency.summary.mean'
 cols_ = [x1_, x2_, x3_, x4_, x5_, x6_, x7_, x8_, y_]
 
 def get_summary(data):
     # Calculate totals grouped by the cluster size
-    grouped = data.groupby(x_, as_index=True)[y_]
+    grouped = data.groupby(x_, as_index=True)[y_2]
     _avg = grouped.mean()
     _stddev = grouped.std()
     _max = grouped.max()
@@ -255,8 +256,8 @@ def plot_budget(nodes, plocal, summary, name):
                 if legend1 is not None else None, bbox_inches='tight')
     fig2.savefig(os.path.join(dirname, filename_local), dpi=300, bbox_extra_artists=(legend2,)
                 if legend2 is not None else None, bbox_inches='tight')
-   
     
+   
             
 def plot_throughput(xcol, originals, summary, hue, xlabel, hue_label, name):
     global x1_, x2_, x3_, y_
@@ -340,27 +341,81 @@ def plot_throughput(xcol, originals, summary, hue, xlabel, hue_label, name):
                 if legend is not None else None, bbox_inches='tight')
 
 
-def plot_p50(data):
+def plot_latency(data):
     print("Plotting latency...")
     
-    columns = ['lock_type', 'experiment_params.num_clients', 'experiment_params.num_nodes', 
+    columns = ['lock_type', 'experiment_params.num_clients', 'experiment_params.num_threads', 'experiment_params.num_nodes', 
                'experiment_params.workload.max_key', 'experiment_params.workload.p_local',
                'experiment_params.remote_budget', 'experiment_params.local_budget', 
-               'results.driver.latency.summary.p50']
+               'results.driver.latency.summary.mean']
     data = data[columns]
     
-    data['results.driver.latency.summary.p50'] = data['results.driver.latency.summary.p50'].apply(lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
-    data = data.explode('results.driver.latency.summary.p50')
-    # reset index number to label each row
-    data = data.reset_index(drop=True)
     print(data)
+    
+    data['results.driver.latency.summary.mean'] = data['results.driver.latency.summary.mean'].apply(
+        lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
+    data = data.explode('results.driver.latency.summary.mean')
+    data = data.reset_index(drop=True)
+
+    summary = get_summary(data)
+    summary = summary.reset_index()
+    
+    plocal=[1, .95, .9, .85]
+    # summary = summary[summary['experiment_params.workload.p_local'].isin(plocal)]
+    # summary = summary.reset_index(drop=True)
+    
+    print(summary)
+    
+    nodes = [10]
+    keys = [20, 100, 1000]
+    
+    # make a grid of subplots with a row for each node number and a column for each key setup
+    fig, axes = plt.subplots(len(plocal), len(keys), figsize=(10, 8))
+    seaborn.set_theme(style='ticks')
+
+    plt.subplots_adjust(hspace = 1, wspace = 0.4)
+    
+    for i, pl in enumerate(plocal):
+        for j, key in enumerate(keys):
+            data = summary[summary['experiment_params.workload.max_key'] == key]
+            data = data[data['experiment_params.num_nodes'] == nodes[0]]
+            data = data[data['experiment_params.workload.p_local'] == pl]
+            data = data.reset_index(drop=True)
+            print(data)
+            seaborn.ecdfplot(
+                    data=data,
+                    x='average',
+                    stat='proportion',
+                    ax=axes[i][j],
+                    hue='lock_type',
+                    palette="colorblind",
+                    legend=False,
+            )
+            axes[i][j].set_xlabel('Latency (ns)')
+            axes[i][j].set_title(str(key) + " Keys, " + str(int(pl*100)) + " % Local")
+             # set 3 ticks on y axis with values auto-chosen
+            axes[i][j].set_yticks((0, .25, .5, .75, 1))
+        # axes[i][0].set_ylabel('Aggregated Throughput (ops/s)', labelpad=20)
+    
+    legend1 = fig.legend(title='Legend', bbox_to_anchor=(.5, 1.04), labels=['ALock', 'MCS', 'Spin'], 
+                         loc='upper center', fontsize=9, title_fontsize=11,  markerscale=.3,
+                        ncol=1, columnspacing=1, edgecolor='white', borderpad=0)
+    # plt.show()
+    name = os.path.join(FLAGS.figdir, FLAGS.exp, 'latency_plots')
+    filename = name + ".png"
+    dirname = os.path.dirname(filename)
+    os.makedirs(dirname, exist_ok=True)
+    fig.savefig(filename, dpi=300, bbox_extra_artists=(legend1,)
+                if legend1 is not None else None, bbox_inches='tight')
+    
+
 
 def plot_locality_lines(nodes, keys, summary, name):
     global x8_, y_
             
     # make a grid of subplots with a row for each node number and a column for each key setup
     # add 1 to len(keys) for final column of 100p% local for each node config
-    fig, axes = plt.subplots(len(nodes), len(keys), figsize=(14, 7))
+    fig, axes = plt.subplots(len(nodes), len(keys)+1, figsize=(14, 7))
     seaborn.set_theme(style='ticks')
     markersize = 10
     
@@ -373,7 +428,7 @@ def plot_locality_lines(nodes, keys, summary, name):
     original = summary
 
     #filter data to only include desire p_local lines
-    plocal = [.75, .5]
+    plocal = [.95, .9, .85]
     summary = summary[summary['experiment_params.workload.p_local'].isin(plocal)]
     summary = summary.reset_index(drop=True)
     
@@ -386,7 +441,7 @@ def plot_locality_lines(nodes, keys, summary, name):
     # # rejoin data to plot competitors (since budget is irrelevant to them)
     # summary = pandas.concat([alock, other])
 
-    plt.subplots_adjust(hspace = 0, wspace = 0.25)
+    plt.subplots_adjust(hspace = .5, wspace = 0.25)
     # phttps://file+.vscode-resource.vscode-cdn.net/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/one_lock/plots/alock_budgets/local_v_remote.png?version%3D1705252647573lt.subplots_adjust(wspace = 0.25)
     
 
@@ -411,45 +466,40 @@ def plot_locality_lines(nodes, keys, summary, name):
             # set 3 ticks on y axis with values auto-chosen
             # axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
             h2, l2 = axes[i][j].get_legend_handles_labels()
-            print(l2)
             axes[i][j].set_ylabel('') 
             axes[i][j].set_xlabel('Threads per Node')
             axes[i][j].set_title(str(key) + " Keys, " + str(node) + " Nodes")
         axes[i][0].set_ylabel('Aggregated Throughput (ops/s)', labelpad=20)
 
-    # # Add final column with 100p local by filtering original data again
-    # p100 = original[original['experiment_params.workload.p_local'] == 1.0]
-    # p100 = p100[p100['experiment_params.remote_budget'] == 5]
-    # p100 = p100.reset_index(drop=True)
+    # Add final column with 100p local by filtering original data again
+    p100 = original[original['experiment_params.workload.p_local'] == 1.0]
+    p100 = p100.reset_index(drop=True)
     
-    # # plot final column with 100p local
-    # for i, node in enumerate(nodes):
-    #     # data = p100[p100['experiment_params.workload.max_key'] == 100]
-    #     data = p100
-    #     data = data[data['experiment_params.num_nodes'] == node]
-    #     data = data.reset_index(drop=True)
-    #     seaborn.lineplot(
-    #             data=data,
-    #             x=x8_,
-    #             y='total',
-    #             ax=axes[i][len(keys)],
-    #             hue='lock_type',
-    #             style='experiment_params.workload.max_key',
-    #             markers=True,
-    #             markersize=markersize,
-    #             palette="magma",
-    #     )
-    #     # set y axis to start at 0
-    #     axes[i][len(keys)].set_ylim(0, axes[i][len(keys)].get_ylim()[1])
-    #     # set 3 ticks on y axis with values auto-chosen
-    #     # axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
-    #     h3, l3 = axes[i][len(keys)].get_legend_handles_labels()
-    #     axes[i][len(keys)].set_ylabel('') 
-    #     axes[i][len(keys)].set_xlabel('Threads per Node')
-    #     axes[i][len(keys)].set_title("100% Local, " + str(node) + " Nodes")
+    # plot final column with 100p local
+    for i, node in enumerate(nodes):
+        data = p100
+        data = data[data['experiment_params.num_nodes'] == node]
+        data = data.reset_index(drop=True)
+        seaborn.lineplot(
+                data=data,
+                x=x8_,
+                y='total',
+                ax=axes[i][len(keys)],
+                hue='lock_type',
+                style='experiment_params.workload.max_key',
+                markers=True,
+                markersize=markersize,
+                palette="magma",
+        )
+        # set y axis to start at 0
+        axes[i][len(keys)].set_ylim(0, axes[i][len(keys)].get_ylim()[1])
+        # set 3 ticks on y axis with values auto-chosen
+        # axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
+        h3, l3 = axes[i][len(keys)].get_legend_handles_labels()
+        axes[i][len(keys)].set_ylabel('') 
+        axes[i][len(keys)].set_xlabel('Threads per Node')
+        axes[i][len(keys)].set_title("100% Local, " + str(node) + " Nodes")
        
-    
-     
     # Legend creation
     # This is a hacky way to change the labels in the legend
     l2[0] = 'Lock Type'
@@ -469,31 +519,33 @@ def plot_locality_lines(nodes, keys, summary, name):
     
     # Legend for 100p plot
     # This is a hacky way to change the labels in the legend
-    # l3[0] = 'Lock Type'
-    # l3[4] = 'Keys'
-    # for h in h3:
-    #     h.set_markersize(24)
-    #     h.set_linewidth(3)
-    # labels_handles = {}
-    # labels_handles.update(dict(zip(l3, h3)))
+    l3[0] = 'Lock Type'
+    l3[4] = 'Keys'
+    for h in h3:
+        h.set_markersize(24)
+        h.set_linewidth(3)
+    labels_handles = {}
+    labels_handles.update(dict(zip(l3, h3)))
     
-    # for ax in axes.flatten():
-    #     ax.legend().remove()
+    for ax in axes.flatten():
+        ax.legend().remove()
     
-    # legend2 = fig.legend(h3, l3, bbox_to_anchor=(.9, 1.1),
-    #     loc='upper right', fontsize=9, title_fontsize=11, title='100% Local Legend', markerscale=.3,
-    #     ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
+    legend2 = fig.legend(h3, l3, bbox_to_anchor=(.9, 1.1),
+        loc='upper right', fontsize=9, title_fontsize=11, title='100% Local Legend', markerscale=.3,
+        ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
 
     filename = name + ".png"
     dirname = os.path.dirname(filename)
     os.makedirs(dirname, exist_ok=True)
-    fig.savefig(filename, dpi=300, bbox_extra_artists=(legend1,)
-                if legend1 is not None else None, bbox_inches='tight')
-    # fig.savefig(filename, dpi=300, bbox_extra_artists=(legend1, legend2)
-    #             if legend1 or legend2 is not None else None, bbox_inches='tight')
+    # fig.savefig(filename, dpi=300, bbox_extra_artists=(legend1,)
+    #             if legend1 is not None else None, bbox_inches='tight')
+    fig.savefig(filename, dpi=300, bbox_extra_artists=(legend1, legend2)
+                if legend1 or legend2 is not None else None, bbox_inches='tight')
    
     # plt.tight_layout()
     # plt.show()
+
+
 
 def plot(datafile, lock_type):
     data = pandas.read_csv(datafile)
@@ -511,7 +563,9 @@ def plot(datafile, lock_type):
     spin['lock_type'] = 'Spin'
  
     data = pandas.concat([alock, mcs, spin])
-    # plot_p50(data)
+    
+    plot_latency(data)
+    
     columns = ['lock_type', 'experiment_params.num_threads', 'experiment_params.num_clients', 'experiment_params.num_nodes', 
                'experiment_params.workload.max_key', 'experiment_params.workload.p_local', 
                'experiment_params.remote_budget', 'experiment_params.local_budget', 'results.driver.qps.summary.mean']
@@ -529,13 +583,13 @@ def plot(datafile, lock_type):
     
     # plot_grid(nodes, keys, x3_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'alock_spin'), False)
     
-    nodes = [5, 10]
+    nodes = [5, 10, 20]
     keys = [20, 100, 1000]
     # clients = [40, 120, 180]
     # p_local = [.3, .5, .8]
     # plot_budget(nodes, keys, clients, p_local, data, summary, 'lock_type', 'Remote Budget', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'local_budget'), False)
 
-    plot_locality_lines(nodes, keys, summary, os.path.join(FLAGS.figdir, FLAGS.exp, 'test'))
+    # plot_locality_lines(nodes, keys, summary, os.path.join(FLAGS.figdir, FLAGS.exp, 'test'))
     
     # plocal = [1.0, .95, .85]
     # plot_budget(nodes, plocal, summary, os.path.join(FLAGS.figdir, FLAGS.exp, 'local_v_remote20'))
