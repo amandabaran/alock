@@ -26,6 +26,7 @@ flags.DEFINE_string('exp', 'exp1', 'Experiment to plot')
 
 FLAGS = flags.FLAGS
 
+
 def getData(proto, path=''):
     data = {}
     for field in proto.DESCRIPTOR.fields:
@@ -121,7 +122,7 @@ y_ = 'results.driver.qps.summary.mean'
 y_2 = 'results.driver.latency.summary.mean'
 cols_ = [x1_, x2_, x3_, x4_, x5_, x6_, x7_, x8_, y_]
 
-def get_summary(data):
+def get_lat_summary(data):
     # Calculate totals grouped by the cluster size
     grouped = data.groupby(x_, as_index=True)[y_2]
     _avg = grouped.mean()
@@ -140,15 +141,99 @@ def get_summary(data):
     print(summary)
     return summary
 
+def get_summary(data):
+    # Calculate totals grouped by the cluster size
+    grouped = data.groupby(x_, as_index=True)[y_]
+    _avg = grouped.mean()
+    _stddev = grouped.std()
+    _max = grouped.max()
+    _min = grouped.min()
+    _total = grouped.sum()
+    summary = pandas.DataFrame(index=grouped.groups.keys())
+    summary.index.names = x_
+    summary['average'] = _avg
+    summary['stddev'] = _stddev
+    summary['min'] = _min
+    summary['max'] = _max
+    summary['total'] = _total
+    print("\n\n----------------SUMMARY------------------\n")
+    print(summary)
+    return summary
+
+def print_data_table_wBudget(data):
+    data = data.reset_index()
+    
+    to_remove = data[x5_] == 1.0
+    data = data[~to_remove]
+    
+    to_remove = data[x2_] != 100
+    data = data[~to_remove]
+
+    y_data = data['average']
+    nodes_data = data[x4_]
+    p_local_data = data[x5_]
+    lock_data = data[x1_]
+    threads_data = data[x8_]
+    keys_data = data[x2_]
+    rb_data = data[x7_]
+    lb_data = data[x6_]
+    
+    print("CSV")
+    print("Lock,Nodes,Keys,P_Local,Threads,R Budget,L Budget,TPut")
+    for nodes, keys, p_local, lock, threads, rb, lb, y in zip(nodes_data, keys_data, p_local_data, lock_data, threads_data, rb_data, lb_data, y_data):
+        print(lock,",",nodes,",",keys,",",p_local,",",threads,",",rb,",",lb,",",y)
+    
+    
+    # # Print the table
+    # print("Data Points:")
+    # print("-----------------------------------------------------------------------")
+    # print(" Lock     |   Nodes   |   Keys   |   P_Local   |   Threads   |   Remote   |   Local   |   Y Data ")
+    # print("-----------------------------------------------------------------------")
+    # for nodes, keys, p_local, lock, threads, rb, lb, y in zip(nodes_data, keys_data, p_local_data, lock_data, threads_data, rb_data, lb_data, y_data):
+    #     print(f"| {lock}        |  {nodes}     | {keys}     | {p_local}     | {threads}     | {rb}     | {lb}     | {y:.2e}    ")
+    # print("-----------------------------------------------------------------------")
+
+
+def print_data_table(data):
+    data = data.reset_index()
+    
+    to_remove = data[x5_] == 1.0
+    data = data[~to_remove]
+    
+    to_remove = data[x2_] != 1000
+    data = data[~to_remove]
+
+    y_data = data['average']
+    nodes_data = data[x4_]
+    p_local_data = data[x5_]
+    lock_data = data[x1_]
+    threads_data = data[x8_]
+    keys_data = data[x2_]
+    
+    print("CSV")
+    print("Lock,Nodes,Keys,P_Local,Threads,TPut")
+    for nodes, keys, p_local, lock, threads, y in zip(nodes_data, keys_data, p_local_data, lock_data, threads_data, y_data):
+        print(lock,",",nodes,",",keys,",",p_local,",",threads,",",y)
+    
+    
+    # Print the table
+    # print("Data Points:")
+    # print("-----------------------------------------------------------------------")
+    # print(" Lock     |   Nodes   |   Keys   |   P_Local   |   Threads   |  Y Data ")
+    # print("-----------------------------------------------------------------------")
+    # for nodes, keys, p_local, lock, threads, y in zip(nodes_data, keys_data, p_local_data, lock_data, threads_data, y_data):
+    #     print(f"| {lock}        |  {nodes}     | {keys}     | {p_local}     | {threads}     | {y:.2e}    ")
+    # print("-----------------------------------------------------------------------")
+
 def plot_budget(nodes, plocal, summary, name):
     global x6_, x7_, y_
     
-    local_budgets = [5, 10, 20, 30]
+    budgets = [5, 10, 20]
             
     # make a grid of subplots with a row for each node number and a column for each key setup
     # add 1 to len(keys) for final column of 100p% local for each node config
-    fig1, axes1 = plt.subplots(len(local_budgets), len(plocal), figsize=(8, 8))
-    fig2, axes2 = plt.subplots(len(local_budgets), len(plocal), figsize=(8, 8))
+    fig1, axes1 = plt.subplots(len(budgets), len(plocal), figsize=(8, 8))
+    fig2, axes2 = plt.subplots(len(budgets), len(plocal), figsize=(8, 8))
     seaborn.set_theme(style='ticks')
     markersize = 10
     
@@ -165,7 +250,7 @@ def plot_budget(nodes, plocal, summary, name):
     fig2.subplots_adjust(hspace = 1.2, wspace = 0.35)
     
     # Remote Plots
-    for i, budget in enumerate(local_budgets):
+    for i, budget in enumerate(budgets):
         for j, pl in enumerate(plocal):
             data = alock[alock['experiment_params.workload.p_local'] == pl]
             data = data[data['experiment_params.num_nodes'] == 20]
@@ -192,7 +277,7 @@ def plot_budget(nodes, plocal, summary, name):
             axes1[i][j].set_ylabel('Aggregated T-put (ops/s)', labelpad=20, fontsize=7)
         
     fig1.subplots_adjust(hspace = 1, wspace = 0.35)    
-    for i, budget in enumerate(local_budgets):
+    for i, budget in enumerate(budgets):
         for j, pl in enumerate(plocal):
             data = alock[alock['experiment_params.workload.p_local'] == pl]
             data = data[data['experiment_params.num_nodes'] == 20]
@@ -220,125 +305,42 @@ def plot_budget(nodes, plocal, summary, name):
 
 
     # Legend creation
-    # This is a hacky way to change the labels in the legend
-    l2[0] = 'Keys'
-    l2[4] = 'Clients'
+    # # This is a hacky way to change the labels in the legend
+    # l2[0] = 'Keys'
+    # l2[4] = 'Clients'
     
-    for h in h2:
-        h.set_markersize(24)
-        h.set_linewidth(3)
+    # for h in h2:
+    #     h.set_markersize(24)
+    #     h.set_linewidth(3)
         
-    for h in h3:
-        h.set_markersize(24)
-        h.set_linewidth(3)
+    # for h in h3:
+    #     h.set_markersize(24)
+    #     h.set_linewidth(3)
         
-    for ax in axes1.flatten():
-        ax.legend().remove()
-    for ax in axes2.flatten():
-        ax.legend().remove()
+    # for ax in axes1.flatten():
+    #     ax.legend().remove()
+    # for ax in axes2.flatten():
+    #     ax.legend().remove()
 
-    legend1 = fig1.legend(h2, l2, bbox_to_anchor=(.5, 1.15),
-        loc='upper center', fontsize=8, title_fontsize=10, title='Legend', markerscale=.3,
-        ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
+    # legend1 = fig1.legend(h2, l2, bbox_to_anchor=(.5, 1.15),
+    #     loc='upper center', fontsize=8, title_fontsize=10, title='Legend', markerscale=.3,
+    #     ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
     
-    legend2 = fig2.legend(h3, l3, bbox_to_anchor=(.5, 1.15),
-        loc='upper center', fontsize=8, title_fontsize=10, title='Legend', markerscale=.3,
-        ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
+    # legend2 = fig2.legend(h3, l3, bbox_to_anchor=(.5, 1.15),
+    #     loc='upper center', fontsize=8, title_fontsize=10, title='Legend', markerscale=.3,
+    #     ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
     
     plt.show()
     
-    filename_remote = name + "_remote" + ".png"
-    filename_local = name + "_local" + ".png"
-    dirname = os.path.dirname(name)
-    os.makedirs(dirname, exist_ok=True)
+    # filename_remote = name + "_remote" + ".png"
+    # filename_local = name + "_local" + ".png"
+    # dirname = os.path.dirname(name)
+    # os.makedirs(dirname, exist_ok=True)
     
-    fig1.savefig(os.path.join(dirname, filename_remote), dpi=300, bbox_extra_artists=(legend1,)
-                if legend1 is not None else None, bbox_inches='tight')
-    fig2.savefig(os.path.join(dirname, filename_local), dpi=300, bbox_extra_artists=(legend2,)
-                if legend2 is not None else None, bbox_inches='tight')
-    
-   
-            
-def plot_throughput(xcol, originals, summary, hue, xlabel, hue_label, name):
-    global x1_, x2_, x3_, y_
-    # make a grid of subplots with r X c plots of size figsize
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 5))
-    seaborn.set_theme(style='ticks')
-    markersize = 8
-
-    if hue != None:
-        num_hues = len(summary.reset_index()[hue].dropna().unique())
-    else:
-        num_hues = 1
-    palette = seaborn.color_palette("viridis", num_hues)
-    per = seaborn.lineplot(
-        data=originals,
-        x=xcol,
-        y=y_,
-        ax=ax1,
-        hue=hue,
-        style=hue,
-        markers=True,
-        markersize=markersize,
-        # errorbar='sd',
-        palette=palette
-    )
-    totals = seaborn.lineplot(
-        data=summary,
-        x=xcol,
-        y='total',
-        ax=ax2,
-        hue=hue,
-        style=hue,
-        markers=True,
-        markersize=markersize,
-        palette=palette
-    )
-
-    font = {'fontsize': 24}
-    for ax in ax1, ax2:
-        ax.ticklabel_format(axis='y', scilimits=[-5, 3])
-        ax.yaxis.get_offset_text().set_fontsize(24)
-        ax.yaxis.set_major_locator(plt.MaxNLocator(5))
-        ax.tick_params(labelsize=24)
-        ax.set_ylim(ymin=0)
-
-    ax1.set_title('Per-client', font)
-    ax1.set_ylabel('Throughput (ops/s)', font, labelpad=20)
-    ax1.set_xlabel(xlabel, font)
-    # ax1.invert_xaxis()
-    ax1.set_ylim(1.5e3)
-    
-    ax2.set_title('Total', font)
-    ax2.set_ylabel('', font)
-    ax2.set_xlabel(xlabel, font)
-    # ax2.invert_xaxis()
-    ax2.set_ylim(2e5)
-    
-    # h1, l1 = totals.get_legend_handles_labels()
-    h2, l2 = ax1.get_legend_handles_labels()
-    for h in h2:
-        h.set_markersize(24)
-        h.set_linewidth(3)
-    labels_handles = {}
-    # labels_handles.update(dict(zip(l1, h1)))
-    labels_handles.update(dict(zip(l2, h2)))
-    totals.legend().remove()
-    per.legend().remove()
-    legend = None
-    if num_hues != 1:
-        legend = fig.legend(
-            h2, l2, bbox_to_anchor=(.5, 1.27),
-            loc='center', fontsize=24, title_fontsize=24, title=hue_label,
-            ncol=num_hues if num_hues < 6 else int(num_hues / 2),
-            # ncol=int(num_hues / 2),
-            columnspacing=1, edgecolor='white', borderpad=0)
-
-    filename = name + ".png"
-    dirname = os.path.dirname(filename)
-    os.makedirs(dirname, exist_ok=True)
-    fig.savefig(filename, dpi=300, bbox_extra_artists=(legend,)
-                if legend is not None else None, bbox_inches='tight')
+    # fig1.savefig(os.path.join(dirname, filename_remote), dpi=300, bbox_extra_artists=(legend1,)
+    #             if legend1 is not None else None, bbox_inches='tight')
+    # fig2.savefig(os.path.join(dirname, filename_local), dpi=300, bbox_extra_artists=(legend2,)
+    #             if legend2 is not None else None, bbox_inches='tight')
 
 
 def plot_latency(data):
@@ -350,76 +352,116 @@ def plot_latency(data):
                'results.driver.latency.summary.mean']
     data = data[columns]
     
-    print(data)
-    
     data['results.driver.latency.summary.mean'] = data['results.driver.latency.summary.mean'].apply(
         lambda s: [float(x.strip()) for x in s.strip(' []').split(',')])
     data = data.explode('results.driver.latency.summary.mean')
     data = data.reset_index(drop=True)
 
-    summary = get_summary(data)
-    summary = summary.reset_index()
+    # summary = get_lat_summary(data)
+    # summary = summary.reset_index()
+    summary = data
     
     plocal=[1, .95, .9, .85]
-    # summary = summary[summary['experiment_params.workload.p_local'].isin(plocal)]
-    # summary = summary.reset_index(drop=True)
     
-    print(summary)
-    
-    nodes = [10]
+    nodes = [20]
+    threads = [8]
     keys = [20, 100, 1000]
     
     # make a grid of subplots with a row for each node number and a column for each key setup
     fig, axes = plt.subplots(len(plocal), len(keys), figsize=(10, 8))
     seaborn.set_theme(style='ticks')
 
-    plt.subplots_adjust(hspace = 1, wspace = 0.4)
+    plt.subplots_adjust(hspace = .75, wspace = 0.4)
     
     for i, pl in enumerate(plocal):
         for j, key in enumerate(keys):
             data = summary[summary['experiment_params.workload.max_key'] == key]
             data = data[data['experiment_params.num_nodes'] == nodes[0]]
             data = data[data['experiment_params.workload.p_local'] == pl]
-            data = data.reset_index(drop=True)
-            print(data)
+            data = data[data['experiment_params.num_threads'] == threads[0]]
             seaborn.ecdfplot(
                     data=data,
-                    x='average',
+                    x='results.driver.latency.summary.mean',
                     stat='proportion',
                     ax=axes[i][j],
                     hue='lock_type',
                     palette="colorblind",
                     legend=False,
             )
-            axes[i][j].set_xlabel('Latency (ns)')
-            axes[i][j].set_title(str(key) + " Keys, " + str(int(pl*100)) + " % Local")
+            # axes[i][j].set_xlabel('Latency (ns)')
+            axes[i][j].set_title(str(key) + " Keys, " + str(int(pl*100)) + " % Local", fontsize=10)
              # set 3 ticks on y axis with values auto-chosen
             axes[i][j].set_yticks((0, .25, .5, .75, 1))
         # axes[i][0].set_ylabel('Aggregated Throughput (ops/s)', labelpad=20)
+        
+    subplot = 'a'
+    for ax in axes.flatten():
+        # ax.legend().remove()    
+        s = '(' + subplot + ')'
+        ax.set_xlabel(s, weight='bold', fontfamily='monospace')
+        subplot = chr(ord(subplot) + 1)
     
-    legend1 = fig.legend(title='Legend', bbox_to_anchor=(.5, 1.04), labels=['ALock', 'MCS', 'Spin'], 
+    legend1 = fig.legend(title='Legend', bbox_to_anchor=(.5, 1.04), labels=['Spin', 'MCS', 'ALock'],
                          loc='upper center', fontsize=9, title_fontsize=11,  markerscale=.3,
                         ncol=1, columnspacing=1, edgecolor='white', borderpad=0)
-    # plt.show()
-    name = os.path.join(FLAGS.figdir, FLAGS.exp, 'latency_plots')
+    plt.show()
+    name = os.path.join(FLAGS.figdir, FLAGS.exp, 'latency_plots_n20_t8')
     filename = name + ".png"
     dirname = os.path.dirname(filename)
     os.makedirs(dirname, exist_ok=True)
     fig.savefig(filename, dpi=300, bbox_extra_artists=(legend1,)
                 if legend1 is not None else None, bbox_inches='tight')
     
+def plot_spin(summary):
+    global x8_, y_
+    
+    # reset index in order to access all fields for hue
+    summary = summary.reset_index()
+    
+    # save original data
+    original = summary
+    
+    line_color = seaborn.color_palette('colorblind')[2]
+    
+    to_remove = summary[x8_] == 98
+    summary = summary[~to_remove]
+    to_remove = summary[x8_] == 102
+    summary = summary[~to_remove]
+    
+    data = summary[summary['experiment_params.workload.max_key'] == 1000]
+    data = data[data['experiment_params.num_nodes'] == 1]
+    data = data.reset_index(drop=True)
+    seaborn.lineplot(
+        data=data,
+        x=x8_,
+        y='total',
+        # hue=line_color,
+        style='lock_type',
+        markers=True,
+        markersize=10,
+        color=line_color,
+    )
+    
+    plt.ylabel('Total Throughput (ops/s)')
+    plt.xlabel('Threads')
+    plt.title('RDMA Loopback Scalability')
+    plt.legend().remove()
+    plt.show()
 
+    
 
 def plot_locality_lines(nodes, keys, summary, name):
     global x8_, y_
             
     # make a grid of subplots with a row for each node number and a column for each key setup
     # add 1 to len(keys) for final column of 100p% local for each node config
-    fig, axes = plt.subplots(len(nodes), len(keys)+1, figsize=(14, 7))
+    fig, axes = plt.subplots(len(nodes), len(keys)+1, figsize=(12, 8))
     seaborn.set_theme(style='ticks')
     markersize = 10
     
-    
+    # make space for a big legend
+    fig.subplots_adjust(top=.8, bottom=.2)
+
 
     # reset index in order to access all fields for hue
     summary = summary.reset_index()
@@ -441,9 +483,7 @@ def plot_locality_lines(nodes, keys, summary, name):
     # # rejoin data to plot competitors (since budget is irrelevant to them)
     # summary = pandas.concat([alock, other])
 
-    plt.subplots_adjust(hspace = .5, wspace = 0.25)
-    # phttps://file+.vscode-resource.vscode-cdn.net/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/one_lock/plots/alock_budgets/local_v_remote.png?version%3D1705252647573lt.subplots_adjust(wspace = 0.25)
-    
+    plt.subplots_adjust(hspace = .6, wspace = 0.25)
 
     for i, node in enumerate(nodes):
         for j, key in enumerate(keys):
@@ -464,12 +504,14 @@ def plot_locality_lines(nodes, keys, summary, name):
             # set y axis to start at 0
             axes[i][j].set_ylim(0, axes[i][j].get_ylim()[1])
             # set 3 ticks on y axis with values auto-chosen
+            axes[i][j].set_xticks([4,8,12])
             # axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
             h2, l2 = axes[i][j].get_legend_handles_labels()
             axes[i][j].set_ylabel('') 
-            axes[i][j].set_xlabel('Threads per Node')
-            axes[i][j].set_title(str(key) + " Keys, " + str(node) + " Nodes")
-        axes[i][0].set_ylabel('Aggregated Throughput (ops/s)', labelpad=20)
+            axes[i][j].set_xlabel('') 
+            # axes[i][j].set_xlabel('Threads per Node')
+            axes[i][j].set_title(str(key) + " Keys, " + str(node) + " Nodes", fontsize=10)
+        axes[i][0].set_ylabel('Throughput (ops/s)', labelpad=20)
 
     # Add final column with 100p local by filtering original data again
     p100 = original[original['experiment_params.workload.p_local'] == 1.0]
@@ -495,10 +537,12 @@ def plot_locality_lines(nodes, keys, summary, name):
         axes[i][len(keys)].set_ylim(0, axes[i][len(keys)].get_ylim()[1])
         # set 3 ticks on y axis with values auto-chosen
         # axes[i][j].set_yticks(axes[i][j].get_yticks()[::len(axes[i][j].get_yticks()) // 3])
+        axes[i][len(keys)].set_xticks([4,8,12])
         h3, l3 = axes[i][len(keys)].get_legend_handles_labels()
         axes[i][len(keys)].set_ylabel('') 
-        axes[i][len(keys)].set_xlabel('Threads per Node')
-        axes[i][len(keys)].set_title("100% Local, " + str(node) + " Nodes")
+        axes[i][len(keys)].set_xlabel('') 
+        # axes[i][len(keys)].set_xlabel('Threads per Node')
+        axes[i][len(keys)].set_title("100% Local, " + str(node) + " Nodes", fontsize=10)
        
     # Legend creation
     # This is a hacky way to change the labels in the legend
@@ -510,12 +554,17 @@ def plot_locality_lines(nodes, keys, summary, name):
     labels_handles = {}
     labels_handles.update(dict(zip(l2, h2)))
     
+    subplot = 'a'
     for ax in axes.flatten():
-        ax.legend().remove()
+        ax.legend().remove()    
+        s = '(' + subplot + ')'
+        ax.set_xlabel(s, weight='bold', fontfamily='monospace')
+        subplot = chr(ord(subplot) + 1)
+        
     
-    legend1 = fig.legend(h2, l2, bbox_to_anchor=(.45, 1.1),
-        loc='upper center', fontsize=9, title_fontsize=11, title='Legend', markerscale=.3,
-        ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
+    # legend1 = fig.legend(h2, l2, bbox_to_anchor=(0, 1.02, 1, .2),
+    #     loc='lower left', fontsize=9, title_fontsize=11, title='Legend', markerscale=.3,
+    #     ncol=2, columnspacing=1, edgecolor='white', borderpad=0)
     
     # Legend for 100p plot
     # This is a hacky way to change the labels in the legend
@@ -526,35 +575,32 @@ def plot_locality_lines(nodes, keys, summary, name):
         h.set_linewidth(3)
     labels_handles = {}
     labels_handles.update(dict(zip(l3, h3)))
+   
+        
+    fig.suptitle('', fontsize=12)
     
-    for ax in axes.flatten():
-        ax.legend().remove()
     
-    legend2 = fig.legend(h3, l3, bbox_to_anchor=(.9, 1.1),
-        loc='upper right', fontsize=9, title_fontsize=11, title='100% Local Legend', markerscale=.3,
-        ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
+    # legend2 = fig.legend(h3, l3, bbox_to_anchor=(.9, 1.12),
+    #     loc='upper right', fontsize=9, title_fontsize=11, title='100% Local Legend', markerscale=.3,
+    #     ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
 
     filename = name + ".png"
     dirname = os.path.dirname(filename)
     os.makedirs(dirname, exist_ok=True)
     # fig.savefig(filename, dpi=300, bbox_extra_artists=(legend1,)
     #             if legend1 is not None else None, bbox_inches='tight')
-    fig.savefig(filename, dpi=300, bbox_extra_artists=(legend1, legend2)
-                if legend1 or legend2 is not None else None, bbox_inches='tight')
-   
+    fig.savefig(filename, dpi=300, bbox_inches='tight')
+    
     # plt.tight_layout()
-    # plt.show()
+    
+    # Adjust layout to prevent clipping of the legend
+    # plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.show()
 
-
-
+    
 def plot(datafile, lock_type):
     data = pandas.read_csv(datafile)
-    # datafile2 = "/Users/amandabaran/Desktop/sss/async_locks/alock/alock/alock/benchmark/one_lock/plots/5node_localp.csv"
-    # if os.path.exists(datafile2) :
-    #     data = merge_csv(datafile, datafile2)
-    # else:
-    #     data = pandas.read_csv(datafile)
-               
+ 
     alock = data[data['experiment_params.name'].str.count("alock.*") == 1]
     alock['lock_type'] = 'ALock'
     mcs = data[data['experiment_params.name'].str.count("mcs.*") == 1]
@@ -578,19 +624,20 @@ def plot(datafile, lock_type):
 
     summary = get_summary(data)
  
-    # data = alock
-    # plot_throughput(x1_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'n2_m10'))
-    
-    # plot_grid(nodes, keys, x3_, data, summary, 'lock_type', 'Clients', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'alock_spin'), False)
-    
     nodes = [5, 10, 20]
     keys = [20, 100, 1000]
-    # clients = [40, 120, 180]
-    # p_local = [.3, .5, .8]
-    # plot_budget(nodes, keys, clients, p_local, data, summary, 'lock_type', 'Remote Budget', 'Lock type', os.path.join(FLAGS.figdir, FLAGS.exp, 'local_budget'), False)
-
-    # plot_locality_lines(nodes, keys, summary, os.path.join(FLAGS.figdir, FLAGS.exp, 'test'))
     
-    # plocal = [1.0, .95, .85]
-    # plot_budget(nodes, plocal, summary, os.path.join(FLAGS.figdir, FLAGS.exp, 'local_v_remote20'))
+    # plot_budget_bar(summary)
+    
+    
+    # plot_spin(summary)
+    
+    # print_data_table(summary)
+    # print_data_table_wBudget(summary)
+    # plot_budget2(nodes, keys, summary, 'test')s
+    
+    # plot_locality_lines(nodes, keys, summary, os.path.join(FLAGS.figdir, FLAGS.exp, 'paper_plots'))
+    
+    # plocal = [.95, .9, .85]
+    # plot_budget(nodes, plocal, summary, os.path.join(FLAGS.figdir, FLAGS.exp, 'local_v_remote_test'))
  

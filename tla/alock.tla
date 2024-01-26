@@ -1,4 +1,4 @@
----- MODULE qplock ----
+---- MODULE alock ----
 EXTENDS Integers, Sequences, TLC
 CONSTANTS NumProcesses, InitialBudget
 ASSUME NumProcesses > 0
@@ -6,7 +6,7 @@ ASSUME InitialBudget > 0
 NP == NumProcesses
 B == InitialBudget
 
-(*--algorithm qplock
+(*--algorithm alock
 variables 
     (* Global *)
     victim \in {1, 2},
