@@ -183,15 +183,6 @@ def print_data_table_wBudget(data):
     for nodes, keys, p_local, lock, threads, rb, lb, y in zip(nodes_data, keys_data, p_local_data, lock_data, threads_data, rb_data, lb_data, y_data):
         print(lock,",",nodes,",",keys,",",p_local,",",threads,",",rb,",",lb,",",y)
     
-    
-    # # Print the table
-    # print("Data Points:")
-    # print("-----------------------------------------------------------------------")
-    # print(" Lock     |   Nodes   |   Keys   |   P_Local   |   Threads   |   Remote   |   Local   |   Y Data ")
-    # print("-----------------------------------------------------------------------")
-    # for nodes, keys, p_local, lock, threads, rb, lb, y in zip(nodes_data, keys_data, p_local_data, lock_data, threads_data, rb_data, lb_data, y_data):
-    #     print(f"| {lock}        |  {nodes}     | {keys}     | {p_local}     | {threads}     | {rb}     | {lb}     | {y:.2e}    ")
-    # print("-----------------------------------------------------------------------")
 
 
 def print_data_table(data):
@@ -214,133 +205,6 @@ def print_data_table(data):
     print("Lock,Nodes,Keys,P_Local,Threads,TPut")
     for nodes, keys, p_local, lock, threads, y in zip(nodes_data, keys_data, p_local_data, lock_data, threads_data, y_data):
         print(lock,",",nodes,",",keys,",",p_local,",",threads,",",y)
-    
-    
-    # Print the table
-    # print("Data Points:")
-    # print("-----------------------------------------------------------------------")
-    # print(" Lock     |   Nodes   |   Keys   |   P_Local   |   Threads   |  Y Data ")
-    # print("-----------------------------------------------------------------------")
-    # for nodes, keys, p_local, lock, threads, y in zip(nodes_data, keys_data, p_local_data, lock_data, threads_data, y_data):
-    #     print(f"| {lock}        |  {nodes}     | {keys}     | {p_local}     | {threads}     | {y:.2e}    ")
-    # print("-----------------------------------------------------------------------")
-
-def plot_budget(nodes, plocal, summary, name):
-    global x6_, x7_, y_
-    
-    budgets = [5, 10, 20]
-            
-    # make a grid of subplots with a row for each node number and a column for each key setup
-    # add 1 to len(keys) for final column of 100p% local for each node config
-    fig1, axes1 = plt.subplots(len(budgets), len(plocal), figsize=(8, 8))
-    fig2, axes2 = plt.subplots(len(budgets), len(plocal), figsize=(8, 8))
-    seaborn.set_theme(style='ticks')
-    markersize = 10
-    
-    # reset index in order to access all fields for hue
-    summary = summary.reset_index()
-    
-    # save original data
-    original = summary
-    
-    #filter data to only include alocks
-    alock = summary[summary['lock_type'] == 'ALock']
-    alock = alock.reset_index(drop=True)
-
-    fig2.subplots_adjust(hspace = 1.2, wspace = 0.35)
-    
-    # Remote Plots
-    for i, budget in enumerate(budgets):
-        for j, pl in enumerate(plocal):
-            data = alock[alock['experiment_params.workload.p_local'] == pl]
-            data = data[data['experiment_params.num_nodes'] == 20]
-            data = data[data['experiment_params.local_budget'] == budget]
-            data = data.reset_index(drop=True)
-            seaborn.lineplot(
-                    data=data,
-                    x=x7_,
-                    y='total',
-                    ax=axes1[i][j],
-                    hue='experiment_params.workload.max_key',
-                    style='experiment_params.num_clients',
-                    markers=True,
-                    markersize=markersize,
-                    palette="colorblind",
-            )
-            # set y axis to start at 0
-            axes1[i][j].set_ylim(0, axes1[i][j].get_ylim()[1])  
-            h2, l2 = axes1[i][j].get_legend_handles_labels()
-            axes1[i][j].set_ylabel('') 
-            axes1[i][j].set_xlabel('Remote Budget', fontsize=7)
-            axes1[i][j].set_title(str(int((pl*100))) + " % Local, Local Budget = " + str(budget), fontsize=9)
-            # axes[i][j].title.set_size(8)
-            axes1[i][j].set_ylabel('Aggregated T-put (ops/s)', labelpad=20, fontsize=7)
-        
-    fig1.subplots_adjust(hspace = 1, wspace = 0.35)    
-    for i, budget in enumerate(budgets):
-        for j, pl in enumerate(plocal):
-            data = alock[alock['experiment_params.workload.p_local'] == pl]
-            data = data[data['experiment_params.num_nodes'] == 20]
-            data = data[data['experiment_params.remote_budget'] == budget]
-            data = data.reset_index(drop=True)
-            seaborn.lineplot(
-                    data=data,
-                    x=x6_,
-                    y='total',
-                    ax=axes2[i][j],
-                    hue='experiment_params.workload.max_key',
-                    style='experiment_params.num_clients',
-                    markers=True,
-                    markersize=markersize,
-                    palette="colorblind",
-            )
-            # set y axis to start at 0
-            axes2[i][j].set_ylim(0, axes2[i][j].get_ylim()[1])  
-            h3, l3 = axes2[i][j].get_legend_handles_labels()
-            axes2[i][j].set_ylabel('') 
-            axes2[i][j].set_xlabel('Local Budget', fontsize=7)
-            axes2[i][j].set_title(str(int((pl*100))) + " % Local, Remote Budget = " + str(budget), fontsize=9)
-            # axes[i][j].title.set_size(8)
-            axes2[i][j].set_ylabel('Aggregated T-put (ops/s)', labelpad=20, fontsize=7)
-
-
-    # Legend creation
-    # # This is a hacky way to change the labels in the legend
-    # l2[0] = 'Keys'
-    # l2[4] = 'Clients'
-    
-    # for h in h2:
-    #     h.set_markersize(24)
-    #     h.set_linewidth(3)
-        
-    # for h in h3:
-    #     h.set_markersize(24)
-    #     h.set_linewidth(3)
-        
-    # for ax in axes1.flatten():
-    #     ax.legend().remove()
-    # for ax in axes2.flatten():
-    #     ax.legend().remove()
-
-    # legend1 = fig1.legend(h2, l2, bbox_to_anchor=(.5, 1.15),
-    #     loc='upper center', fontsize=8, title_fontsize=10, title='Legend', markerscale=.3,
-    #     ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
-    
-    # legend2 = fig2.legend(h3, l3, bbox_to_anchor=(.5, 1.15),
-    #     loc='upper center', fontsize=8, title_fontsize=10, title='Legend', markerscale=.3,
-    #     ncol=2, columnspacing=1, edgecolor='white', borderpad=1)
-    
-    plt.show()
-    
-    # filename_remote = name + "_remote" + ".png"
-    # filename_local = name + "_local" + ".png"
-    # dirname = os.path.dirname(name)
-    # os.makedirs(dirname, exist_ok=True)
-    
-    # fig1.savefig(os.path.join(dirname, filename_remote), dpi=300, bbox_extra_artists=(legend1,)
-    #             if legend1 is not None else None, bbox_inches='tight')
-    # fig2.savefig(os.path.join(dirname, filename_local), dpi=300, bbox_extra_artists=(legend2,)
-    #             if legend2 is not None else None, bbox_inches='tight')
 
 
 def plot_latency(data):
@@ -473,15 +337,6 @@ def plot_locality_lines(nodes, keys, summary, name):
     plocal = [.95, .9, .85]
     summary = summary[summary['experiment_params.workload.p_local'].isin(plocal)]
     summary = summary.reset_index(drop=True)
-    
-    #filter data to only include desire remote_budget data for alocks only
-    # budget = [20]
-    # alock = summary[summary['lock_type'] == 'ALock']
-    # other = summary[summary['lock_type'] != "ALock"]
-    # alock = alock[alock['experiment_params.remote_budget'].isin(budget)]
-    # alock = alock.reset_index(drop=True)
-    # # rejoin data to plot competitors (since budget is irrelevant to them)
-    # summary = pandas.concat([alock, other])
 
     plt.subplots_adjust(hspace = .6, wspace = 0.25)
 
@@ -626,8 +481,6 @@ def plot(datafile, lock_type):
  
     nodes = [5, 10, 20]
     keys = [20, 100, 1000]
-    
-    # plot_budget_bar(summary)
     
     
     # plot_spin(summary)

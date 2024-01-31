@@ -37,7 +37,7 @@ clean
 echo "Pushing local repo to remote nodes..."
 sync
 
-save_dir="budget_exp"
+save_dir="spin_exp"
 
 lock="spin"
 log_level='info'
