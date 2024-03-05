@@ -21,26 +21,16 @@ enable_testing()
 
 add_subdirectory(../remus remus)
 
-add_subdirectory(protos) #TODO get rid of this requirement
-
-add_subdirectory(src)
-
-add_subdirectory(tests)
-
 #######################################################################################################################
 ## Install
 
-install(TARGETS src
-                EXPORT alockTargets
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-        RUNTIME DESTINATION bin
-        INCLUDES DESTINATION include)
+# Include directories for your current project
 
-# install the include dirs
-install(FILES ${PROJECT_SOURCE_DIR}/protos/experiment.proto DESTINATION protos)
-install(FILES ${PROJECT_SOURCE_DIR}/protos/cluster.proto DESTINATION protos)
-# install protos for reuse
+add_executable(main main.cc)
+target_include_directories(main PRIVATE include)
+target_link_libraries(main PUBLIC rome::rdma rome::workload rome::util)
+# Set up the logging level
+target_compile_definitions(main PUBLIC ROME_LOG_LEVEL=${LOG_LEVEL})
 
 #######################################################################################################################
 ## DEB Package
