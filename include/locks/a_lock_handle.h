@@ -13,7 +13,7 @@
 #include "rome/rdma/connection_manager/connection.h"
 #include "rome/rdma/connection_manager/connection_manager.h"
 #include "rome/rdma/memory_pool/memory_pool.h"
-#include "rome/rdma/memory_pool/remote_ptr.h"
+#include "rome/rdma/memory_pool/rdma_ptr.h"
 #include "rome/rdma/rdma_memory.h"
 #include "rome/metrics/stopwatch.h"
 #include "rome/metrics/summary.h"
@@ -25,7 +25,7 @@ namespace X {
 using ::rome::rdma::ConnectionManager;
 using ::rome::rdma::MemoryPool;
 using ::rome::rdma::remote_nullptr;
-using ::rome::rdma::remote_ptr;
+using ::rome::rdma::rdma_ptr;
 using ::rome::rdma::RemoteObjectProto;
 
 class ALockHandle {
@@ -50,7 +50,7 @@ public:
 
     //Used as preallocated memory for RDMA reads/writes
     prealloc_ = pool_.Allocate<ALock>();
-    r_prealloc_ = pool_.Allocate<remote_ptr<RemoteDescriptor>>();
+    r_prealloc_ = pool_.Allocate<rdma_ptr<RemoteDescriptor>>();
     
     stopwatch_ = rome::metrics::Stopwatch::Create("driver_stopwatch");
 
@@ -64,7 +64,7 @@ public:
     return reaq_count_;
   }
  
-  void Lock(remote_ptr<ALock> alock){
+  void Lock(rdma_ptr<ALock> alock){
     ROME_ASSERT(a_lock_pointer_ == remote_nullptr, "Attempting to lock handle that is already locked.");
     a_lock_pointer_ = alock;
     r_tail_ = decltype(r_tail_)(alock.id(), alock.address());
@@ -116,7 +116,7 @@ public:
     // lock_count_++;
   }
 
-  void Unlock(remote_ptr<ALock> alock){
+  void Unlock(rdma_ptr<ALock> alock){
     // ROME_ASSERT(alock.address() == a_lock_pointer_.address(), "Attempting to unlock alock that is not locked.");
     if (is_local_){
       LocalUnlock();
@@ -174,17 +174,17 @@ private:
     auto prev = pool_.AtomicSwap(r_victim_, static_cast<uint64_t>(REMOTE_VICTIM));
     while (true){
       auto remote = pool_.Read<ALock>(a_lock_pointer_, prealloc_);
-      auto temp_ptr = remote_ptr<uint8_t>(remote);
+      auto temp_ptr = rdma_ptr<uint8_t>(remote);
       temp_ptr += TAIL_PTR_OFFSET;
-      auto local_tail = remote_ptr<remote_ptr<LocalDescriptor>>(temp_ptr);
+      auto local_tail = rdma_ptr<rdma_ptr<LocalDescriptor>>(temp_ptr);
       //break if local tail isn't locked
       if (static_cast<uint64_t>(*(std::to_address(local_tail))) == 0){
         ROME_DEBUG("local tail is no longer locked, break");
         break;
       }
-      temp_ptr = remote_ptr<uint8_t>(remote);
+      temp_ptr = rdma_ptr<uint8_t>(remote);
       temp_ptr += VICTIM_OFFSET;
-      auto victim = remote_ptr<remote_ptr<LocalDescriptor>>(temp_ptr);
+      auto victim = rdma_ptr<rdma_ptr<LocalDescriptor>>(temp_ptr);
       // break if remote is no longer victim
       if (static_cast<uint64_t>(*(std::to_address(victim))) != REMOTE_VICTIM){
         ROME_DEBUG("remote is no longer victim, break");
@@ -204,13 +204,13 @@ private:
       auto prev =
         pool_.AtomicSwap(r_tail_, static_cast<uint64_t>(r_desc_pointer_));
       if (prev != remote_nullptr) { //someone else has the lock
-          auto temp_ptr = remote_ptr<uint8_t>(prev);
+          auto temp_ptr = rdma_ptr<uint8_t>(prev);
           temp_ptr += NEXT_PTR_OFFSET; //temp_ptr = next field of the current tail's RemoteDescriptor
           // make prev point to the current tail RemoteDescriptor's next pointer
-          prev = remote_ptr<RemoteDescriptor>(temp_ptr);
+          prev = rdma_ptr<RemoteDescriptor>(temp_ptr);
           // set the address of the current tail's next field = to the addr of our local RemoteDescriptor
-          pool_.Write<remote_ptr<RemoteDescriptor>>(
-              static_cast<remote_ptr<remote_ptr<RemoteDescriptor>>>(prev), r_desc_pointer_,
+          pool_.Write<rdma_ptr<RemoteDescriptor>>(
+              static_cast<rdma_ptr<rdma_ptr<RemoteDescriptor>>>(prev), r_desc_pointer_,
               r_prealloc_);
           ROME_DEBUG("[Lock] Enqueued: {} --> (id={})",
                   static_cast<uint64_t>(prev.id()),
@@ -325,11 +325,11 @@ private:
         ;
         std::atomic_thread_fence(std::memory_order_acquire);
         // gets a pointer to the next RemoteDescriptor object
-        auto next = const_cast<remote_ptr<RemoteDescriptor> &>(r_desc_->next);
+        auto next = const_cast<rdma_ptr<RemoteDescriptor> &>(r_desc_->next);
         //writes to the the next descriptors budget which lets it know it has the lock now
-        pool_.Write<uint64_t>(static_cast<remote_ptr<uint64_t>>(next),
+        pool_.Write<uint64_t>(static_cast<rdma_ptr<uint64_t>>(next),
                             r_desc_->budget - 1,
-                            static_cast<remote_ptr<uint64_t>>(r_prealloc_));
+                            static_cast<rdma_ptr<uint64_t>>(r_prealloc_));
       } 
       
       //else: successful CAS, we unlocked our RemoteDescriptor and no one is queued after us
@@ -392,12 +392,12 @@ private:
   MemoryPool& pool_; // pool of alocks that the handle is local to (initalized in cluster/node_impl.h)
 
   //Pointer to alock to allow it to be read/write via rdma
-  remote_ptr<ALock> a_lock_pointer_;
+  rdma_ptr<ALock> a_lock_pointer_;
   
   // Access to fields remotely
-  remote_ptr<remote_ptr<RemoteDescriptor>> r_tail_;
-  remote_ptr<remote_ptr<LocalDescriptor>> r_l_tail_;
-  remote_ptr<uint64_t> r_victim_;
+  rdma_ptr<rdma_ptr<RemoteDescriptor>> r_tail_;
+  rdma_ptr<rdma_ptr<LocalDescriptor>> r_l_tail_;
+  rdma_ptr<uint64_t> r_victim_;
 
   // Access to fields locally
   uint64_t* l_r_tail_;
@@ -405,15 +405,15 @@ private:
   uint64_t* l_victim_;
   
   // Prealloc used for rdma writes of rdma descriptor in RemoteUnlock
-  remote_ptr<ALock> prealloc_;
-  remote_ptr<remote_ptr<RemoteDescriptor>> r_prealloc_;
+  rdma_ptr<ALock> prealloc_;
+  rdma_ptr<rdma_ptr<RemoteDescriptor>> r_prealloc_;
 
   // Pointers to pre-allocated descriptor to be used locally
-  remote_ptr<LocalDescriptor> l_desc_pointer_;
+  rdma_ptr<LocalDescriptor> l_desc_pointer_;
   LocalDescriptor l_desc_;
 
   // Pointers to pre-allocated descriptor to be used remotely
-  remote_ptr<RemoteDescriptor> r_desc_pointer_;
+  rdma_ptr<RemoteDescriptor> r_desc_pointer_;
   volatile RemoteDescriptor* r_desc_;
 
 };

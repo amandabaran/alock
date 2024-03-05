@@ -3,7 +3,7 @@
 #include <cstdint>
 #include "alock/src/cluster/cluster.pb.h"
 #include "alock/src/cluster/common.h"
-#include "rome/rdma/memory_pool/remote_ptr.h"
+#include "rome/rdma/memory_pool/rdma_ptr.h"
 
 namespace X {
 
@@ -21,15 +21,15 @@ class LockTable {
  using key_type = K; // some int (uint16)
  using lock_type = V; // ALock or MCS or Spin
  using MemoryPool = rome::rdma::MemoryPool;
- using root_type = rome::rdma::remote_ptr<lock_type>;
+ using root_type = rome::rdma::rdma_ptr<lock_type>;
 
  public:
-  LockTable(const NodeProto& node, MemoryPool &lock_pool)
+  LockTable(const NodeProto& node, std::shared_ptr<rdma_capability> pool)
     :   self_(node),
         node_id_(node.nid()),
-        lock_pool_(lock_pool) {
-          min_key_ = self_.range().low();
-          max_key_= self_.range().high();
+        lock_pool_(pool) {
+            min_key_ = self_.range().low();
+            max_key_= self_.range().high();
   }
 
   root_type AllocateLocks(const key_type& min_key, const key_type& max_key){
@@ -49,7 +49,7 @@ class LockTable {
  private:
   const NodeProto& self_;
   const uint32_t node_id_;
-  MemoryPool &lock_pool_;
+  std::shared_ptr<rdma_capability> lock_pool_;
   root_type root_lock_ptr_;
   key_type max_key_;
   key_type min_key_;

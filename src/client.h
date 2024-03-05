@@ -14,7 +14,7 @@
 #include "rome/logging/logging.h"
 #include "rome/rdma/connection_manager/connection_manager.h"
 #include "rome/rdma/memory_pool/memory_pool.h"
-#include "rome/rdma/memory_pool/remote_ptr.h"
+#include "rome/rdma/memory_pool/rdma_ptr.h"
 #include "rome/util/clocks.h"
 #include "rome/util/distribution_util.h"
 #include "alock/src/cluster/node.h"
@@ -101,7 +101,7 @@ class Client : public rome::ClientAdaptor<key_type> {
     return result; 
   }
 
-  X::remote_ptr<LockType> CalcLockAddr(const key_type &key){
+  X::rdma_ptr<LockType> CalcLockAddr(const key_type &key){
     auto min_key = node_proto_.range().low();
     auto max_key = node_proto_.range().high();
     if (key > max_key || key < min_key){
@@ -117,7 +117,7 @@ class Client : public rome::ClientAdaptor<key_type> {
           // calculate address of desired key and return 
           auto diff = key - min_key;
           auto bytes_to_jump = lock_byte_size_ * diff;
-          auto temp_ptr = rome::rdma::remote_ptr<uint8_t>(root_ptr);
+          auto temp_ptr = rome::rdma::rdma_ptr<uint8_t>(root_ptr);
           temp_ptr -= bytes_to_jump;
           auto lock_ptr = root_type(temp_ptr);
           return lock_ptr;
@@ -129,7 +129,7 @@ class Client : public rome::ClientAdaptor<key_type> {
         // calculate the address of the desired key
         auto diff = key - min_key;
         auto bytes_to_jump = lock_byte_size_ * diff;
-        auto temp_ptr = rome::rdma::remote_ptr<uint8_t>(root_lock_ptr_);
+        auto temp_ptr = rome::rdma::rdma_ptr<uint8_t>(root_lock_ptr_);
         temp_ptr -= bytes_to_jump;
         auto lock_ptr = root_type(temp_ptr);
         return lock_ptr;
@@ -151,7 +151,7 @@ class Client : public rome::ClientAdaptor<key_type> {
   absl::Status Apply(const key_type &op) override {
     // key_type k = 6;
     ROME_DEBUG("Client {} attempting to lock key {}", self_.id, op);    
-    X::remote_ptr<LockType> lock_addr = CalcLockAddr(op);
+    X::rdma_ptr<LockType> lock_addr = CalcLockAddr(op);
     ROME_TRACE("Address for lock is {:x}", static_cast<uint64_t>(lock_addr));
     lock_handle_.Lock(lock_addr);
     auto start = util::SystemClock::now();

@@ -54,7 +54,7 @@ using LockType = LOCK_TYPE;
 #endif
 
 using LockTable = X::LockTable<key_type, LockType>;
-using root_type = X::remote_ptr<LockType>;
+using root_type = X::rdma_ptr<LockType>;
 using root_map = std::map<uint32_t, root_type>;
 using key_map = std::map<uint32_t, std::pair<key_type, key_type>>;
 using Operation = key_type;

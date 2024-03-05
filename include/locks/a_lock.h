@@ -13,7 +13,7 @@
 namespace X {
 
 using ::rome::rdma::remote_nullptr;
-using ::rome::rdma::remote_ptr;
+using ::rome::rdma::rdma_ptr;
 
 // Note: Uncomment this line to use override local keys to use RDMA ops
 // #define REMOTE_ONLY
@@ -36,7 +36,7 @@ using ::rome::rdma::remote_ptr;
 struct alignas(64) RemoteDescriptor {
     int64_t budget = -1;
     uint8_t pad1[NEXT_PTR_OFFSET - sizeof(budget)];
-    remote_ptr<RemoteDescriptor> next = remote_nullptr;
+    rdma_ptr<RemoteDescriptor> next = remote_nullptr;
     uint8_t pad2[CACHELINE_SIZE - NEXT_PTR_OFFSET - sizeof(next)];
 };
 static_assert(alignof(RemoteDescriptor) == CACHELINE_SIZE);
@@ -53,11 +53,11 @@ static_assert(sizeof(LocalDescriptor) == CACHELINE_SIZE);
 
 struct alignas(64) ALock {
     // pointer to the pointer of the remote tail
-    remote_ptr<RemoteDescriptor> r_tail = remote_nullptr;
+    rdma_ptr<RemoteDescriptor> r_tail = remote_nullptr;
     // pad so local tail starts at addr+16
     uint8_t pad1[TAIL_PTR_OFFSET - sizeof(r_tail)]; 
     // pointer to the local tail
-    remote_ptr<LocalDescriptor> l_tail = remote_nullptr;
+    rdma_ptr<LocalDescriptor> l_tail = remote_nullptr;
     // pad so victim starts at addr+32
     uint8_t pad2[VICTIM_OFFSET - TAIL_PTR_OFFSET - sizeof(l_tail)]; 
     // cohort id of the victim

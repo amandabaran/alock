@@ -20,7 +20,7 @@ namespace X {
 using ::rome::rdma::ConnectionManager;
 using ::rome::rdma::MemoryPool;
 using ::rome::rdma::remote_nullptr;
-using ::rome::rdma::remote_ptr;
+using ::rome::rdma::rdma_ptr;
 using ::rome::rdma::RemoteObjectProto;
 
 struct alignas(64) RdmaSpinLock {
@@ -57,7 +57,7 @@ public:
     return remote.ToProto(); 
   }
 
-  bool IsLocked(remote_ptr<RdmaSpinLock> lock) { 
+  bool IsLocked(rdma_ptr<RdmaSpinLock> lock) { 
     uint64_t val = static_cast<uint64_t>(pool_.Read(lock));
     if (val == kUnlocked){
       return false;
@@ -65,7 +65,7 @@ public:
     return true;
   }
 
-  void Lock(remote_ptr<RdmaSpinLock> lock) {  
+  void Lock(rdma_ptr<RdmaSpinLock> lock) {  
     lock_ = decltype(lock_)(lock.id(), lock.address());
     //?: IDEA: switch to read and write to see if CAS introduces an issue with the rdma card because its atomic
     while (pool_.CompareAndSwap(lock_, kUnlocked, self_.id) != kUnlocked) {
@@ -75,7 +75,7 @@ public:
     return;
   }
 
-  void  Unlock(remote_ptr<RdmaSpinLock> lock) {
+  void  Unlock(rdma_ptr<RdmaSpinLock> lock) {
     ROME_ASSERT(lock.address() == lock_.address(), "Attempting to unlock spinlock that is not locked.");
     pool_.Write<uint64_t>(lock_, 0, /*prealloc=*/local_);
     std::atomic_thread_fence(std::memory_order_release);
@@ -95,8 +95,8 @@ private:
   MemoryPool &pool_;
   std::unordered_set<int> local_clients_;
 
-  remote_ptr<uint64_t> lock_;
-  remote_ptr<uint64_t> local_;
+  rdma_ptr<uint64_t> lock_;
+  rdma_ptr<uint64_t> local_;
 
 };
 

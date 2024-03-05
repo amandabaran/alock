@@ -60,7 +60,7 @@ protected:
   std::vector<peer_type> peers_;
   std::vector<MemoryPool*> pools_;
   std::unordered_map<uint16_t, std::unique_ptr<RdmaSpinLockHandle>> lock_handles_;
-  remote_ptr<int64_t> lock_{-1};
+  rdma_ptr<int64_t> lock_{-1};
 };
 
 TEST_F(RdmaSpinLockTest, HostIsLocked) {
