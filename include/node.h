@@ -126,6 +126,6 @@ class Node {
   root_map root_ptrs_;
 };
 
-}  // namespace X å
+}  // namespace X
 
 #include "node_impl.h"
