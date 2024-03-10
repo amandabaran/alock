@@ -14,8 +14,11 @@
 /// @param contains Percentage of operations are contains, (contains + insert + remove = 100)
 /// @param insert Percentage of operations are inserts, (contains + insert + remove = 100)
 /// @param remove Percentage of operations are removes, (contains + insert + remove = 100)
-/// @param key_lb The lower limit of the key range for operations
-/// @param key_ub The upper limit of the key range for operations
+/// @param p_local; Percentage of operations thare are local
+/// @param min_key The lower limit of the key range for operations
+/// @param max_key The upper limit of the key range for operations
+/// @param local_budget //Inital budget for local cohort in ALock
+/// @param remote_budget //Inital budget for remote cohort in ALock
 class BenchmarkParams {
 public:
     /// The node's id. (nodeX in cloudlab should have X in this option)
@@ -40,10 +43,16 @@ public:
     int insert;
     /// Percentage of operations are removes, (contains + insert + remove = 100)
     int remove;
+    // Percentage of operations that are local
+    int p_local;
     /// The lower limit of the key range for operations
-    int key_lb;
+    int min_key;
     /// The upper limit of the key range for operations
-    int key_ub;
+    int max_key; 
+    //Inital budget for local cohort in ALock
+    int local_budget;
+    //Inital budget for remote cohort in ALock
+    int remote_budget;
 
     BenchmarkParams(){}
 
@@ -59,8 +68,11 @@ public:
         contains = args.iget("--contains");
         insert = args.iget("--insert");
         remove = args.iget("--remove");
-        key_lb = args.iget("--key_lb");
-        key_ub = args.iget("--key_ub");
+        p_local = args.iget("--p_local");
+        min_key = args.iget("--min_key");
+        max_key = args.iget("--max_key");
+        local_budget = args.iget("--local_budget");
+        remote_budget = args.iget("--remote_budget");
     }
 };
 
@@ -84,7 +96,7 @@ public:
     Result(BenchmarkParams params_) : params(params_) {}
 
     static const std::string result_as_string_header() {
-        return "node_id,runtime,unlimited_stream,op_count,region_size,thread_count,node_count,qp_max,contains,insert,remove,lb,ub,count,runtime_ns,units,mean,stdev,min,p50,p90,p95,p99,p999,max\n";
+        return "node_id,runtime,unlimited_stream,op_count,region_size,thread_count,node_count,qp_max,contains,insert,remove,p_local,min,max,localb,remoteb,count,runtime_ns,units,mean,stdev,min,p50,p90,p95,p99,p999,max\n";
     }
 
     std::string result_as_string(){
@@ -100,8 +112,11 @@ public:
         builder += std::to_string(params.contains) + ",";
         builder += std::to_string(params.insert) + ",";
         builder += std::to_string(params.remove) + ",";
-        builder += std::to_string(params.key_lb) + ",";
-        builder += std::to_string(params.key_ub) + ",";
+        builder += std::to_string(params.p_local) + ",";
+        builder += std::to_string(params.min_key) + ",";
+        builder += std::to_string(params.max_key) + ",";
+        builder += std::to_string(params.local_budget) + ",";
+        builder += std::to_string(params.remote_budget) + ",";
         builder += std::to_string(count) + ",";
         builder += std::to_string(runtime_ns) + ",";
         builder += units + ",";
@@ -131,8 +146,11 @@ public:
         builder += "\t\tcontains: " + std::to_string(params.contains) + "\n";
         builder += "\t\tinsert: " + std::to_string(params.insert) + "\n";
         builder += "\t\tremove: " + std::to_string(params.remove) + "\n";
-        builder += "\t\tkey_lb: " + std::to_string(params.key_lb) + "\n";
-        builder += "\t\tkey_ub: " + std::to_string(params.key_ub) + "\n";
+        builder += "\t\tp_local: " + std::to_string(params.p_local) + "\n";
+        builder += "\t\tmin_key: " + std::to_string(params.min_key) + "\n";
+        builder += "\t\tmax_key: " + std::to_string(params.max_key) + "\n";
+        builder += "\t\tlocal_budget: " + std::to_string(params.local_budget) + "\n";
+        builder += "\t\tremote_budget: " + std::to_string(params.remote_budget) + "\n";
         builder += "\t}\n\tResult {\n";
         builder += "\t\tcount:" + std::to_string(count) + "\n";
         builder += "\t\truntime_ns:" + std::to_string(runtime_ns) + "\n";

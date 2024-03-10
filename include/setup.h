@@ -3,23 +3,13 @@
 #include <infiniband/verbs.h>
 
 #include <memory>
+#include <random>
 
-#include "alock/benchmark/one_lock/experiment.pb.h"
-#include "alock/src/locks/rdma_mcs_lock/rdma_mcs_lock.h"
-#include "alock/src/locks/rdma_spin_lock/rdma_spin_lock.h"
-#include "alock/src/locks/a_lock/a_lock_handle.h"
-#include "alock/util.h"
-
-#include "absl/status/status.h"
-#include "rome/colosseum/client_adaptor.h"
-#include "rome/colosseum/streams/streams.h"
-#include "rome/logging/logging.h"
-#include "rome/metrics/counter.h"
-#include "rome/rdma/channel/sync_accessor.h"
-#include "rome/rdma/connection_manager/connection.h"
-#include "rome/rdma/connection_manager/connection_manager.h"
-#include "rome/rdma/memory_pool/memory_pool.h"
-#include "rome/util/status_util.h"
+#include "locks/rdma_mcs_lock.h"
+#include "locks/rdma_spin_lock.h"
+#include "locks/a_lock.h"
+#include "common.h"
+#include "experiment.h"
 
 #ifdef __cpp_lib_hardware_interference_size
 using std::hardware_constructive_interference_size;
@@ -30,16 +20,6 @@ using std::hardware_destructive_interference_size;
 constexpr std::size_t hardware_constructive_interference_size = 64;
 constexpr std::size_t hardware_destructive_interference_size = 64;
 #endif
-
-using ::rome::ClientAdaptor;
-using ::rome::Stream;
-using ::rome::metrics::Counter;
-using ::rome::rdma::RemoteObjectProto;
-using Peer = ::rome::rdma::MemoryPool::Peer;
-using cm_type = ::rome::rdma::MemoryPool::cm_type;
-using conn_type = ::rome::rdma::MemoryPool::conn_type;
-
-using key_type = uint64_t;
 
 #ifdef LOCK_HANDLE
 using LockHandle = LOCK_HANDLE;
@@ -53,65 +33,57 @@ using LockType = LOCK_TYPE;
 #error "LOCK_TYPE is undefined"
 #endif
 
-using LockTable = X::LockTable<key_type, LockType>;
-using root_type = X::rdma_ptr<LockType>;
+using LockTable = LockTable<key_type, LockType>;
+using root_type = rdma_ptr<LockType>;
 using root_map = std::map<uint32_t, root_type>;
 using key_map = std::map<uint32_t, std::pair<key_type, key_type>>;
 using Operation = key_type;
 
-// uint64_t lock_byte_size_ = sizeof(LockType);
-uint64_t lock_byte_size_ = CACHELINE_SIZE;
+uint64_t lock_byte_size_ = sizeof(LockType);
+ROME_ASSERT(lock_byte_size_ == CACHELINE_SIZE);
 
 // struct LockOp {
 //   key_type key; 
 //   std::chrono::nanoseconds think;
 // };
 
-static constexpr uint16_t kServerPort = 18000;
-static constexpr uint16_t kBaseClientPort = 18001;
+auto CalcThreadKeyRange(BenchmarkParams &params, Peer self){
+  int total_keys = params.max_key - params.min_key + 1;
+  int keys_per_client = total_keys / params.thread_count;
+  int keys_per_node = total_keys / params.node_count;
 
-void PopulateDefaultValues(ExperimentParams* params) {
-  if (!params->workload().has_min_key())
-    params->mutable_workload()->set_min_key(0);
-  if (!params->workload().has_max_key())
-    params->mutable_workload()->set_max_key(1000000);
-  if (!params->workload().has_theta())
-    params->mutable_workload()->set_theta(0.99);
-  if (!params->has_num_threads()) params->set_num_threads(1);
-  if (!params->has_sampling_rate_ms())
-    params->set_sampling_rate_ms(10);
+
+  // return pair of key range to be populated by thread
+  auto result = std::make_pair(low, high);
 }
 
-absl::Status ValidateExperimentParams(const ExperimentParams& params) {
-  if (!params.has_workload()) {
-    return util::InvalidArgumentErrorBuilder()
-           << "No workload: " << params.DebugString();
-  }
-  if (params.client_ids_size() != params.num_threads()) {
-    return util::InvalidArgumentErrorBuilder()
-            << "Number of threads does not match node node_ids: " << params.DebugString();
-  } 
-  return absl::OkStatus();
+auto CalcLocalNodeRange(BenchmarkParams &params, Peer self){
+  int total_keys = params.max_key - params.min_key + 1;
+  int keys_per_client = total_keys / params.thread_count;
+  int keys_per_node = total_keys / params.node_count;
+  // return pair of node's entire local key range
+  auto result = std::make_pair(low, high);
+
 }
 
 //Using this one since it seems to perform equally to opstream3, and is more trusted
-auto CreateOpStream(const ExperimentParams& params, const X::NodeProto& node){
+auto CreateOpStream(BenchmarkParams &params, Peer self){
   auto num_keys = 10e6; //10M
 
-  int local_start = node.local_range().low();
-  int local_end = node.local_range().high();
+  auto local_start, local_end = CalcLocalNodeRange(params, self);
   int local_range = local_end - local_start + 1;
-  int min_key = params.workload().min_key();
-  int max_key = params.workload().max_key();
+
+  int min_key = params.min_key;
+  int max_key = params.max_key;
   int full_range = max_key - min_key + 1;
-  auto p_local = params.workload().p_local() * 100; //change to represent a percentage
+
+  auto p_local = params.p_local * 100; //change to represent a percentage
 
   std::vector<key_type> keys;
   keys.reserve(num_keys); //reserve room for 5M keys
 
   std::mt19937 gen;
   std::uniform_int_distribution<> dist(1, max_key);
-
 
   for (auto i = 0; i < num_keys; i++){
     volatile int random = dist(gen);
@@ -140,13 +112,7 @@ auto CreateOpStream(const ExperimentParams& params, const X::NodeProto& node){
 
 }
 
-auto CreateOpStream(const ExperimentParams& params) {
-  return std::make_unique<rome::RandomDistributionStream<
-      std::uniform_int_distribution<key_type>, key_type, key_type>>(
-      params.workload().min_key(), params.workload().max_key());
-}
-
-void RecordResults(const ExperimentParams &experiment_params,
+void RecordResults(BenchmarkParams &params,
                           const std::vector<ResultProto> &experiment_results) {                      
   ResultsProto results;
   results.mutable_experiment_params()->CopyFrom(experiment_params);

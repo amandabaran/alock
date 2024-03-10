@@ -3,25 +3,14 @@
 #include <cstdint>
 #include <string_view>
 
-#include "absl/strings/str_cat.h"
-#include "alock/src/cluster/cluster.pb.h"
-#include "rome/rdma/channel/sync_accessor.h"
-#include "rome/rdma/connection_manager/connection.h"
-#include "rome/rdma/connection_manager/connection_manager.h"
-#include "rome/rdma/memory_pool/memory_pool.h"
-#include "rome/rdma/memory_pool/rdma_ptr.h"
-#include "rome/rdma/rdma_memory.h"
+#include <rome/rdma/rdma.h>
 #include "common.h"
 #include "lock_table.h"
+#include "experiment.h"
 
 
 namespace X {
 
-using ::rome::rdma::ConnectionManager;
-using ::rome::rdma::MemoryPool;
-using ::rome::rdma::remote_nullptr;
-using ::rome::rdma::rdma_ptr;
-using ::rome::rdma::RemoteObjectProto;
 
 template <typename K, typename V>
 class Node {
@@ -34,18 +23,19 @@ class Node {
   
  public:
   ~Node();
-  Node(const NodeProto& np_self, Peer self, std::vector<Peer> peers, std::shared_ptr<rdma_capability> pool, const ClusterProto& cluster, const ExperimentParams& params)
-    : np_self_(np_self),
-      self_(self),
+  Node(Peer self, std::vector<Peer> peers, std::shared_ptr<rdma_capability> pool, const ClusterProto& cluster, BenchmarkParams &params)
+    : self_(self),
       peers_(peers),
       pool_(),
       cluster_(cluster),
       params_(params),
-      prefill_(params.prefill()),
       lock_pool_(MemoryPool::Peer(self.nid(), self.name(), self.port()), std::make_unique<MemoryPool::cm_type>(self.nid())),
       lock_table_(self, lock_pool_) {}
   
   absl::Status Connect(){
+    // TODO: create key range for "node" (aka thread since we need a pool per thread rn)
+    int min_key = 
+    int max_key = 
     ROME_ASSERT_OK(Prefill(self_.range().low(), self_.range().high()));
 
     ROME_ASSERT_OK(FillKeyRangeMap());
@@ -76,20 +66,14 @@ class Node {
     }
     std::atomic_thread_fence(std::memory_order_release);
     
-    return absl::OkStatus();
+    return rome::util::Status::Ok();
   }
 
-  absl::Status Prefill(const key_type& min_key,
-                                   const key_type& max_key) {
-    if (prefill_){
-      ROME_DEBUG("Prefilling lock table... [{}, {}]", min_key, max_key);
-      root_lock_ptr_ = lock_table_.AllocateLocks(min_key, max_key);
-    } else {
-      ROME_DEBUG("Prefilling set to false, one lock per lock table");
-      root_lock_ptr_ = lock_table_.AllocateLocks(min_key, min_key);
-    }
+  absl::Status Prefill(const key_type& min_key, const key_type& max_key) {
+    ROME_DEBUG("Prefilling lock table... [{}, {}]", min_key, max_key);
+    root_lock_ptr_ = lock_table_.AllocateLocks(min_key, max_key);
     root_ptrs_.emplace(self_.nid(), root_lock_ptr_);
-    return absl::OkStatus();
+    return rome::util::Status::Ok();
   }
 
   absl::Status FillKeyRangeMap(){
@@ -98,7 +82,7 @@ class Node {
       auto key_range = node.range();
       key_range_map_.emplace(node.nid(), std::make_pair(key_range.low(), key_range.high()));
     }
-    return absl::OkStatus();
+    return rome::util::Status::Ok();
   }
 
   LockTable<K, V>* GetLockTable() { return &lock_table_; }
@@ -109,15 +93,12 @@ class Node {
 
   MemoryPool* GetLockPool(){ return &pool_; }
 
- private:
-  inline static void cpu_relax() { asm volatile("pause\n" : : : "memory"); }
-  
+ private:  
   const NodeProto np_self_;
   Peer self_;
   std::vector<MemoryPool::Peer> peers_;
   const ClusterProto cluster_;
   const ExperimentParams params_;
-  bool prefill_;
 
   std::shared_ptr<rdma_capability> pool_;
   LockTable<K,V> lock_table_;

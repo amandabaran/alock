@@ -5,23 +5,11 @@
 #include <limits>
 #include <random>
 
-#include "absl/status/status.h"
-#include "absl/status/statusor.h"
-#include "alock/benchmark/one_lock/experiment.pb.h"
-#include "rome/colosseum/qps_controller.h"
-#include "rome/colosseum/streams/streams.h"
-#include "rome/colosseum/workload_driver.h"
 #include "rome/logging/logging.h"
-#include "rome/rdma/connection_manager/connection_manager.h"
-#include "rome/rdma/memory_pool/memory_pool.h"
-#include "rome/rdma/memory_pool/rdma_ptr.h"
-#include "rome/util/clocks.h"
-#include "rome/util/distribution_util.h"
-#include "alock/src/cluster/node.h"
-#include "alock/src/cluster/lock_table.h"
-#include "alock/src/cluster/common.h"
-
+#include <rome/rdma/rdma.h>
+#include "node.h"
 #include "setup.h"
+#include "experiment.h"
 
 using ::rome::rdma::MemoryPool;
 
@@ -44,7 +32,7 @@ class Client : public rome::ClientAdaptor<key_type> {
     exit(signal);
   }
 
-  static absl::StatusOr<ResultProto> Run(
+  static rome::util::StatusOr<ResultProto> Run(
       std::unique_ptr<Client> client, const ExperimentParams& experiment_params,
       volatile bool* done) {
 
@@ -138,7 +126,7 @@ class Client : public rome::ClientAdaptor<key_type> {
     return X::remote_nullptr;
   }
 
-  absl::Status Start() override {
+  rome::util::Status Start() override {
     ROME_DEBUG("Starting Client...");
     root_lock_ptr_ = root_ptrs_->at(self_.id);
     auto status = lock_handle_.Init();
@@ -148,7 +136,7 @@ class Client : public rome::ClientAdaptor<key_type> {
     return status;
   }
 
-  absl::Status Apply(const key_type &op) override {
+  rome::util::Status Apply(const key_type &op) override {
     // key_type k = 6;
     ROME_DEBUG("Client {} attempting to lock key {}", self_.id, op);    
     X::rdma_ptr<LockType> lock_addr = CalcLockAddr(op);
@@ -163,16 +151,16 @@ class Client : public rome::ClientAdaptor<key_type> {
     ROME_TRACE("Client {} unlocking key {}...", self_.id, op);
     lock_handle_.Unlock(lock_addr);
     ROME_TRACE("Unlocked key {}", op);
-    return absl::OkStatus();
+    return rome::util::Status::Ok();
   }
 
     
-  absl::Status Stop() override {
+  rome::util::Status Stop() override {
     std::this_thread::sleep_for(std::chrono::seconds(1)); //sleep for a sec to let remote ops finish?
     ROME_INFO("Stopping...");
     barrier_->arrive_and_wait();
     ROME_INFO("Client {} Reaq Count {}", self_.id, lock_handle_.GetReaqCount());
-    return absl::OkStatus();
+    return rome::util::Status::Ok();
   }
 
   X::NodeProto ToProto() {  

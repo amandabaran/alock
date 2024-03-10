@@ -1,11 +1,9 @@
 #pragma once
 
 #include <cstdint>
-#include "alock/src/cluster/cluster.pb.h"
-#include "alock/src/cluster/common.h"
-#include "rome/rdma/memory_pool/rdma_ptr.h"
-
-namespace X {
+#include "common.h"
+#include "setup.h"
+#include <rome/rdma/rdma.h>
 
 template <typename V>
 struct alignas(128) Entry {
@@ -20,12 +18,11 @@ template <typename K, typename V>
 class LockTable {
  using key_type = K; // some int (uint16)
  using lock_type = V; // ALock or MCS or Spin
- using MemoryPool = rome::rdma::MemoryPool;
  using root_type = rome::rdma::rdma_ptr<lock_type>;
 
  public:
-  LockTable(const NodeProto& node, std::shared_ptr<rdma_capability> pool)
-    :   self_(node),
+  LockTable(Peer self, std::shared_ptr<rdma_capability> pool)
+    :   self_(self),
         node_id_(node.nid()),
         lock_pool_(pool) {
             min_key_ = self_.range().low();
@@ -47,12 +44,10 @@ class LockTable {
   }
 
  private:
-  const NodeProto& self_;
+  Peer self_;
   const uint32_t node_id_;
   std::shared_ptr<rdma_capability> lock_pool_;
   root_type root_lock_ptr_;
   key_type max_key_;
   key_type min_key_;
 };
-
-}  // namespace X

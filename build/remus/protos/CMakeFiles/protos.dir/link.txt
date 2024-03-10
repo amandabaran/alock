@@ -1,0 +1,2 @@
+/usr/bin/llvm-ar-15 qc libprotos.a CMakeFiles/protos.dir/metrics.pb.cc.o CMakeFiles/protos.dir/workloaddriver.pb.cc.o CMakeFiles/protos.dir/experiment.pb.cc.o CMakeFiles/protos.dir/rdma.pb.cc.o
+/usr/bin/llvm-ranlib-15 libprotos.a

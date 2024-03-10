@@ -1,7 +1,5 @@
-include <vector>
+#include <vector>
 
-#include <protos/experiment.pb.h>
-#include <rome/rdma/memory_pool.h>
 #include <rome/logging/logging.h>
 #include <rome/rdma/rdma.h>
 #include <rome/util/cli.h>

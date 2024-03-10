@@ -7,21 +7,10 @@
 #include <memory>
 #include <thread>
 
-#include "rome/rdma/channel/sync_accessor.h"
-#include "rome/rdma/connection_manager/connection.h"
-#include "rome/rdma/connection_manager/connection_manager.h"
-#include "rome/rdma/memory_pool/memory_pool.h"
-#include "rome/rdma/rdma_memory.h"
-#include "rome/metrics/summary.h"
-#include "../../../util.h"
+#include <rome/rdma/rdma.h>
+#include "common.h"
 
-namespace X {
-
-using ::rome::rdma::ConnectionManager;
-using ::rome::rdma::MemoryPool;
-using ::rome::rdma::remote_nullptr;
-using ::rome::rdma::rdma_ptr;
-using ::rome::rdma::RemoteObjectProto;
+using namespace rome::rdma;
 
 struct alignas(64) RdmaSpinLock {
     uint64_t lock{0};
@@ -34,14 +23,14 @@ static_assert(sizeof(RdmaSpinLock) == CACHELINE_SIZE);
 
 class RdmaSpinLockHandle{
 public:
-  RdmaSpinLockHandle(MemoryPool::Peer self, MemoryPool& pool, std::unordered_set<int> local_clients, int64_t local_budget, int64_t remote_budget)
+  RdmaSpinLockHandle(Peer self, std::shared_ptr<rdma_capability> pool, std::unordered_set<int> local_clients, int64_t local_budget, int64_t remote_budget)
     : self_(self), pool_(pool), local_clients_(local_clients), lock_count_(0) {}
 
-  absl::Status Init() {
+  rome::util::Status Init() {
     // Preallocate memory for RDMA writes
-    local_ = pool_.Allocate<uint64_t>();
+    local_ = pool_->Allocate<uint64_t>();
     std::atomic_thread_fence(std::memory_order_release);
-    return absl::OkStatus();
+    return rome::util::Status::Ok();
   }
 
   uint64_t GetReaqCount(){
@@ -58,7 +47,7 @@ public:
   }
 
   bool IsLocked(rdma_ptr<RdmaSpinLock> lock) { 
-    uint64_t val = static_cast<uint64_t>(pool_.Read(lock));
+    uint64_t val = static_cast<uint64_t>(pool_->Read(lock));
     if (val == kUnlocked){
       return false;
     }
@@ -68,7 +57,7 @@ public:
   void Lock(rdma_ptr<RdmaSpinLock> lock) {  
     lock_ = decltype(lock_)(lock.id(), lock.address());
     //?: IDEA: switch to read and write to see if CAS introduces an issue with the rdma card because its atomic
-    while (pool_.CompareAndSwap(lock_, kUnlocked, self_.id) != kUnlocked) {
+    while (pool_->CompareAndSwap(lock_, kUnlocked, self_.id) != kUnlocked) {
       cpu_relax();
     }
     std::atomic_thread_fence(std::memory_order_release);
@@ -77,9 +66,9 @@ public:
 
   void  Unlock(rdma_ptr<RdmaSpinLock> lock) {
     ROME_ASSERT(lock.address() == lock_.address(), "Attempting to unlock spinlock that is not locked.");
-    pool_.Write<uint64_t>(lock_, 0, /*prealloc=*/local_);
+    pool_->Write<uint64_t>(lock_, 0, /*prealloc=*/local_);
     std::atomic_thread_fence(std::memory_order_release);
-    lock_ = remote_nullptr;
+    lock_ = nullptr;
     return;
   }
 
@@ -91,13 +80,11 @@ private:
   static constexpr uint64_t kUnlocked = 0;
   bool is_host_;
 
-  MemoryPool::Peer self_;
-  MemoryPool &pool_;
+  Peer self_;
+  std::shared_ptr<rdma_capability> pool_;
   std::unordered_set<int> local_clients_;
 
   rdma_ptr<uint64_t> lock_;
   rdma_ptr<uint64_t> local_;
 
 };
-
-} // namespace X
