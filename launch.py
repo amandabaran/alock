@@ -36,11 +36,14 @@ qps_sample_rate = 10 # not sure what these do, so leaving them out of the cmd-li
 max_qps_second = -1
 parser.add_argument('--runtime', type=int, default=10, help="How long to run the experiment before cutting off")
 parser.add_argument('--unlimited_stream', action='store_true', help="If to run the stream for an infinite amount or just until the operations run out")
-parser.add_argument('--op_distribution', type=str, default="80-10-10", help="The distribution of operations as contains-insert-remove. Must add up to 100")
+# parser.add_argument('--op_distribution', type=str, default="80-10-10", help="The distribution of operations as contains-insert-remove. Must add up to 100")
+# parser.add_argument('--p_local', type=int, default=50, help="The distribution of operations as contains-insert-remove. Must add up to 100")
 parser.add_argument('--op_count', type=int, default=10000, help="The number of operations to run if unlimited stream is passed as False.")
-parser.add_argument('-min_key', '--min_key', type=str, default='0', help="Pass in the lower bound of the key range. Can use e-notation as well.")
-parser.add_argument('-max_key', '--max_key', type=str, default='1e5', help="Pass in the ubber bound of the key range. Can use e-notation as well.")
+parser.add_argument('--min_key', type=str, default='0', help="Pass in the lower bound of the key range. Can use e-notation as well.")
+parser.add_argument('--max_key', type=str, default='1e5', help="Pass in the ubber bound of the key range. Can use e-notation as well.")
 parser.add_argument('--region_size', type=int, default=25, help="2 ^ x bytes to allocate on each node")
+parser.add_argument('--local_budget', type=int, default=5, help="Initial budget for Alock Local Cohort")
+parser.add_argument('--remote_budget', type=int, default=5, help="Initial budget for Alock Remote Cohort")
 # Experiment resources
 parser.add_argument('--thread_count', type=int, default=1, help="The number of threads to start per client. Only applicable in send_exp")
 parser.add_argument('--node_count', type=int, default=1, help="The number of nodes to use in the experiment. Will use node0-nodeN")
