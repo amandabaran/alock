@@ -11,9 +11,6 @@
 /// @param thread_count How many threads to spawn with the operations
 /// @param node_count How many nodes are in the experiment
 /// @param qp_max The max number of queue pairs to allocate for the experiment.
-/// @param contains Percentage of operations are contains, (contains + insert + remove = 100)
-/// @param insert Percentage of operations are inserts, (contains + insert + remove = 100)
-/// @param remove Percentage of operations are removes, (contains + insert + remove = 100)
 /// @param p_local; Percentage of operations thare are local
 /// @param min_key The lower limit of the key range for operations
 /// @param max_key The upper limit of the key range for operations
@@ -37,12 +34,6 @@ public:
     int node_count;
     /// The max number of queue pairs to allocate for the experiment.
     int qp_max;
-    /// Percentage of operations are contains, (contains + insert + remove = 100)
-    int contains;
-    //. Percentage of operations are inserts, (contains + insert + remove = 100)
-    int insert;
-    /// Percentage of operations are removes, (contains + insert + remove = 100)
-    int remove;
     // Percentage of operations that are local
     int p_local;
     /// The lower limit of the key range for operations
@@ -65,9 +56,6 @@ public:
         thread_count = args.iget("--thread_count");
         node_count = args.iget("--node_count");
         qp_max = args.iget("--qp_max");
-        contains = args.iget("--contains");
-        insert = args.iget("--insert");
-        remove = args.iget("--remove");
         p_local = args.iget("--p_local");
         min_key = args.iget("--min_key");
         max_key = args.iget("--max_key");
@@ -109,9 +97,6 @@ public:
         builder += std::to_string(params.thread_count) + ",";
         builder += std::to_string(params.node_count) + ",";
         builder += std::to_string(params.qp_max) + ",";
-        builder += std::to_string(params.contains) + ",";
-        builder += std::to_string(params.insert) + ",";
-        builder += std::to_string(params.remove) + ",";
         builder += std::to_string(params.p_local) + ",";
         builder += std::to_string(params.min_key) + ",";
         builder += std::to_string(params.max_key) + ",";
@@ -143,9 +128,6 @@ public:
         builder += "\t\tthread_count: " + std::to_string(params.thread_count) + "\n";
         builder += "\t\tnode_count: " + std::to_string(params.node_count) + "\n";
         builder += "\t\tqp_max: " + std::to_string(params.qp_max) + "\n";
-        builder += "\t\tcontains: " + std::to_string(params.contains) + "\n";
-        builder += "\t\tinsert: " + std::to_string(params.insert) + "\n";
-        builder += "\t\tremove: " + std::to_string(params.remove) + "\n";
         builder += "\t\tp_local: " + std::to_string(params.p_local) + "\n";
         builder += "\t\tmin_key: " + std::to_string(params.min_key) + "\n";
         builder += "\t\tmax_key: " + std::to_string(params.max_key) + "\n";

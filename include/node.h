@@ -8,10 +8,6 @@
 #include "lock_table.h"
 #include "experiment.h"
 
-
-namespace X {
-
-
 template <typename K, typename V>
 class Node {
   using key_type = K; // some int (uint16)
@@ -106,7 +102,3 @@ class Node {
   key_map key_range_map_;
   root_map root_ptrs_;
 };
-
-}  // namespace X
-
-#include "node_impl.h"

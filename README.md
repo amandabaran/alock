@@ -25,3 +25,14 @@ In order to plot the data, run the plot.sh script with the name of the directory
 
 For example, plotting the scalability experiment would be the command: 
 "zsh plot.sh scalability_exp"
+
+
+## Commands
+
+# Sync
+sh sync.sh -u adb321
+
+# Install Dependencies 
+From remus/scripts:
+<!-- -i installs dependencies for first time connecting to nodes -->
+sh sync.sh -u adb321 -i 
