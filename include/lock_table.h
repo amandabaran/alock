@@ -3,7 +3,7 @@
 #include <cstdint>
 #include "common.h"
 #include "setup.h"
-#include <rome/rdma/rdma.h>
+#include <remus/rdma/rdma.h>
 
 template <typename V>
 struct alignas(128) Entry {
@@ -18,27 +18,24 @@ template <typename K, typename V>
 class LockTable {
  using key_type = K; // some int (uint16)
  using lock_type = V; // ALock or MCS or Spin
- using root_type = rome::rdma::rdma_ptr<lock_type>;
+ using root_type = remus::rdma::rdma_ptr<lock_type>;
 
  public:
   LockTable(Peer self, std::shared_ptr<rdma_capability> pool)
     :   self_(self),
-        node_id_(node.nid()),
-        lock_pool_(pool) {
-            min_key_ = self_.range().low();
-            max_key_= self_.range().high();
-  }
+        node_id_(self.id),
+        lock_pool_(pool) {}
 
   root_type AllocateLocks(const key_type& min_key, const key_type& max_key){
-    auto lock = lock_pool_.Allocate<lock_type>();
+    auto lock = lock_pool_->Allocate<lock_type>();
     root_lock_ptr_ = lock;
-    ROME_TRACE("Allocated root lock for key {}", static_cast<key_type>(min_key));
+    REMUS_TRACE("Allocated root lock for key {}", static_cast<key_type>(min_key));
     // Allocate one lock per key
     for (auto i = min_key + 1; i <= max_key; i++){
-        auto __attribute__ ((unused)) lock = lock_pool_.Allocate<lock_type>();
-        ROME_TRACE("Allocated lock for key {}", i);
+        auto __attribute__ ((unused)) lock = lock_pool_->Allocate<lock_type>();
+        REMUS_TRACE("Allocated lock for key {}", i);
     }
-    ROME_DEBUG("Root Ptr on Node {} is {:x}", node_id_, static_cast<uint64_t>(root_lock_ptr_));
+    REMUS_DEBUG("Root Ptr on Node {} is {:x}", node_id_, static_cast<uint64_t>(root_lock_ptr_));
     // return pointer to first lock in table
     return root_lock_ptr_;
   }

@@ -7,10 +7,10 @@
 #include <memory>
 #include <thread>
 
-#include <rome/rdma/rdma.h>
+#include <remus/rdma/rdma.h>
 #include "common.h"
 
-using namespace rome::rdma;
+using namespace remus::rdma;
 
 // Uses MCS algorithm from page 10 of: "Algorithms for Scalable Synchronization on Shared-Memory Multiprocessor" 
 // by John Mellor-Crummey and Michael L. Scott https://www.cs.rochester.edu/u/scott/papers/1991_TOCS_synch.pdf 
@@ -33,28 +33,28 @@ public:
   RdmaMcsLockHandle(Peer self, std::shared_ptr<rdma_capability> pool, std::unordered_set<int> local_clients, int64_t local_budget, int64_t remote_budget)
       : self_(self), pool_(pool), local_clients_(local_clients), lock_count_(0) {}
 
-  rome::util::Status Init() {    
+  remus::util::Status Init() {    
     // Reserve remote memory for the local descriptor.
     desc_pointer_ = pool_->Allocate<RdmaMcsLock>();
     descriptor_ = reinterpret_cast<RdmaMcsLock *>(desc_pointer_.address());
-    ROME_DEBUG("RdmaMcsLock @ {:x}", static_cast<uint64_t>(desc_pointer_));
+    REMUS_DEBUG("RdmaMcsLock @ {:x}", static_cast<uint64_t>(desc_pointer_));
     //Used as preallocated memory for RDMA writes
     prealloc_ = pool_->Allocate<rdma_ptr<RdmaMcsLock>>();
 
     std::atomic_thread_fence(std::memory_order_release);
-    return rome::util::Status::Ok();
+    return remus::util::Status::Ok();
   }
 
   uint64_t GetReaqCount(){
     return 0;
   }
 
-  rome::metrics::MetricProto GetLocalLatSummary() { 
-    rome::metrics::Summary<double> local("local_lat", "ns", 1000);
+  remus::metrics::MetricProto GetLocalLatSummary() { 
+    remus::metrics::Summary<double> local("local_lat", "ns", 1000);
     return local.ToProto(); 
   }
-  rome::metrics::MetricProto GetRemoteLatSummary() { 
-    rome::metrics::Summary<double> remote("local_lat", "ns", 1000);
+  remus::metrics::MetricProto GetRemoteLatSummary() { 
+    remus::metrics::Summary<double> remote("local_lat", "ns", 1000);
     return remote.ToProto(); 
   }
 
@@ -77,9 +77,9 @@ public:
 
   void Lock(rdma_ptr<RdmaMcsLock> lock) {
     lock_ = lock;
-    ROME_DEBUG("lock_: {:x}", static_cast<uint64_t>(lock_));
+    REMUS_DEBUG("lock_: {:x}", static_cast<uint64_t>(lock_));
     tail_pointer_ = decltype(tail_pointer_)(lock.id(), lock.address() + NEXT_PTR_OFFSET);
-    ROME_DEBUG("tail_pointer_: {:x}", static_cast<uint64_t>(tail_pointer_));
+    REMUS_DEBUG("tail_pointer_: {:x}", static_cast<uint64_t>(tail_pointer_));
     // Set local descriptor to initial values
     descriptor_->locked = UNLOCKED;
     descriptor_->next = nullptr;
@@ -96,7 +96,7 @@ public:
       pool_->Write<rdma_ptr<RdmaMcsLock>>(
           static_cast<rdma_ptr<rdma_ptr<RdmaMcsLock>>>(prev), desc_pointer_,
           prealloc_);
-      ROME_DEBUG("[Lock] Enqueued: {} --> (id={})",
+      REMUS_DEBUG("[Lock] Enqueued: {} --> (id={})",
                 static_cast<uint64_t>(prev.id()),
                 static_cast<uint64_t>(desc_pointer_.id()));
       // spins, waits for Unlock() to unlock our desriptor and let us enter the CS
@@ -105,7 +105,7 @@ public:
       }
     } 
     // Once here, we can enter the critical section
-    ROME_DEBUG("[Lock] Acquired: prev={:x}, locked={:x} (id={})",
+    REMUS_DEBUG("[Lock] Acquired: prev={:x}, locked={:x} (id={})",
               static_cast<uint64_t>(prev), descriptor_->locked,
               static_cast<uint64_t>(desc_pointer_.id()));
     //  make sure Lock operation finished
@@ -114,7 +114,7 @@ public:
   }
 
   void Unlock(rdma_ptr<RdmaMcsLock> lock) {
-    ROME_ASSERT(lock.address() == lock_.address(), "Attempting to unlock lock that is not locked.");
+    REMUS_ASSERT(lock.address() == lock_.address(), "Attempting to unlock lock that is not locked.");
     std::atomic_thread_fence(std::memory_order_release);
     // if tail_pointer_ == my desc (we are the tail), set it to 0 to unlock
     // otherwise, someone else is contending for lock and we want to give it to them
@@ -133,7 +133,7 @@ public:
                             UNLOCKED,
                             static_cast<rdma_ptr<uint64_t>>(prealloc_));
     } 
-    ROME_DEBUG("[Unlock] Unlocked (id={}), locked={:x}",
+    REMUS_DEBUG("[Unlock] Unlocked (id={}), locked={:x}",
                 static_cast<uint64_t>(desc_pointer_.id()),
                 descriptor_->locked);
   }

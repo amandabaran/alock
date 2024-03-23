@@ -7,10 +7,10 @@
 #include <memory>
 #include <thread>
 
-#include <rome/rdma/rdma.h>
+#include <remus/rdma/rdma.h>
 #include "common.h"
 
-using namespace rome::rdma;
+using namespace remus::rdma;
 
 struct alignas(64) RdmaSpinLock {
     uint64_t lock{0};
@@ -26,23 +26,23 @@ public:
   RdmaSpinLockHandle(Peer self, std::shared_ptr<rdma_capability> pool, std::unordered_set<int> local_clients, int64_t local_budget, int64_t remote_budget)
     : self_(self), pool_(pool), local_clients_(local_clients), lock_count_(0) {}
 
-  rome::util::Status Init() {
+  remus::util::Status Init() {
     // Preallocate memory for RDMA writes
     local_ = pool_->Allocate<uint64_t>();
     std::atomic_thread_fence(std::memory_order_release);
-    return rome::util::Status::Ok();
+    return remus::util::Status::Ok();
   }
 
   uint64_t GetReaqCount(){
     return 0;
   }
 
-  rome::metrics::MetricProto GetLocalLatSummary() { 
-    rome::metrics::Summary<double> local("local_lat", "ns", 1000);
+  remus::metrics::MetricProto GetLocalLatSummary() { 
+    remus::metrics::Summary<double> local("local_lat", "ns", 1000);
     return local.ToProto(); 
   }
-  rome::metrics::MetricProto GetRemoteLatSummary() { 
-    rome::metrics::Summary<double> remote("local_lat", "ns", 1000);
+  remus::metrics::MetricProto GetRemoteLatSummary() { 
+    remus::metrics::Summary<double> remote("local_lat", "ns", 1000);
     return remote.ToProto(); 
   }
 
@@ -65,7 +65,7 @@ public:
   }
 
   void  Unlock(rdma_ptr<RdmaSpinLock> lock) {
-    ROME_ASSERT(lock.address() == lock_.address(), "Attempting to unlock spinlock that is not locked.");
+    REMUS_ASSERT(lock.address() == lock_.address(), "Attempting to unlock spinlock that is not locked.");
     pool_->Write<uint64_t>(lock_, 0, /*prealloc=*/local_);
     std::atomic_thread_fence(std::memory_order_release);
     lock_ = nullptr;

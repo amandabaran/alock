@@ -7,6 +7,8 @@ option(DOCS "Set to build documentation" OFF)
 # Flags
 set(CXX_STANDARD 20 CACHE STRING "Uses C++20 or 23")
 
+set(LOCK "ALock") #default
+
 #######################################################################################################################
 # Setup
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,7 +21,7 @@ enable_testing()
 #######################################################################################################################
 ## Libraries
 
-add_subdirectory(../remus remus)
+find_package(remus REQUIRED)
 
 #######################################################################################################################
 ## Install
@@ -28,9 +30,10 @@ add_subdirectory(../remus remus)
 
 add_executable(main main.cc)
 target_include_directories(main PRIVATE include)
-target_link_libraries(main PUBLIC rome::rdma rome::workload rome::util)
+target_link_libraries(main PUBLIC remus::rdma remus::workload remus::util)
 # Set up the logging level
-target_compile_definitions(main PUBLIC ROME_LOG_LEVEL=${LOG_LEVEL})
+target_compile_definitions(main PUBLIC REMUS_LOG_LEVEL=${LOG_LEVEL})
+target_compile_definitions(main PUBLIC LOCK_TYPE=${LOCK} LOCK_HANDLE=${LOCK}Handle)
 
 #######################################################################################################################
 ## DEB Package

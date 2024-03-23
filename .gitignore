@@ -16,3 +16,5 @@
 alock/**/*.pbtxt
 .DS_Store
 **build**
+**log**
+**.screenrc**

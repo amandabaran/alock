@@ -22,27 +22,26 @@ parser = argparse.ArgumentParser(description='Process the parameters for running
 # Experiment configuration
 parser.add_argument('-u', '--ssh_user', type=str, required=True, help='Username for login)')
 parser.add_argument('-e', '--experiment_name', type=str, required=True, help="Used as local save directory")
-parser.add_argument('--nodefile', type=str, default="../../scripts/cloudlab.csv", help='Path to csv with the node names')
+parser.add_argument('--nodefile', type=str, default="../../remus-internal/scripts/cloudlab.csv", help='Path to csv with the node names')
 parser.add_argument('--dry_run', action='store_true', help='Print the commands instead of running them')
-parser.add_argument('--exp_result', type=str, default='alock_result.csv', help='File to retrieve experiment result')
+parser.add_argument('--exp_result', type=str, default='result.csv', help='File to retrieve experiment result')
 
 # Program run-types
-# parser.add_argument('--runtype', required=True, choices=['test', 'concurrent_test', 'bench'], help="Define the type of experiment to run. Test will run correctness tests single-threaded. Concurrent test will run a correctness test with multiple threads. And bench will run a benchmark")
 parser.add_argument('--log_level', default='info', choices=['info', 'debug', 'trace'], help='The level of print-out in the program')
 
 # Experiment parameters
-parser.add_argument('--from_param_config', type=str, default=None, help="Used to override the parameters with a config file.")
+parser.add_argument('--from_param_config', type=str, default=None, help="If to override the parameters with a config file.")
 qps_sample_rate = 10 # not sure what these do, so leaving them out of the cmd-line options
 max_qps_second = -1
 parser.add_argument('--runtime', type=int, default=10, help="How long to run the experiment before cutting off")
 parser.add_argument('--unlimited_stream', action='store_true', help="If to run the stream for an infinite amount or just until the operations run out")
+parser.add_argument('--p_local', type=int, default=50, help="The percentage of operations that should be local")
 parser.add_argument('--op_count', type=int, default=10e6, help="The number of operations to run if unlimited stream is passed as False.")
 parser.add_argument('--min_key', type=str, default='0', help="Pass in the lower bound of the key range. Can use e-notation as well.")
 parser.add_argument('--max_key', type=str, default='1e5', help="Pass in the ubber bound of the key range. Can use e-notation as well.")
 parser.add_argument('--region_size', type=int, default=25, help="2 ^ x bytes to allocate on each node")
 parser.add_argument('--local_budget', type=int, default=5, help="Initial budget for Alock Local Cohort")
 parser.add_argument('--remote_budget', type=int, default=5, help="Initial budget for Alock Remote Cohort")
-parser.add_argument('--p_local', type=int, default=50, help="Percentage of operations that are on local locks. ")
 # Experiment resources
 parser.add_argument('--thread_count', type=int, default=1, help="The number of threads to start per client. Only applicable in send_exp")
 parser.add_argument('--node_count', type=int, default=1, help="The number of nodes to use in the experiment. Will use node0-nodeN")
@@ -50,8 +49,11 @@ parser.add_argument('--qp_max', type=int, default=30, help="The number of queue 
 ARGS = parser.parse_args()
 
 # Get parent folder name
-dir = os.path.abspath("../..")
-bin_dir = dir.split("/").pop()
+bin_dir = "alock"
+dir = "alock"
+# dir = os.path.abspath("../..")
+# bin_dir = dir.split("/").pop()
+# print(dir, '\n', bin_dir)
 
 def quote(string):
     return f"'{string}'"
@@ -71,23 +73,21 @@ def process_exp_flags(node_id):
             # Load the json into the proto
             json_data = f.read()
             mapper = json.loads(json_data)
-            one_to_ones = ["runtime", "op_count", "min_key", "max_key", "region_size", "thread_count", "node_count", "qp_max"]
+            one_to_ones = ["runtime", "op_count", "min_key", "max_key", "region_size", "thread_count", "node_count", "qp_max", "p_local", "local_budget", "remote_budget"]
             for param in one_to_ones:
                 params += f" --{param} " + str(mapper[param]).lower()
             if mapper['unlimited_stream'] == True:
                 params += f" --unlimited_stream "
     else:
-        one_to_ones = ["runtime", "op_count", "region_size", "thread_count", "node_count", "qp_max"]
+        one_to_ones = ["runtime", "op_count", "region_size", "thread_count", "node_count", "qp_max", "min_key", "max_key", "p_local", "local_budget", "remote_budget"]
         for param in one_to_ones:
             params += f" --{param} " + str(eval(f"ARGS.{param}")).lower()
         if ARGS.unlimited_stream == True:
             params += f" --unlimited_stream "
-        p_local = ARGS.p_local
-        if int(p_local) < 0 or int(p_local) > 100:
-            print("Must specify value between 0 and 100 for p_local")
+        contains, insert, remove = ARGS.op_distribution.split("-")
+        if int(contains) + int(insert) + int(remove) != 100:
+            print("Must specify values that add to 100 in op_distribution")
             exit(1)
-        params += " --min_key " + str(eval(ARGS.lb))
-        params += " --max_key " + str(eval(ARGS.ub))
     return params
 
 # Create a function that will create a file and run the given command using that file as stout
@@ -130,24 +130,24 @@ def main():
     commands = []
     commands_copy = []
     with open(ARGS.nodefile, "r") as f:
-        # do for all nodes
         for node in csv.reader(f):
             # For every node in nodefile, get the node info
             nodename, nodealias, nodetype = node
             node_id = int(nodename.replace("node", ""))
             # Construct ssh command and payload
             ssh_login = f"ssh {ARGS.ssh_user}@{nodealias}.{domain_name(nodetype)}"
-            payload = f"cd {bin_dir} && cmake . && make && LD_LIBRARY_PATH=.:./protos ./"
-            # Add executable name
-            payload += "main"
-            # Adding experiment flags
+            payload = f"cd {bin_dir} && cmake -DCMAKE_PREFIX_PATH=/opt/remus/lib/cmake -DCMAKE_MODULE_PATH=/opt/remus/lib/cmake .."
+           
             payload += process_exp_flags(node_id)
+          
             # Tuple: (Creating Command | Output File Name)
             commands.append((' '.join([ssh_login, quote(payload)]), nodename))
-            filepath = os.path.join(f"/users/{ARGS.ssh_user}", bin_dir, ARGS.exp_result)
+            
+            filepath = os.path.join(f"/users/{ARGS.ssh_user}", dir, ARGS.exp_result)
             local_dir = os.path.join("./results", ARGS.experiment_name + "-stats", nodename + "-" + ARGS.exp_result)
             copy = f"scp {ssh_login[4:]}:{filepath} {local_dir}"
             commands_copy.append((copy, nodename))
+
     # Execute the commands and let us know we've finished
     execute(commands, "w+")
     execute(commands_copy, "a")
@@ -156,4 +156,5 @@ def main():
 
 
 if __name__ == "__main__":
+    # Run abseil app
     main()
