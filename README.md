@@ -53,3 +53,8 @@ python3 launch.py -u adb321 --from_param_config config.json -e testexp
 
 ## Shutdown on stall
 python shutdown.py -u adb321
+
+
+sh synch.sh -u adb321
+bash launch_experiment.sh -no-prep
+screen -c run.screenrc

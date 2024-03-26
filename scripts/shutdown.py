@@ -12,7 +12,7 @@ def domain_name(nodetype):
 
 parser = argparse.ArgumentParser(description='Process the parameters for shutting down stuck processes')
 parser.add_argument('-u', '--ssh_user', type=str, required=True, help='Username for login)')
-parser.add_argument('--nodefile', type=str, default="../../scripts/cloudlab.csv", help='Path to csv with the node names')
+parser.add_argument('--nodefile', type=str, default="cloudlab.csv", help='Path to csv with the node names')
 parser.add_argument('--dry_run', action='store_true', help='Print the commands instead of running them')
 
 # Define ARGS to represet the flags

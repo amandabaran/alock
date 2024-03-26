@@ -6,8 +6,6 @@
 
 inline static void cpu_relax() { asm volatile("pause\n" : : : "memory"); }
 
-using key_type = uint64_t;
-
 #define CACHELINE_SIZE 64
 
 auto calcThreadKeyRange(const BenchmarkParams &params, uint16_t node_id){
@@ -28,6 +26,7 @@ auto calcLocalNodeRange(const BenchmarkParams &params, uint16_t node_id){
   int total_keys = params.max_key - params.min_key + 1;
   int keys_per_node = total_keys / params.node_count;
 
+  //determine cloud lab physcial node id
   auto nodeid = ceil(node_id/params.thread_count);
   auto low = ((nodeid -1) * keys_per_node) + 1;
   auto high = low + keys_per_node - 1;

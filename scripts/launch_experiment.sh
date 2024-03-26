@@ -30,6 +30,7 @@ source "exp.conf"
 # WARNING:  Order matters for the machines, because there is an implicit
 #           conversion to names like node0, node1, etc.  Be sure to follow the
 #           order in the CloudLab "List View" for your experiment.
+# machines=(apt081 apt141)
 machines=(apt076 apt075 apt081 apt164 apt141) 
 domain=apt.emulab.net
 

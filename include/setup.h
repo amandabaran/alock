@@ -31,19 +31,19 @@ using LockHandle = LOCK_HANDLE;
 #else
 #error "LOCK_TYPE is undefined"
 #endif
- 
+
+using key_type = uint64_t;
 using root_type = rdma_ptr<LockType>;
-using root_map = std::map<uint32_t, root_type>;
-using key_map = std::map<uint32_t, std::pair<key_type, key_type>>;
+using root_map = std::vector<root_type>;
+// <low, high>, vector position = node
+using key_map = std::vector<std::pair<key_type, key_type>>;
 using Operation = key_type;
 
 constexpr uint64_t lock_byte_size_ = sizeof(LockType);
-//error with below?
-//REMUS_ASSERT(lock_byte_size_ == CACHELINE_SIZE);
 
 //Using this one since it seems to perform equally to opstream3, and is more trusted
-auto createOpStream(BenchmarkParams &params, Peer self){
-  auto num_keys = 10e6; //10M
+auto createOpStream(const BenchmarkParams params, Peer self){
+  auto num_keys = params.op_count; 
 
   auto pair  = calcLocalNodeRange(params, self.id);
   auto local_start = pair.first;
@@ -60,7 +60,7 @@ auto createOpStream(BenchmarkParams &params, Peer self){
   keys.reserve(num_keys); //reserve room for 5M keys
 
   std::mt19937 gen;
-  std::uniform_int_distribution<> dist(1, max_key);
+  std::uniform_int_distribution<> dist(min_key, max_key);
 
   for (auto i = 0; i < num_keys; i++){
     volatile int random = dist(gen);
@@ -89,40 +89,33 @@ auto createOpStream(BenchmarkParams &params, Peer self){
 
 }
 
-// void RecordResults(BenchmarkParams &params,
-//                           const std::vector<ResultProto> &experiment_results) {                      
-//   ResultsProto results;
-//   results.mutable_experiment_params()->CopyFrom(experiment_params);
-//   results.set_cluster_size(experiment_params.num_nodes());
-//   for (auto &result : experiment_results) {
-//     auto *r = results.add_results();
-//     r->CopyFrom(result);
-//   }
+createRandomOpStream(const BenchmarkParams params, Peer self){
+  auto num_keys = params.op_count; 
+  auto pair  = calcLocalNodeRange(params, self.id);
+  auto local_start = pair.first;
+  auto local_end = pair.second;
+  int local_range = local_end - local_start + 1;
 
-//   if (experiment_params.has_save_dir()) {
-//     auto save_dir = experiment_params.save_dir();
-//     REMUS_ASSERT(!save_dir.empty(),
-//                 "Trying to write results to a file, but results "
-//                 "directory is empty string");
-//     if (!std::filesystem::exists(save_dir) &&
-//         !std::filesystem::create_directories(save_dir)) {
-//       REMUS_FATAL("Failed to create save directory. Exiting...");
-//     }
+  int min_key = params.min_key;
+  int max_key = params.max_key;
+  int full_range = max_key - min_key + 1;
 
-//     auto filestream = std::ofstream();
-//     std::filesystem::path outfile;
-//     outfile /= save_dir;
-//     std::string filename =
-//         "client."+ (experiment_params.has_name() ? experiment_params.name() : "data") + ".pbtxt";
-//     outfile /= filename;
-//     filestream.open(outfile);
-//     REMUS_ASSERT(filestream.is_open(), "Failed to open output file: {}",
-//                 outfile.c_str());
-//     REMUS_INFO("Saving results to '{}'", outfile.c_str());
-//     filestream << results.DebugString();
-//     filestream.flush();
-//     filestream.close();
-//   } else {
-//     std::cout << results.DebugString();
-//   }
-// }
+  auto p_local = params.p_local;
+
+  std::vector<key_type> keys;
+  keys.reserve(num_keys); //reserve room for 5M keys
+
+  std::mt19937 gen;
+  std::uniform_int_distribution<> dist(min_key, max_key);
+
+  for (auto i = 0; i < num_keys; i++){
+    volatile int random = dist(gen);
+    key_type key = (random % full_range) + min_key;
+    keys.push_back(key);
+  }
+  REMUS_ASSERT(keys.size() == num_keys, "Error generating vector for prefilled stream");
+
+  // creates a stream such that the random numbers are already generated, and are popped from vector for each operation
+  return std::make_unique<remus::PrefilledStream<key_type>>(keys, num_keys);
+
+}

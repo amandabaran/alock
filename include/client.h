@@ -22,22 +22,18 @@ template <class Operation> class Client {
   ~Client() = default;
 
   static std::unique_ptr<Client> Create(const Peer &self, BenchmarkParams params, std::barrier<> *barrier,
-          std::shared_ptr<rdma_capability> pool, key_map* kr_map, root_map* root_ptr_map, std::unordered_set<int> locals) {
-    return std::unique_ptr<Client>(new Client(self, params, barrier, pool, kr_map, root_ptr_map, locals));
+          std::shared_ptr<rdma_capability> pool, root_map* root_ptr_map, std::unordered_set<int> locals) {
+    return std::unique_ptr<Client>(new Client(self, params, barrier, pool, root_ptr_map, locals));
   }
 
   static void signal_handler(int signal) { 
-    // this->Stop();
     // Wait for all clients to be done shutting down
     REMUS_INFO("\nSIGNAL HANDLER\n");
     std::this_thread::sleep_for(std::chrono::seconds(2));
     exit(signal);
   }
 
-  static remus::util::StatusVal<remus::WorkloadDriverProto> Run(
-      std::unique_ptr<Client> client, const BenchmarkParams& params,
-      volatile bool* done) {
-
+  static remus::util::StatusVal<remus::metrics::WorkloadDriverResult> Run(std::unique_ptr<Client> client, const BenchmarkParams& params) {
     //Signal Handler
     signal(SIGINT, signal_handler);
 
@@ -46,7 +42,7 @@ template <class Operation> class Client {
 
     auto *client_ptr = client.get();
 
-    auto stream = createOpStream(params, client_ptr->node_proto_);
+    auto stream = createRandomOpStream(params, client_ptr->self_);
     // auto stream = CreateOpStream(params);
     std::barrier<>* barr = client_ptr->barrier_;
     barr->arrive_and_wait();
@@ -57,7 +53,7 @@ template <class Operation> class Client {
 
     // Sleep while driver is running
     auto runtime = std::chrono::seconds(params.runtime);
-    REMUS_INFO("Running workload for {}s", runtime);
+    // REMUS_INFO("Running workload for {}s", runtime);
     std::this_thread::sleep_for(runtime);
 
     REMUS_INFO("Stopping client {}...", client_ptr->self_.id);
@@ -69,7 +65,7 @@ template <class Operation> class Client {
     // clients before disconnecting.
     // (see https://github.com/jacnel/project-x/issues/15)
     std::this_thread::sleep_for(std::chrono::milliseconds(1500));
-    return {remus::util::Status::Ok(), driver->ToProto()}; 
+    return {remus::util::Status::Ok(), driver->ToMetrics()};
   }
 
   rdma_ptr<LockType> calcLockAddr(const key_type &key){
@@ -81,8 +77,9 @@ template <class Operation> class Client {
     // inspired by LIT
     // auto nid = std::clamp(std::floor(c*(key-a)), 0, n-1) + 1;
     auto nid = std::min(std::max(int(std::floor(c*(key-a))), 0), n-1) + 1;
+    // REMUS_DEBUG("Key {} is on Node {}", nid);
 
-    std::pair<key_type, key_type> range = key_range_map_->at(nid);
+    std::pair<key_type, key_type> range = calcLocalNodeRange(params_, nid);
     key_type min_key = range.first;
     key_type max_key = range.second; 
     // get root lock pointer of correct node
@@ -96,7 +93,7 @@ template <class Operation> class Client {
     return lock_ptr;
   }
   
-  remus::util::Status Start() override {
+  remus::util::Status Start() {
     REMUS_DEBUG("Starting Client...");
     pool_->RegisterThread(); //Register this client thread with memory pool
     root_lock_ptr_ = root_ptrs_->at(self_.id);
@@ -107,7 +104,7 @@ template <class Operation> class Client {
     return status;
   }
 
-  remus::util::Status Apply(const key_type &op) override {
+  remus::util::Status Apply(const key_type &op) {
     REMUS_DEBUG("Client {} attempting to lock key {}", self_.id, op);    
     rdma_ptr<LockType> lock_addr = calcLockAddr(op);
     REMUS_TRACE("Address for lock is {:x}", static_cast<uint64_t>(lock_addr));
@@ -125,7 +122,7 @@ template <class Operation> class Client {
   }
 
     
-  remus::util::Status Stop() override {
+  remus::util::Status Stop() {
     REMUS_INFO("Stopping...");
     barrier_->arrive_and_wait();
     return remus::util::Status::Ok();
@@ -133,15 +130,14 @@ template <class Operation> class Client {
 
  private:
   Client(const Peer &self, BenchmarkParams params, std::barrier<> *barrier,
-          std::shared_ptr<rdma_capability> pool, key_map* kr_map, root_map* root_ptr_map, std::unordered_set<int> locals)
+          std::shared_ptr<rdma_capability> pool, root_map* root_ptr_map, std::unordered_set<int> locals)
       : self_(self),
         params_(params),
         barrier_(barrier),
         pool_(pool),
-        key_range_map_(kr_map), 
         root_ptrs_(root_ptr_map),
         local_clients_(locals),
-        lock_handle_(self, pool_, locals, params.local_budget(), params.remote_budget()), 
+        lock_handle_(self, pool_, locals, params.local_budget, params.remote_budget), 
         root_lock_ptr_(root_ptrs_->at(self.id)) {}
 
   const Peer self_;
@@ -150,7 +146,6 @@ template <class Operation> class Client {
 
   std::shared_ptr<rdma_capability> pool_;
   LockHandle lock_handle_; //Handle to interact with descriptors, one per worker
-  key_map* key_range_map_;
   root_map* root_ptrs_;
   root_type root_lock_ptr_;
   std::unordered_set<int> local_clients_;
