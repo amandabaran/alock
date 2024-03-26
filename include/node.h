@@ -23,7 +23,10 @@ class Node {
       peers_(peers),
       pool_(pool),
       params_(params),
-      lock_table_(self, pool_) {}
+      lock_table_(self, pool_) {
+        root_ptrs_.resize(peers.size());
+        REMUS_DEBUG("PEERS SIZE: {}", peers.size());
+      }
   
   remus::util::Status connect(){
     std::pair key_range = calcThreadKeyRange(params_, self_.id);
@@ -61,7 +64,9 @@ class Node {
   remus::util::Status prefill(const key_type& min_key, const key_type& max_key) {
     REMUS_DEBUG("Prefilling lock table... [{}, {}]", min_key, max_key);
     root_lock_ptr_ = lock_table_.AllocateLocks(min_key, max_key);
+    REMUS_DEBUG("DONE, root_ptr size: {}, self {}", root_ptrs_.size(), self_.id);
     root_ptrs_.at(self_.id) = root_lock_ptr_;
+    REMUS_DEBUG("FAIL");
     return remus::util::Status::Ok();
   }
 

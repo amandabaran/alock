@@ -89,7 +89,7 @@ auto createOpStream(const BenchmarkParams params, Peer self){
 
 }
 
-createRandomOpStream(const BenchmarkParams params, Peer self){
+auto createRandomOpStream(const BenchmarkParams params, Peer self){
   auto num_keys = params.op_count; 
   auto pair  = calcLocalNodeRange(params, self.id);
   auto local_start = pair.first;
