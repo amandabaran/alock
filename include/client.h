@@ -43,6 +43,7 @@ template <class Operation> class Client {
     auto *client_ptr = client.get();
 
     auto stream = createRandomOpStream(params, client_ptr->self_);
+ 
     // auto stream = CreateOpStream(params);
     std::barrier<>* barr = client_ptr->barrier_;
     barr->arrive_and_wait();
@@ -69,17 +70,16 @@ template <class Operation> class Client {
   }
 
   rdma_ptr<LockType> calcLockAddr(const key_type &key){
-    auto n = params_.node_count;
-    auto a = params_.min_key;
-    auto b = params_.max_key;
-    auto c = n / (b-a);
+    float n = float(params_.node_count * params_.thread_count);
+    float a = params_.min_key;
+    float b = params_.max_key;
+    float c = n/(b-a);
     // determine node that the key is on with a lookup function 
     // inspired by LIT
-    // auto nid = std::clamp(std::floor(c*(key-a)), 0, n-1) + 1;
-    auto nid = std::min(std::max(int(std::floor(c*(key-a))), 0), n-1) + 1;
-    // REMUS_DEBUG("Key {} is on Node {}", nid);
-
-    std::pair<key_type, key_type> range = calcLocalNodeRange(params_, nid);
+    int x = int(std::floor(c*(key-a)));
+    uint64_t nid = std::min(int(std::max(x, 0)), int(n-1));
+    REMUS_TRACE("Key {} is on Node {}", key, nid);
+    std::pair<key_type, key_type> range = calcThreadKeyRange(params_, nid);
     key_type min_key = range.first;
     key_type max_key = range.second; 
     // get root lock pointer of correct node
@@ -96,7 +96,6 @@ template <class Operation> class Client {
   remus::util::Status Start() {
     REMUS_DEBUG("Starting Client...");
     pool_->RegisterThread(); //Register this client thread with memory pool
-    root_lock_ptr_ = root_ptrs_->at(self_.id);
     auto status = lock_handle_.Init();
     OK_OR_FAIL(status);
     if (barrier_ != nullptr)
@@ -137,8 +136,7 @@ template <class Operation> class Client {
         pool_(pool),
         root_ptrs_(root_ptr_map),
         local_clients_(locals),
-        lock_handle_(self, pool_, locals, params.local_budget, params.remote_budget), 
-        root_lock_ptr_(root_ptrs_->at(self.id)) {}
+        lock_handle_(self, pool_, locals, params.local_budget, params.remote_budget) {}
 
   const Peer self_;
   const BenchmarkParams params_;
@@ -147,7 +145,6 @@ template <class Operation> class Client {
   std::shared_ptr<rdma_capability> pool_;
   LockHandle lock_handle_; //Handle to interact with descriptors, one per worker
   root_map* root_ptrs_;
-  root_type root_lock_ptr_;
   std::unordered_set<int> local_clients_;
   
   // For generating a random key to lock if stream doesnt work

@@ -30,6 +30,7 @@ class Node {
   
   remus::util::Status connect(){
     std::pair key_range = calcThreadKeyRange(params_, self_.id);
+    REMUS_DEBUG("Thread local range for {} is [{},{}]", self_.id, key_range.first, key_range.second);
     OK_OR_FAIL(prefill(key_range.first, key_range.second));
 
     RemoteObjectProto proto;
@@ -57,7 +58,7 @@ class Node {
       root_ptrs_.at(p.id) = root;
     }
     std::atomic_thread_fence(std::memory_order_release);
-    
+    sleep(3);
     return remus::util::Status::Ok();
   }
 
@@ -66,7 +67,6 @@ class Node {
     root_lock_ptr_ = lock_table_.AllocateLocks(min_key, max_key);
     REMUS_DEBUG("DONE, root_ptr size: {}, self {}", root_ptrs_.size(), self_.id);
     root_ptrs_.at(self_.id) = root_lock_ptr_;
-    REMUS_DEBUG("FAIL");
     return remus::util::Status::Ok();
   }
 

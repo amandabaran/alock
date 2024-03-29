@@ -31,7 +31,7 @@ source "exp.conf"
 #           conversion to names like node0, node1, etc.  Be sure to follow the
 #           order in the CloudLab "List View" for your experiment.
 # machines=(apt081 apt141)
-machines=(apt076 apt075 apt081 apt164 apt141) 
+machines=(apt076 apt075 apt081) #apt164 apt141) 
 domain=apt.emulab.net
 
 # The user who is going to be using ssh/scp to connect to cloudlab.  It is

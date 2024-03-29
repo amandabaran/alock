@@ -13,13 +13,11 @@
 using namespace remus::rdma;
 
 struct alignas(64) RdmaSpinLock {
-    uint64_t lock{0};
+    uint64_t lock{UNLOCKED};
     uint8_t pad1[CACHELINE_SIZE - sizeof(lock)];
 };
 static_assert(alignof(RdmaSpinLock) == CACHELINE_SIZE);
 static_assert(sizeof(RdmaSpinLock) == CACHELINE_SIZE);
-
-// using RdmaSpinLock = uint64_t;
 
 class RdmaSpinLockHandle{
 public:
@@ -33,42 +31,33 @@ public:
     return remus::util::Status::Ok();
   }
 
-  uint64_t GetReaqCount(){
-    return 0;
-  }
-
-  remus::metrics::MetricProto GetLocalLatSummary() { 
-    remus::metrics::Summary<double> local("local_lat", "ns", 1000);
-    return local.ToProto(); 
-  }
-  remus::metrics::MetricProto GetRemoteLatSummary() { 
-    remus::metrics::Summary<double> remote("local_lat", "ns", 1000);
-    return remote.ToProto(); 
-  }
-
   bool IsLocked(rdma_ptr<RdmaSpinLock> lock) { 
     uint64_t val = static_cast<uint64_t>(pool_->Read(lock));
-    if (val == kUnlocked){
+    if (val == UNLOCKED){
       return false;
     }
     return true;
   }
 
   void Lock(rdma_ptr<RdmaSpinLock> lock) {  
+    REMUS_DEBUG("RdmaSpinLock Locking addr {:x}", lock.address());
     lock_ = decltype(lock_)(lock.id(), lock.address());
     //?: IDEA: switch to read and write to see if CAS introduces an issue with the rdma card because its atomic
-    while (pool_->CompareAndSwap(lock_, kUnlocked, self_.id) != kUnlocked) {
+    while (pool_->CompareAndSwap(lock_, UNLOCKED, LOCKED) != UNLOCKED) {
       cpu_relax();
     }
     std::atomic_thread_fence(std::memory_order_release);
+    REMUS_DEBUG("RdmaSpinLock Locked addr {:x}", lock.address());
     return;
   }
 
   void  Unlock(rdma_ptr<RdmaSpinLock> lock) {
+    REMUS_DEBUG("RdmaSpinLock Unlocking addr {:x}", lock.address());
     REMUS_ASSERT(lock.address() == lock_.address(), "Attempting to unlock spinlock that is not locked.");
-    pool_->Write<uint64_t>(lock_, 0, /*prealloc=*/local_);
+    pool_->Write<uint64_t>(lock_, UNLOCKED, /*prealloc=*/local_);
     std::atomic_thread_fence(std::memory_order_release);
     lock_ = nullptr;
+    REMUS_DEBUG("RdmaSpinLock Locked addr {:x}", lock.address());
     return;
   }
 
@@ -77,7 +66,6 @@ private:
 
   uint64_t lock_count_;
 
-  static constexpr uint64_t kUnlocked = 0;
   bool is_host_;
 
   Peer self_;

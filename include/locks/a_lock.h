@@ -18,14 +18,8 @@ using namespace remus::rdma;
 //? Note: Uncomment this line to use override local keys to use RDMA ops
 // #define REMOTE_ONLY
 
-#define NUM_OPS 10e6
-
 #define LOCAL_VICTIM  1
 #define REMOTE_VICTIM 2
-
-// Used for tracking status of descriptors
-#define UNLOCKED 0
-#define LOCKED 1
 
 #define NEXT_PTR_OFFSET 32
 #define TAIL_PTR_OFFSET 16

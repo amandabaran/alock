@@ -64,19 +64,20 @@ auto createOpStream(const BenchmarkParams params, Peer self){
 
   for (auto i = 0; i < num_keys; i++){
     volatile int random = dist(gen);
-    REMUS_DEBUG("random % 100 is {}", random % 100 + 1);
+    // REMUS_DEBUG("random % 100 is {}", random % 100 + 1);
     auto random_p = (random % 100) + 1;
     if ( p_local == 1.0 || random_p <= p_local ){
-      keys.push_back(static_cast<key_type>((random % local_range) + local_start));
-      REMUS_DEBUG("local key");
+      key_type key = (random % local_range) + local_start;
+      keys.push_back(key);
+      // REMUS_DEBUG("local key");
     } else {
       //scale random float to number in full key range
       key_type key = (random % full_range) + min_key;
-      REMUS_DEBUG("remote key");
+      // REMUS_DEBUG("remote key");
       //retry until key is remote (i.e. not in local)
       while (key <= local_end && key >= local_start){
         random = dist(gen);
-        REMUS_DEBUG("random % range is {}", random % full_range);
+        // REMUS_DEBUG("random % range is {}", random % full_range);
         key = (random % full_range) + min_key;
       }
       keys.push_back(key);
@@ -103,7 +104,7 @@ auto createRandomOpStream(const BenchmarkParams params, Peer self){
   auto p_local = params.p_local;
 
   std::vector<key_type> keys;
-  keys.reserve(num_keys); //reserve room for 5M keys
+  keys.reserve(num_keys);
 
   std::mt19937 gen;
   std::uniform_int_distribution<> dist(min_key, max_key);

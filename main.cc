@@ -35,6 +35,9 @@ auto ARGS = {
     remus::util::I64_ARG("--max_key", "The upper limit of the key range for operations"),
     remus::util::I64_ARG("--local_budget", "Initial budget for Alock Local Cohort"),
     remus::util::I64_ARG("--remote_budget", "Initial budget for Alock Remote Cohort"),
+     remus::util::BOOL_ARG_OPT(
+        "--random",
+        "If the stream should be random, or preset topology"),
 };
 
 #define PATH_MAX 4096
@@ -114,12 +117,13 @@ int main(int argc, char **argv) {
         },
         i, (params.node_id * mp) + i));
   }
-  REMUS_DEBUG("AMI HERE");
   // Let the init finish
   for (int i = 0; i < mp; i++) {
     mempool_threads[i].join();
   }
-  REMUS_DEBUG("HERE?");
+
+  sleep(3);
+  // std::this_thread::sleep_for(std::chrono::milliseconds(10));
   
   // Create and Launch each of the clients.
   std::vector<std::thread> client_threads;
@@ -128,13 +132,10 @@ int main(int argc, char **argv) {
   remus::metrics::WorkloadDriverResult workload_results[params.thread_count];
   for (int i = 0; i < params.thread_count; i++){
     client_threads.emplace_back(std::thread([&mp, &peers, &pools, &params, &locals, &workload_results, &client_barrier](int tidx){
-      REMUS_DEBUG("PLEASE?");
       auto self_idx = (params.node_id * mp) + tidx;
       Peer self = peers.at(self_idx);
       auto pool = pools[tidx];
-      // Create "node" (prob want to rename)
-      REMUS_DEBUG("Creating node for client {}:{}", self.id, self.port);
-
+    
       std::vector<Peer> others;
       #ifdef REMOTE_ONLY
         REMUS_DEBUG("Including self in others for loopback connection");
@@ -148,7 +149,8 @@ int main(int argc, char **argv) {
           std::copy(peers.begin(), peers.end(), std::back_inserter(others));
         }   
       #endif
-
+      // Create "node" (prob want to rename)
+      REMUS_DEBUG("Creating node for client {}:{}", self.id, self.port);
       auto node = std::make_unique<Node<key_type, LockType>>(self, others, pool, params);
       // Create mem pools of lock tables on each node and connect with all clients
       OK_OR_FAIL(node->connect());
