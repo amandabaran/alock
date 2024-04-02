@@ -42,7 +42,6 @@ public:
   void Lock(rdma_ptr<RdmaSpinLock> lock) {  
     REMUS_DEBUG("RdmaSpinLock Locking addr {:x}", lock.address());
     lock_ = decltype(lock_)(lock.id(), lock.address());
-    //?: IDEA: switch to read and write to see if CAS introduces an issue with the rdma card because its atomic
     while (pool_->CompareAndSwap(lock_, UNLOCKED, LOCKED) != UNLOCKED) {
       cpu_relax();
     }
@@ -52,11 +51,12 @@ public:
   }
 
   void  Unlock(rdma_ptr<RdmaSpinLock> lock) {
+    std::atomic_thread_fence(std::memory_order_release);
     REMUS_DEBUG("RdmaSpinLock Unlocking addr {:x}", lock.address());
     REMUS_ASSERT(lock.address() == lock_.address(), "Attempting to unlock spinlock that is not locked.");
     pool_->Write<uint64_t>(lock_, UNLOCKED, /*prealloc=*/local_);
     std::atomic_thread_fence(std::memory_order_release);
-    lock_ = nullptr;
+    // lock_ = nullptr;
     REMUS_DEBUG("RdmaSpinLock Locked addr {:x}", lock.address());
     return;
   }

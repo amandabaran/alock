@@ -42,9 +42,18 @@ template <class Operation> class Client {
 
     auto *client_ptr = client.get();
 
-    auto stream = createRandomOpStream(params, client_ptr->self_);
- 
-    // auto stream = CreateOpStream(params);
+    if (params.topology){
+      #define TOPOPLOGY
+    }
+
+    #if defined(TOPOPLOGY)
+      REMUS_INFO("Using Node Topology Stream");
+      auto stream = createNodeTopOpStream(params, client_ptr->self_);
+    #else
+      REMUS_INFO("Using Random Stream");
+      auto stream = createRandomOpStream(params, client_ptr->self_);
+    #endif
+
     std::barrier<>* barr = client_ptr->barrier_;
     barr->arrive_and_wait();
     REMUS_INFO("Starting client {}...", client_ptr->self_.id);
@@ -108,6 +117,7 @@ template <class Operation> class Client {
     rdma_ptr<LockType> lock_addr = calcLockAddr(op);
     REMUS_TRACE("Address for lock is {:x}", static_cast<uint64_t>(lock_addr));
     lock_handle_.Lock(lock_addr);
+    std::atomic_thread_fence(std::memory_order_release);
     // auto start = std::chrono::system_clocknow();
     // if (params_.workload().has_think_time_ns()) {
     //   while (std::chrono::system_clocknow() - start <

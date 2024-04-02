@@ -35,13 +35,13 @@ auto ARGS = {
     remus::util::I64_ARG("--max_key", "The upper limit of the key range for operations"),
     remus::util::I64_ARG("--local_budget", "Initial budget for Alock Local Cohort"),
     remus::util::I64_ARG("--remote_budget", "Initial budget for Alock Remote Cohort"),
-     remus::util::BOOL_ARG_OPT(
-        "--random",
-        "If the stream should be random, or preset topology"),
+    remus::util::BOOL_ARG_OPT(
+        "--topology",
+        "If the stream should use the specified topology"),
 };
 
 #define PATH_MAX 4096
-#define PORT_NUM 13000
+#define PORT_NUM 14000
 
 using namespace remus::rdma;
 
@@ -103,8 +103,8 @@ int main(int argc, char **argv) {
   // Create one memory pool per thread
   uint32_t block_size = 1 << params.region_size;
   //Calculate to determine size of memory pool needed (based on number of locks per mp)
-  uint32_t bytesNeeded = ((64 * params.max_key) + (64 * 5 * params.thread_count));
-  block_size = 1 << uint32_t(ceil(log2(bytesNeeded)));
+  // uint32_t bytesNeeded = ((64 * params.max_key) + (64 * 5 * params.thread_count));
+  // block_size = 1 << uint32_t(ceil(log2(bytesNeeded)));
   for (int i = 0; i < mp; i++) {
     mempool_threads.emplace_back(std::thread(
         [&](int mp_index, int self_index) {
@@ -156,6 +156,8 @@ int main(int argc, char **argv) {
       OK_OR_FAIL(node->connect());
       // Make sure Connect() is done before launching clients
       client_barrier.arrive_and_wait();
+      // We need a cross node barrier 
+      sleep(5);
 
       std::unique_ptr<Client<key_type>> client = Client<key_type>::Create(self, params, &client_barrier, pool, node->getRootPtrMap(), locals);
       client_barrier.arrive_and_wait();
@@ -178,6 +180,7 @@ int main(int argc, char **argv) {
       t->join();
   }
 
+  // Puts results from all threads into result array
   Result result[params.thread_count];
   for (int i = 0; i < params.thread_count; i++) {
     // REMUS_DEBUG("Protobuf Result {}\n{}", i, result[i].result_as_debug_string());
@@ -200,13 +203,14 @@ int main(int argc, char **argv) {
       result[i].p999 = qps->p99;
       result[i].max = qps->max;
     }
-    REMUS_DEBUG("Protobuf Result {}\n{}", i, result[i].result_as_debug_string());
+    REMUS_INFO("Protobuf Result {}\n{}", i, result[i].result_as_debug_string());
   }
 
   std::ofstream file_stream("exp_result.csv");
   file_stream << Result::result_as_string_header();
   for (int i = 0; i < params.thread_count; i++) {
-    file_stream << result[0].result_as_string();
+    // Add results from all threads to result file
+    file_stream << result[i].result_as_string();
   }
   file_stream.close();
   REMUS_INFO("[EXPERIMENT] -- End of execution; -- ");

@@ -3,11 +3,11 @@
 source "exp.conf"
 
 user=${ssh_user}
-machines=("apt076" "apt075" "apt081" "apt164" "apt141" "apt158" "apt148" "apt163" "apt153" "apt145")
+machines=("apt150" "apt138" "apt164" "apt148" "apt149" "apt140" "apt152" "apt142" "apt147" "apt158")
 domain="apt.emulab.net"
 
-mkdir results
-cd results
+mkdir -p results/top/t2/
+cd results/top/t2/
 
 for m in ${machines[@]}; do
     mkdir $m

@@ -29,15 +29,33 @@ For example, plotting the scalability experiment would be the command:
 
 # Commands
 
-## Build
+## Build Dependecies
+
 <!-- rebuilds and installs remus into /opt/ -->
+cd remus/tools
 sh install.sh 
 
+## Change Experiment Configuration
+cd alock
+Edit "exp.conf"
+
+## Build ALock Executable
 cd alock/build
 cmake -DCMAKE_PREFIX_PATH=/opt/remus/lib/cmake -DCMAKE_MODULE_PATH=/opt/remus/lib/cmake ..
 
+make -j
 
-# Cloudlab Commands
+### Change Log Level:
+-DLOG_LEVEL=INFO
+
+## Send to Clouldab and Run
+
+<!-- Builds executable, sends to nodes, and runs exp_run.sh  -->
+cd alock
+bash run.sh  <!-- TODO: Update with cloudlab node info  -->
+
+
+# Old Commands: 
 
 ## Sync
 sh sync.sh -u adb321
@@ -53,7 +71,6 @@ python3 launch.py -u adb321 --from_param_config config.json -e testexp
 
 ## Shutdown on stall
 python shutdown.py -u adb321
-
 
 sh synch.sh -u adb321
 bash launch_experiment.sh -no-prep

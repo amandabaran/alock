@@ -4,7 +4,7 @@
 
 /// An object to hold the experimental params
 /// @param node_id The node's id. (nodeX in cloudlab should have X in this option)
-/// @param runtime How long to run the experiment for. Only valid if unlimited_stream
+/// @param runtime How long to run the experiment for
 /// @param unlimited_stream If the stream should be endless, stopping after runtime
 /// @param op_count How many operations to run. Only valid if not unlimited_stream
 /// @param region_size How big the memory region should be in 2^x bytes
@@ -16,6 +16,7 @@
 /// @param max_key The upper limit of the key range for operations
 /// @param local_budget //Inital budget for local cohort in ALock
 /// @param remote_budget //Inital budget for remote cohort in ALock
+/// @param topology //True if the specified topology should be used
 class BenchmarkParams {
 public:
     /// The node's id. (nodeX in cloudlab should have X in this option)
@@ -44,6 +45,8 @@ public:
     int local_budget;
     //Inital budget for remote cohort in ALock
     int remote_budget;
+    //True if the specified topology should be used
+    bool topology;
 
     BenchmarkParams(){}
 
@@ -61,6 +64,7 @@ public:
         max_key = args.iget("--max_key");
         local_budget = args.iget("--local_budget");
         remote_budget = args.iget("--remote_budget");
+        topology = args.bget("--topology");
     }
 };
 
@@ -84,7 +88,7 @@ public:
     Result(BenchmarkParams params_) : params(params_) {}
 
     static const std::string result_as_string_header() {
-        return "node_id,runtime,unlimited_stream,op_count,region_size,thread_count,node_count,qp_max,contains,insert,remove,p_local,min,max,localb,remoteb,count,runtime_ns,units,mean,stdev,min,p50,p90,p95,p99,p999,max\n";
+        return "node_id,runtime,unlimited_stream,op_count,region_size,thread_count,node_count,qp_max,p_local,min_key,max_key,localb,remoteb,topology,count,runtime_ns,units,mean,stdev,min,p50,p90,p95,p99,p999,max\n";
     }
 
     std::string result_as_string(){
@@ -102,6 +106,7 @@ public:
         builder += std::to_string(params.max_key) + ",";
         builder += std::to_string(params.local_budget) + ",";
         builder += std::to_string(params.remote_budget) + ",";
+        builder += std::to_string(params.topology) + ",";
         builder += std::to_string(count) + ",";
         builder += std::to_string(runtime_ns) + ",";
         builder += units + ",";
@@ -133,6 +138,7 @@ public:
         builder += "\t\tmax_key: " + std::to_string(params.max_key) + "\n";
         builder += "\t\tlocal_budget: " + std::to_string(params.local_budget) + "\n";
         builder += "\t\tremote_budget: " + std::to_string(params.remote_budget) + "\n";
+        builder += "\t\tremote_budget: " + std::to_string(params.topology) + "\n";
         builder += "\t}\n\tResult {\n";
         builder += "\t\tcount:" + std::to_string(count) + "\n";
         builder += "\t\truntime_ns:" + std::to_string(runtime_ns) + "\n";

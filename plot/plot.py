@@ -43,7 +43,7 @@ def aggregate_results(df):
     print(f"Merged results saved to '{merged_csv_path}'.")
 
 def trim_columns(df):
-    columns = ['thread_count', 'node_count', 'p_local', 'min', 'max', 'mean', 'stdev', 'min.1' ,'p50', 'p90' ,'p95' ,'p99' ,'p999', 'max.1']
+    columns = ['thread_count', 'node_count', 'p_local', 'mink', 'maxk', 'mean', 'stdev', 'min.1' ,'p50', 'p90' ,'p95' ,'p99' ,'p999', 'max.1']
     df = df[columns]
     return df
 
@@ -65,6 +65,19 @@ def merge_csv_results(root_dir):
 
 merge_csv_results(FLAGS.save_dir)
 
+def plot_tput(file):
+    df = pandas.read_csv(file)
+    header_row = df.head(1)
+    averaged_results = df.tail(1)
+    df = pandas.concat([header_row,averaged_results])
+    print(df)
+    
+    plt.figure(figsize=(10,6))
+    ax = seaborn.lineplot(
+        data=df,
+        x='thread_count'
+    
+    )
 
     
 # # Globals

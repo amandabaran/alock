@@ -2,28 +2,51 @@
 
 source "exp.conf"
 
-DEBUG=0
+user=${ssh_user}
+machines=("apt150" "apt138" "apt164" "apt148" "apt149" "apt140" "apt152" "apt142" "apt147" "apt158")
+domain="apt.emulab.net"
 
 exe_dir="./build"
 exe="main"
 
-cd build
-make -j ${exe}
-cd ..
+usage() {
+    echo "Usage: $0 [-h] [-s]"
+    echo "  -h: Display this help message"
+    echo "  -s: Update arguments of experiment only"
+    exit 1
+}
 
-user=${ssh_user}
-machines=("apt076" "apt075" "apt081")
-domain="apt.emulab.net"
-node_list="node0,node1,node2"
-
-for m in ${machines[@]}; do
-  ssh "${user}@$m.$domain" hostname
+while getopts ":hs" option; do
+    case "$option" in
+        h)  # Display usage information
+            usage
+            ;;
+        s)  # Update the specified package
+            UPDATE=true
+            ;;
+        \?) # Invalid option
+            echo "Error: Invalid option -$OPTARG"
+            usage
+            ;;
+    esac
 done
+shift $((OPTIND - 1))
 
-for m in ${machines[@]}; do
-  ssh "${user}@$m.$domain" pkill -9 "${exe}"
-  scp "${exe_dir}/${exe}" "${user}@$m.$domain":~
-done
+if [ "$UPDATE" != true ]; then
+
+    cd build
+    make -j ${exe}
+    cd ..
+
+    for m in ${machines[@]}; do
+      ssh "${user}@$m.$domain" hostname
+    done
+
+    for m in ${machines[@]}; do
+      ssh "${user}@$m.$domain" pkill -9 "${exe}"
+      scp "${exe_dir}/${exe}" "${user}@$m.$domain":~
+    done
+fi 
 
 echo "#!/bin/env bash" > exp_run.sh
 
@@ -38,7 +61,7 @@ for m in ${machines[@]}; do
   if [[ $idx -ne 0 ]]; then
     echo " new-window \; \\" >> exp_run.sh
   fi
-  echo -n " send-keys 'ssh ${user}@$m.$domain ./${exe} --node_count ${num_nodes} --node_id ${idx} --runtime ${runtime} --op_count ${op_count} --min_key ${min_key} --max_key ${max_key} --region_size ${region_size} --thread_count ${thread_count} --qp_max ${qp_max} --p_local ${p_local} --local_budget ${local_budget} --remote_budget ${remote_budget}' C-m \\; " >> exp_run.sh
+  echo -n " send-keys 'ssh ${user}@$m.$domain ./${exe} --node_count ${num_nodes} --node_id ${idx} --runtime ${runtime} --op_count ${op_count} --min_key ${min_key} --max_key ${max_key} --region_size ${region_size} --thread_count ${thread_count} --qp_max ${thread_count} --p_local ${p_local} --local_budget ${local_budget} --remote_budget ${remote_budget}' C-m \\; " >> exp_run.sh
   idx=$((idx + 1))
 done
 

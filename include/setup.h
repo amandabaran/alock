@@ -92,16 +92,9 @@ auto createOpStream(const BenchmarkParams params, Peer self){
 
 auto createRandomOpStream(const BenchmarkParams params, Peer self){
   auto num_keys = params.op_count; 
-  auto pair  = calcLocalNodeRange(params, self.id);
-  auto local_start = pair.first;
-  auto local_end = pair.second;
-  int local_range = local_end - local_start + 1;
-
   int min_key = params.min_key;
   int max_key = params.max_key;
   int full_range = max_key - min_key + 1;
-
-  auto p_local = params.p_local;
 
   std::vector<key_type> keys;
   keys.reserve(num_keys);
@@ -119,4 +112,37 @@ auto createRandomOpStream(const BenchmarkParams params, Peer self){
   // creates a stream such that the random numbers are already generated, and are popped from vector for each operation
   return std::make_unique<remus::PrefilledStream<key_type>>(keys, num_keys);
 
+}
+
+auto createNodeTopOpStream(const BenchmarkParams params, Peer self){
+  auto num_keys = params.op_count; 
+  int other;
+  if (self.id % 2 == 0){
+    other = self.id + 1;
+  } else {
+    other = self.id - 1;
+  }
+  auto range1 = calcLocalNodeRange(params, self.id);
+  auto range2 = calcLocalNodeRange(params, other);
+
+  std::vector<key_type> keys;
+  keys.reserve(num_keys);
+
+  std::mt19937 rng(std::random_device{}());
+  std::mt19937 gen;
+  std::uniform_int_distribution<> dist1(range1.first, range1.second);
+  std::uniform_int_distribution<> dist2(range2.first, range2.second);
+  for (auto i = 0; i < num_keys; i++){
+    if (rng() % 2 == 0){
+        volatile int random = dist1(gen);
+        key_type key = (random % int(range1.second - range1.first + 1)) + range1.first;
+        keys.push_back(key);
+    } else {
+        volatile int random = dist2(gen);
+        key_type key = (random % int(range2.second - range2.first + 1)) + range2.first;
+        keys.push_back(key);
+    }
+  }
+  REMUS_ASSERT(keys.size() == num_keys, "Error generating vector for prefilled stream");
+  return std::make_unique<remus::PrefilledStream<key_type>>(keys, num_keys);
 }
