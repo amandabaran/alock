@@ -6,13 +6,25 @@ option(DOCS "Set to build documentation" OFF)
 
 # Flags
 set(CXX_STANDARD 20 CACHE STRING "Uses C++20 or 23")
-set(LOG_LEVEL "INFO" CACHE STRING "Log level options include TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL, and OFF")
+set(LOG_LEVEL CACHE STRING "Log level options include TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL, and OFF")
 set(LOCK "RdmaSpinLock") #default
 
 #######################################################################################################################
 # Setup
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 message(STATUS "Using standard ${CXX_STANDARD}")
+
+# Ensure the LOG_LEVEL is correct
+set(LOG_LEVELS "TRACE;DEBUG;INFO;WARN;ERROR;CRITICAL;OFF")
+foreach(L ${LOG_LEVELS})
+  if("${LOG_LEVEL}" STREQUAL "${L}")
+    set(CORRECT_LOG_LEVEL TRUE)
+  endif()
+endforeach()
+if(NOT DEFINED CORRECT_LOG_LEVEL)
+  message(FATAL_ERROR "LOG_LEVEL must be one of ${LOG_LEVELS}") 
+endif()
+message(STATUS "Using LOG_LEVEL=${LOG_LEVEL}")
 
 set(CMAKE_CXX_STANDARD ${CXX_STANDARD})
 

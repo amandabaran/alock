@@ -181,38 +181,71 @@ int main(int argc, char **argv) {
   }
 
   // Puts results from all threads into result array
-  Result result[params.thread_count];
+  Result tput_result[params.thread_count];
+  Result lat_result[params.thread_count];
   for (int i = 0; i < params.thread_count; i++) {
     // REMUS_DEBUG("Protobuf Result {}\n{}", i, result[i].result_as_debug_string());
-    result[i] = Result(params);
+    tput_result[i] = Result(params);
+
     if (workload_results[i].ops.has_counter()) {
-      result[i].count = workload_results[i].ops.try_get_counter()->counter;
+      tput_result[i].count = workload_results[i].ops.try_get_counter()->counter;
     }
     if (workload_results[i].runtime.has_stopwatch()) {
-      result[i].runtime_ns = workload_results[i].runtime.try_get_stopwatch()->runtime_ns;
+      tput_result[i].runtime_ns = workload_results[i].runtime.try_get_stopwatch()->runtime_ns;
     }
     if (workload_results[i].qps.has_summary()) {
       auto qps = workload_results[i].qps.try_get_summary();
-      result[i].units = qps->units;
-      result[i].mean = qps->mean;
-      result[i].stdev = qps->stddev;
-      result[i].min = qps->min;
-      result[i].p50 = qps->p50;
-      result[i].p90 = qps->p90;
-      result[i].p95 = qps->p95;
-      result[i].p999 = qps->p99;
-      result[i].max = qps->max;
+      tput_result[i].units = qps->units;
+      tput_result[i].mean = qps->mean;
+      tput_result[i].stdev = qps->stddev;
+      tput_result[i].min = qps->min;
+      tput_result[i].p50 = qps->p50;
+      tput_result[i].p90 = qps->p90;
+      tput_result[i].p95 = qps->p95;
+      tput_result[i].p999 = qps->p99;
+      tput_result[i].max = qps->max;
     }
-    REMUS_INFO("Protobuf Result {}\n{}", i, result[i].result_as_debug_string());
+    REMUS_DEBUG("Protobuf Tput Result {}\n{}", i, tput_result[i].result_as_debug_string());
+
+    lat_result[i] = Result(params);
+    
+    if (workload_results[i].ops.has_counter()) {
+      lat_result[i].count = workload_results[i].ops.try_get_counter()->counter;
+    }
+    if (workload_results[i].runtime.has_stopwatch()) {
+      lat_result[i].runtime_ns = workload_results[i].runtime.try_get_stopwatch()->runtime_ns;
+    }
+    if (workload_results[i].latency.has_summary()) {
+      auto lat = workload_results[i].latency.try_get_summary();
+      lat_result[i].units = lat->units;
+      lat_result[i].mean = lat->mean;
+      lat_result[i].stdev = lat->stddev;
+      lat_result[i].min = lat->min;
+      lat_result[i].p50 = lat->p50;
+      lat_result[i].p90 = lat->p90;
+      lat_result[i].p95 = lat->p95;
+      lat_result[i].p999 = lat->p99;
+      lat_result[i].max = lat->max;
+    }
+    REMUS_DEBUG("Protobuf Lat Result {}\n{}", i, lat_result[i].result_as_debug_string());
   }
 
-  std::ofstream file_stream("exp_result.csv");
+  std::ofstream file_stream("tput_result.csv");
   file_stream << Result::result_as_string_header();
   for (int i = 0; i < params.thread_count; i++) {
     // Add results from all threads to result file
-    file_stream << result[i].result_as_string();
+    file_stream << tput_result[i].result_as_string();
   }
   file_stream.close();
+
+  std::ofstream file_stream2("lat_result.csv");
+  file_stream2 << Result::result_as_string_header();
+  for (int i = 0; i < params.thread_count; i++) {
+    // Add results from all threads to result file
+    file_stream2 << lat_result[i].result_as_string();
+  }
+  file_stream2.close();
+
   REMUS_INFO("[EXPERIMENT] -- End of execution; -- ");
   return 0;
 }

@@ -42,17 +42,13 @@ template <class Operation> class Client {
 
     auto *client_ptr = client.get();
 
-    if (params.topology){
-      #define TOPOPLOGY
-    }
 
-    #if defined(TOPOPLOGY)
-      REMUS_INFO("Using Node Topology Stream");
-      auto stream = createNodeTopOpStream(params, client_ptr->self_);
-    #else
-      REMUS_INFO("Using Random Stream");
-      auto stream = createRandomOpStream(params, client_ptr->self_);
-    #endif
+    // REMUS_INFO("Using Node Topology Stream");
+    // static auto stream = createNodeTopOpStream(params, client_ptr->self_);
+
+    REMUS_INFO("Using Random Stream");
+    static auto stream = createRandomOpStream(params, client_ptr->self_);
+
 
     std::barrier<>* barr = client_ptr->barrier_;
     barr->arrive_and_wait();
