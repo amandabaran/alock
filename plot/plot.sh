@@ -1,9 +1,13 @@
 #!/bin/bash
 
-source "../exp.conf"
+#cas or write
+type=write
+# top or rand
+mode=rand 
+#tput or lat
+data=tput 
+threads=1
 
-mode=top # top or rand
+path="results/${type}/${mode}/t${threads}"
 
-path="results/${mode}/t${thread_count}"
-
-python3 plot.py --save_dir "../${path}" --resfile '_result.csv' --exp 'tput'
+python3 plot.py --save_dir "../${path}" --resfile '_result.csv' --exp ${data}

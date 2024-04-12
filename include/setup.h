@@ -117,14 +117,12 @@ auto createRandomOpStream(const BenchmarkParams params, Peer self){
 
 auto createNodeTopOpStream(const BenchmarkParams params, Peer self){
   auto num_keys = params.op_count; 
-  int other;
-  if (self.id % 2 == 0){
-    other = self.id + 1;
-  } else {
-    other = self.id - 1;
-  }
+  int other = (self.id % 2 == 0) ? (self.id + 1) : (self.id -1);
+
   auto range1 = calcLocalNodeRange(params, self.id);
   auto range2 = calcLocalNodeRange(params, other);
+  REMUS_INFO("Local Node Range for self ({}) is {} - {}", self.id, range1.first, range1.first);
+  REMUS_INFO("Local Node Range for other ({}) is {} - {}", self.id, range2.first, range2.first);
 
   std::vector<key_type> keys;
   keys.reserve(num_keys);
@@ -136,14 +134,17 @@ auto createNodeTopOpStream(const BenchmarkParams params, Peer self){
   for (auto i = 0; i < num_keys; i++){
     if (rng() % 2 == 0){
         volatile int random = dist1(gen);
-        key_type key = (random % int(range1.second - range1.first + 1)) + range1.first;
-        keys.push_back(key);
+        // key_type key = (random % int(range1.second - range1.first + 1)) + range1.first;
+        REMUS_DEBUG("Adding local key {}", random);
+        keys.push_back(random);
     } else {
         volatile int random = dist2(gen);
-        key_type key = (random % int(range2.second - range2.first + 1)) + range2.first;
-        keys.push_back(key);
+        // key_type key = (random % int(range2.second - range2.first + 1)) + range2.first;
+        REMUS_DEBUG("Adding remote key {}", random);
+        keys.push_back(random);
     }
   }
   REMUS_ASSERT(keys.size() == num_keys, "Error generating vector for prefilled stream");
+  _exit(0);
   return std::make_unique<remus::PrefilledStream<key_type>>(keys, num_keys);
 }

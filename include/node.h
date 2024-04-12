@@ -30,7 +30,7 @@ class Node {
   
   remus::util::Status connect(){
     std::pair key_range = calcThreadKeyRange(params_, self_.id);
-    REMUS_DEBUG("Thread local range for {} is [{},{}]", self_.id, key_range.first, key_range.second);
+    REMUS_INFO("Thread local range for {} is [{},{}]", self_.id, key_range.first, key_range.second);
     OK_OR_FAIL(prefill(key_range.first, key_range.second));
 
     RemoteObjectProto proto;

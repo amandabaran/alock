@@ -26,6 +26,7 @@ In order to plot the data, run the plot.sh script with the name of the directory
 For example, plotting the scalability experiment would be the command: 
 "zsh plot.sh scalability_exp"
 
+# POST SUBMISSION STUFF BELOW: 
 
 # Commands
 
@@ -40,13 +41,26 @@ cd alock
 Edit "exp.conf"
 
 ## Build ALock Executable
-cd alock/build
-cmake -DCMAKE_PREFIX_PATH=/opt/remus/lib/cmake -DCMAKE_MODULE_PATH=/opt/remus/lib/cmake ..
 
-make -j
+Create build directory. 
+``mkdir build``
+``cd build``
 
-### Change Log Level:
+Generate build system. 
+``cmake -DCMAKE_PREFIX_PATH=/opt/remus/lib/cmake -DCMAKE_MODULE_PATH=/opt/remus/lib/cmake ..``
+
+Build. 
+``make -j``
+
+
+### Log Level Flag:
 -DLOG_LEVEL=INFO
+
+### CMake Build Type
+-DCMAKE_BUILD_TYPE=Release (-o3)
+-DCMAKE_BUILD_TYPE=Debug (-g) 
+-DCMAKE_BUILD_TYPE=RelWithDebInfo (-o3 and -g)
+
 
 ## Send to Clouldab and Run
 
@@ -75,3 +89,15 @@ python shutdown.py -u adb321
 sh synch.sh -u adb321
 bash launch_experiment.sh -no-prep
 screen -c run.screenrc
+
+# GDB Commands
+
+### Build for GDB
+
+cd build
+cmake 
+
+
+### GDB command on Node 0
+
+gdb --args main --node_count 1 --node_id 0 --runtime 10 --op_count 100000000 --min_key 1 --max_key 1000 --region_size 22 --thread_count 3 --qp_max 3 --p_local 50 --local_budget 5 --remote_budget 5
