@@ -41,7 +41,7 @@ auto ARGS = {
 };
 
 #define PATH_MAX 4096
-#define PORT_NUM 14000
+#define PORT_NUM 14200
 
 using namespace remus::rdma;
 
@@ -65,6 +65,7 @@ int main(int argc, char **argv) {
     REMUS_FATAL(res.value());
   }
   BenchmarkParams params(args);
+  REMUS_INFO("PARAMS KEY RANGE {} - {}", params.max_key, params.min_key);
 
   // Check node count, ensure this node is part of the experiment
   if (params.node_count <= 0 || params.thread_count <= 0) {
@@ -72,7 +73,6 @@ int main(int argc, char **argv) {
   }
   if (params.node_id >= params.node_count) {
     REMUS_INFO("This node is not in the experiment. Exiting...");
-    exit(0);
   }
 
   // Since we want a 1:1 thread to qp mapping, we currently need to use one memory pool per thread.
