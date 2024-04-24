@@ -41,7 +41,7 @@ auto ARGS = {
 };
 
 #define PATH_MAX 4096
-#define PORT_NUM 14200
+#define PORT_NUM 14000
 
 using namespace remus::rdma;
 
@@ -80,7 +80,6 @@ int main(int argc, char **argv) {
   REMUS_INFO("Distributing {} MemoryPools across {} threads", mp,
             params.thread_count);
 
-
   // Initialize the vector of peers.  For ALock currently, each thread needs to have it's own unique peer (hence mp * node_count)
   // Start with peer id = 1 since we use 0 to represent an unlocked state in ALock
   std::vector<Peer> peers;
@@ -95,8 +94,8 @@ int main(int argc, char **argv) {
       locals.insert(i+1);
     }
   }
-  
 
+  std::vector<Peer> others;
   // Initialize memory pools into an array
   std::vector<std::thread> mempool_threads;
   std::shared_ptr<rdma_capability> pools[mp];
@@ -105,14 +104,28 @@ int main(int argc, char **argv) {
   //Calculate to determine size of memory pool needed (based on number of locks per mp)
   // uint32_t bytesNeeded = ((64 * params.max_key) + (64 * 5 * params.thread_count));
   // block_size = 1 << uint32_t(ceil(log2(bytesNeeded)));
+  // TODO: for ALOCK, peers list cant include locals
   for (int i = 0; i < mp; i++) {
     mempool_threads.emplace_back(std::thread(
         [&](int mp_index, int self_index) {
           REMUS_DEBUG("Creating pool");
           Peer self = peers.at(self_index);
+          #ifdef REMOTE_ONLY
+            REMUS_DEBUG("Including self in others for loopback connection");
+            std::copy(peers.begin(), peers.end(), std::back_inserter(others));
+          #else
+            // If LockType == ALock, don't include local peers in others
+            if (std::is_same<LockType, ALock>::value){
+              std::copy_if(peers.begin(), peers.end(), std::back_inserter(others),
+                            [self](auto &p) { return p.id != self.id; });
+            } else {
+              REMUS_DEBUG("Including self in others for loopback connection");
+              std::copy(peers.begin(), peers.end(), std::back_inserter(others));
+            }   
+          #endif
           std::shared_ptr<rdma_capability> pool =
               std::make_shared<rdma_capability>(self);
-          pool->init_pool(block_size, peers);
+          pool->init_pool(block_size, others);
           pools[mp_index] = pool;
         },
         i, (params.node_id * mp) + i));
@@ -131,24 +144,11 @@ int main(int argc, char **argv) {
   std::barrier client_barrier(params.thread_count);
   remus::metrics::WorkloadDriverResult workload_results[params.thread_count];
   for (int i = 0; i < params.thread_count; i++){
-    client_threads.emplace_back(std::thread([&mp, &peers, &pools, &params, &locals, &workload_results, &client_barrier](int tidx){
+    client_threads.emplace_back(std::thread([&mp, &peers, &others, &pools, &params, &locals, &workload_results, &client_barrier](int tidx){
       auto self_idx = (params.node_id * mp) + tidx;
       Peer self = peers.at(self_idx);
       auto pool = pools[tidx];
     
-      std::vector<Peer> others;
-      #ifdef REMOTE_ONLY
-        REMUS_DEBUG("Including self in others for loopback connection");
-        std::copy(peers.begin(), peers.end(), std::back_inserter(others));
-      #else
-        if (std::is_same<LockType, ALock>::value){
-          std::copy_if(peers.begin(), peers.end(), std::back_inserter(others),
-                        [self](auto &p) { return p.id != self.id; });
-        } else {
-          REMUS_DEBUG("Including self in others for loopback connection");
-          std::copy(peers.begin(), peers.end(), std::back_inserter(others));
-        }   
-      #endif
       // Create "node" (prob want to rename)
       REMUS_DEBUG("Creating node for client {}:{}", self.id, self.port);
       auto node = std::make_unique<Node<key_type, LockType>>(self, others, pool, params);
