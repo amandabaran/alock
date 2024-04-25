@@ -6,7 +6,7 @@ remus_dir="../remus-internal"
 exe="cloudlab_depend.sh"
 
 user=${ssh_user}
-machines=("apt104" "apt120" "apt108" "apt103" "apt101" "apt097" "apt111" "apt105" "apt106" "apt113")
+machines=("apt152" "apt156" "apt144" "apt153" "apt138" "apt147" "apt163" "apt164" "apt157" "apt148")
 domain="apt.emulab.net"
 
 for m in ${machines[@]}; do

@@ -3,10 +3,10 @@
 source "exp.conf"
 
 user=${ssh_user}
-machines=("apt150" "apt138" "apt164" "apt148" "apt149" "apt140" "apt152" "apt142" "apt147" "apt158")
+machines=("apt070" "apt071" "apt112" "apt073" "apt103" "apt106" "apt120" "apt113" "apt081" "apt102")
 domain="apt.emulab.net"
 
-path="results/write/rand/t${thread_count}/"
+path="results/rand/t${thread_count}/"
 
 mkdir -p ${path}
 cd ${path}
